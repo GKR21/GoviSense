@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "govisense"
+version = "0.1.0"
+description = "GoviSense - Agricultural Supply Pressure & Price Forecasting System for Sri Lanka"
+readme = "README.md"
+authors = [{ name = "Team DARKBITE" }]
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-v --tb=short"

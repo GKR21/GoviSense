@@ -1,0 +1,55 @@
+{
+  "thesis_validation": {
+    "big_onion": {
+      "spi_vs_next_month_price_change_corr": -0.37,
+      "spi_vs_2month_price_change_corr": -0.181,
+      "glut_prediction_hit_rate_pct": 76.2,
+      "shortage_prediction_hit_rate_pct": 88.7,
+      "overall_direction_hit_rate_pct": 82.5,
+      "thesis_confirmed": true
+    },
+    "chilli": {
+      "spi_vs_next_month_price_change_corr": -0.023,
+      "spi_vs_2month_price_change_corr": 0.029,
+      "glut_prediction_hit_rate_pct": 72.3,
+      "shortage_prediction_hit_rate_pct": NaN,
+      "overall_direction_hit_rate_pct": 72.3,
+      "thesis_confirmed": false
+    }
+  },
+  "walk_forward_evaluation": {
+    "big_onion": {
+      "ai1_harvest_volume": {
+        "lgbm_mae_mt": 11536.86,
+        "seasonal_naive_mae_mt": 2121.98,
+        "improvement_vs_baseline_pct": -443.68
+      },
+      "ai2_price_forecast": {
+        "selected_model_mae_rs": 52.5,
+        "sarimax_baseline_mae_rs": 60.46,
+        "improvement_vs_baseline_pct": 13.17
+      },
+      "ai3_spi_classification": {
+        "hit_rate_pct": 43.8,
+        "total_eval_points": 48
+      }
+    },
+    "chilli": {
+      "ai1_harvest_volume": {
+        "lgbm_mae_mt": 1351.54,
+        "seasonal_naive_mae_mt": 1165.79,
+        "improvement_vs_baseline_pct": -15.93
+      },
+      "ai2_price_forecast": {
+        "selected_model_mae_rs": 33.46,
+        "sarimax_baseline_mae_rs": 32.54,
+        "improvement_vs_baseline_pct": -2.83
+      },
+      "ai3_spi_classification": {
+        "hit_rate_pct": 100.0,
+        "total_eval_points": 48
+      }
+    }
+  },
+  "status": "SUCCESS"
+}
