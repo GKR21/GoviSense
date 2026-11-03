@@ -3794,7 +3794,15 @@ function DesignSystem() {
 }
 
 export default function App() {
-  const [view, setView] = useState<View>("officer")
+  const [view, setView] = useState<View>(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get("view") === "farmer" || window.location.pathname.includes("/farmer")) {
+        return "farmer"
+      }
+    }
+    return "officer"
+  })
   return (
     <div className="app-shell">
       {view === "officer" && <OfficerScreen view={view} setView={setView} />}

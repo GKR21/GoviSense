@@ -1818,6 +1818,40 @@
   flex-shrink: 0;
 }
 
+/* Standalone Native APK & Mobile Screen Viewport */
+@media (max-width: 640px), (display-mode: standalone) {
+  .farmer-stage {
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: 100vh !important;
+    background: #ffffff !important;
+  }
+
+  .farmer-stage-switcher,
+  .mobile-note {
+    display: none !important;
+  }
+
+  .farmer-stage-content {
+    gap: 0 !important;
+    width: 100% !important;
+  }
+
+  .phone {
+    width: 100vw !important;
+    height: 100vh !important;
+    min-height: 100vh !important;
+    max-width: 100% !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .mobile-content {
+    height: calc(100vh - 134px) !important;
+  }
+}
+
 
 .phone--local {
   font-family: 'Noto Sans Sinhala', 'Noto Sans Tamil', 'Inter', sans-serif;
