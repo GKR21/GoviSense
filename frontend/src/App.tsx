@@ -141,23 +141,50 @@ function IconButton({
 function SelectControl({
   label,
   value,
+  options = [],
+  onChange,
   compact,
 }: {
   label: string
   value: string
+  options?: string[]
+  onChange?: (val: string) => void
   compact?: boolean
 }) {
+  const opts = options.length > 0 ? options : [value]
   return (
-    <button
+    <div
       className={cx("select-control", compact && "select-control--compact")}
-      type="button"
+      style={{ position: "relative", display: "inline-flex", alignItems: "center", cursor: "pointer" }}
     >
       <span className="select-control__copy">
         {!compact && <span className="select-control__label">{label}</span>}
         <span className="select-control__value">{value}</span>
       </span>
-      <ChevronDown size={15} aria-hidden="true" />
-    </button>
+      <ChevronDown size={15} aria-hidden="true" style={{ pointerEvents: "none" }} />
+      <select
+        value={value}
+        onChange={(e) => onChange?.(e.target.value)}
+        aria-label={label}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          opacity: 0,
+          cursor: "pointer",
+          appearance: "none",
+          WebkitAppearance: "none",
+        }}
+      >
+        {opts.map((opt) => (
+          <option key={opt} value={opt} style={{ background: "#0c1422", color: "#f0fdf8", padding: "8px" }}>
+            {opt}
+          </option>
+        ))}
+      </select>
+    </div>
   )
 }
 
@@ -1742,7 +1769,8 @@ function AdoptionScreen({
 }
 
 function HistoryScreen({ decision }: { decision: string }) {
-  const rows = [
+  const [filter, setFilter] = useState("All actions")
+  const rawRows = [
     [
       "RUN-260404-18",
       "04 Apr 2026",
@@ -1790,7 +1818,13 @@ function HistoryScreen({ decision }: { decision: string }) {
               placeholder="Search run ID or action"
             />
           </div>
-          <SelectControl compact label="Filter" value="All actions" />
+          <SelectControl
+            compact
+            label="Filter"
+            value={filter}
+            options={["All actions", "Tariff adjustment", "Planting advisory", "Storage buffer", "Import quota"]}
+            onChange={setFilter}
+          />
         </div>
         <div className="data-table-wrap">
           <table className="data-table">
@@ -1810,7 +1844,9 @@ function HistoryScreen({ decision }: { decision: string }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {rawRows
+                .filter((r) => filter === "All actions" || r[5].toLowerCase().includes(filter.toLowerCase()))
+                .map((row) => (
                 <tr key={row[0]}>
                   {row.map((cell, index) => (
                     <td key={cell}>
@@ -1972,6 +2008,8 @@ function DataSourcesScreen() {
 }
 
 function SettingsScreen() {
+  const [lang, setLang] = useState("English")
+  const [defaultDistrict, setDefaultDistrict] = useState("Anuradhapura")
   return (
     <>
       <PageHeading
@@ -2036,8 +2074,18 @@ function SettingsScreen() {
               <p>Officer workspace defaults.</p>
             </div>
           </div>
-          <SelectControl label="Interface language" value="English" />
-          <SelectControl label="Default district" value="Anuradhapura" />
+          <SelectControl
+            label="Interface language"
+            value={lang}
+            options={["English", "Sinhala (සිංහල)", "Tamil (தமிழ்)"]}
+            onChange={setLang}
+          />
+          <SelectControl
+            label="Default district"
+            value={defaultDistrict}
+            options={["Anuradhapura", "Polonnaruwa", "Kurunegala", "Matale", "Hambantota", "Jaffna"]}
+            onChange={setDefaultDistrict}
+          />
         </section>
         <section className="panel settings-card">
           <div className="panel-heading">
@@ -2150,6 +2198,11 @@ function OfficerScreen({
   groundReports?: GroundReport[]
   onAddReport?: (report: GroundReport) => void
 }) {
+  const [selectedCrop, setSelectedCrop] = useState("Big onion")
+  const [selectedDistrict, setSelectedDistrict] = useState("Anuradhapura")
+  const [selectedSeason, setSelectedSeason] = useState("Maha 2026")
+  const [scenario, setScenario] = useState<"Low" | "Middle" | "High">("Middle")
+  const [period, setPeriod] = useState("12 months")
   const [area, setArea] = useState(2131)
   const [yieldValue, setYieldValue] = useState(16.45)
   const [selectedMonth, setSelectedMonth] = useState(6)
@@ -2241,17 +2294,81 @@ function OfficerScreen({
       <div className="officer-main">
         <header className="officer-topbar">
           <div className="context-controls">
-            <SelectControl label="Crop" value="Big onion" />
-            <SelectControl label="District" value="Anuradhapura" />
-            <SelectControl label="Season" value="Maha 2026" />
+            <SelectControl
+              label="Crop"
+              value={selectedCrop}
+              options={["Big onion", "Chilli", "Green gram", "Maize", "Red onion", "Potato"]}
+              onChange={(crop) => {
+                setSelectedCrop(crop)
+                if (crop === "Big onion") {
+                  setArea(2131)
+                  setYieldValue(16.45)
+                } else if (crop === "Chilli") {
+                  setArea(2493)
+                  setYieldValue(5.2)
+                } else if (crop === "Green gram") {
+                  setArea(1750)
+                  setYieldValue(1.4)
+                } else if (crop === "Maize") {
+                  setArea(3100)
+                  setYieldValue(4.8)
+                }
+              }}
+            />
+            <SelectControl
+              label="District"
+              value={selectedDistrict}
+              options={[
+                "Anuradhapura",
+                "Polonnaruwa",
+                "Kurunegala",
+                "Matale",
+                "Hambantota",
+                "Jaffna",
+                "Monaragala",
+                "Badulla",
+              ]}
+              onChange={setSelectedDistrict}
+            />
+            <SelectControl
+              label="Season"
+              value={selectedSeason}
+              options={["Maha 2026", "Yala 2026", "Maha 2025/26"]}
+              onChange={setSelectedSeason}
+            />
             <div className="scenario-control" aria-label="Scenario">
               <span>Scenario</span>
               <div>
-                <button type="button">Low</button>
-                <button className="active" type="button">
+                <button
+                  type="button"
+                  className={scenario === "Low" ? "active" : ""}
+                  onClick={() => {
+                    setScenario("Low")
+                    setYieldValue((prev) => Math.round(prev * 0.85 * 100) / 100)
+                  }}
+                >
+                  Low
+                </button>
+                <button
+                  type="button"
+                  className={scenario === "Middle" ? "active" : ""}
+                  onClick={() => {
+                    setScenario("Middle")
+                    setYieldValue(selectedCrop === "Chilli" ? 5.2 : 16.45)
+                  }}
+                >
                   Middle
                 </button>
-                <button type="button">High</button>
+                <button
+                  type="button"
+                  className={scenario === "High" ? "active" : ""}
+                  onClick={() => {
+                    setScenario("High")
+                    setYieldValue((prev) => Math.round(prev * 1.20 * 100) / 100)
+                  }}
+                >
+                  High
+                </button>
               </div>
             </div>
           </div>
@@ -2390,7 +2507,13 @@ function OfficerScreen({
                       </div>
                       <p>Monthly tonnes · 2026 crop plan</p>
                     </div>
-                    <SelectControl compact label="Period" value="12 months" />
+                    <SelectControl
+                        compact
+                        label="Period"
+                        value={period}
+                        options={["12 months", "6 months (Maha)", "3 months (Harvest)"]}
+                        onChange={setPeriod}
+                      />
                   </div>
                   <SupplyChart
                     area={area}
@@ -3724,6 +3847,7 @@ function ReportPlantingScreen({
 function AlertsScreen({ language }: { language: Language }) {
   const extra = farmerExtra[language]
   const [read, setRead] = useState([false, false, true])
+  const [alertTab, setAlertTab] = useState<"all" | "unread">("all")
   const alerts = [
     [TriangleAlert, extra.alertBody, "Today · 08:30", "weather"],
     [
@@ -3754,15 +3878,25 @@ function AlertsScreen({ language }: { language: Language }) {
         <p>{extra.alertsBody}</p>
       </div>
       <div className="alert-tabs">
-        <button className="active" type="button">
+        <button
+          className={alertTab === "all" ? "active" : ""}
+          type="button"
+          onClick={() => setAlertTab("all")}
+        >
           {extra.all} <span>3</span>
         </button>
-        <button type="button">
+        <button
+          className={alertTab === "unread" ? "active" : ""}
+          type="button"
+          onClick={() => setAlertTab("unread")}
+        >
           {extra.unread} <span>{read.filter((item) => !item).length}</span>
         </button>
       </div>
       <div className="alert-list">
-        {alerts.map(([Icon, body, time, tone], index) => (
+        {alerts
+          .filter((_, idx) => alertTab === "all" || !read[idx])
+          .map(([Icon, body, time, tone], index) => (
           <article
             className={cx("inbox-alert", !read[index] && "inbox-alert--unread")}
             key={time}
