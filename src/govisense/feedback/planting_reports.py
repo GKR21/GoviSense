@@ -235,3 +235,4 @@ class PlantingReportStore:
             oversupply_stop_triggered=oversupply_stop,
             action_summary=summary,
         )
+

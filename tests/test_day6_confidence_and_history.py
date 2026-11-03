@@ -90,3 +90,4 @@ def test_decision_history_audit_logging():
         assert item.quantity == 3500.0
         assert item.assumptions["loss_pct"] == 0.15
         assert item.model_version.startswith("GoviSense")
+

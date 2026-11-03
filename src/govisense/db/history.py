@@ -209,3 +209,4 @@ class DecisionHistoryStore:
         # Return sorted descending by timestamp
         records = sorted(records, key=lambda r: r.timestamp, reverse=True)
         return records[:limit]
+

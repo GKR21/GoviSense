@@ -115,3 +115,4 @@ def test_planting_report_oversupply_stop_rule_trigger():
         assert retrigger.oversupply_stop_triggered is True
         assert retrigger.new_a_rec_ha == 0.0
         assert "STOP" in retrigger.action_summary
+
