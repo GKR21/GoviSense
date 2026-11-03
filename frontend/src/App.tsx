@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   AlertCircle,
   ArrowDownCircle,
@@ -151,39 +151,112 @@ function SelectControl({
   onChange?: (val: string) => void
   compact?: boolean
 }) {
-  const opts = options.length > 0 ? options : [value]
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleOutside)
+    return () => document.removeEventListener("mousedown", handleOutside)
+  }, [])
+
   return (
     <div
+      ref={containerRef}
       className={cx("select-control", compact && "select-control--compact")}
-      style={{ position: "relative", display: "inline-flex", alignItems: "center", cursor: "pointer" }}
+      style={{ position: "relative", cursor: "pointer", userSelect: "none" }}
+      onClick={() => setOpen((prev) => !prev)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault()
+          setOpen((prev) => !prev)
+        }
+      }}
     >
       <span className="select-control__copy">
         {!compact && <span className="select-control__label">{label}</span>}
         <span className="select-control__value">{value}</span>
       </span>
-      <ChevronDown size={15} aria-hidden="true" style={{ pointerEvents: "none" }} />
-      <select
-        value={value}
-        onChange={(e) => onChange?.(e.target.value)}
-        aria-label={label}
+      <ChevronDown
+        size={15}
+        aria-hidden="true"
         style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          opacity: 0,
-          cursor: "pointer",
-          appearance: "none",
-          WebkitAppearance: "none",
+          transform: open ? "rotate(180deg)" : "rotate(0deg)",
+          transition: "transform 0.2s ease",
+          color: open ? "var(--primary)" : "var(--ink-muted)",
         }}
-      >
-        {opts.map((opt) => (
-          <option key={opt} value={opt} style={{ background: "#0c1422", color: "#f0fdf8", padding: "8px" }}>
-            {opt}
-          </option>
-        ))}
-      </select>
+      />
+
+      {open && (
+        <div
+          className="select-dropdown-menu"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            left: 0,
+            minWidth: "190px",
+            width: "max-content",
+            maxHeight: "280px",
+            overflowY: "auto",
+            background: "#0c1524",
+            border: "1px solid rgba(16, 185, 129, 0.4)",
+            borderRadius: "10px",
+            boxShadow: "0 16px 40px rgba(0,0,0,0.85), 0 0 16px rgba(16,185,129,0.25)",
+            backdropFilter: "blur(20px)",
+            zIndex: 999999,
+            padding: "6px",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {options.map((opt) => {
+            const isSelected = opt === value
+            return (
+              <button
+                type="button"
+                key={opt}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onChange?.(opt)
+                  setOpen(false)
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "12px",
+                  width: "100%",
+                  padding: "9px 12px",
+                  borderRadius: "6px",
+                  background: isSelected ? "rgba(16, 185, 129, 0.2)" : "transparent",
+                  color: isSelected ? "#34d399" : "#f0fdf8",
+                  fontSize: "13px",
+                  fontWeight: isSelected ? 700 : 500,
+                  border: "none",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  transition: "background 0.15s ease",
+                  outline: "none",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSelected) e.currentTarget.style.background = "rgba(255,255,255,0.06)"
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) e.currentTarget.style.background = "transparent"
+                }}
+              >
+                <span>{opt}</span>
+                {isSelected && <Check size={14} color="#34d399" />}
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -884,207 +957,143 @@ function KpiTile({
 }
 
 function OverviewScreen({
+  crop = "Big onion",
+  district = "Anuradhapura",
+  season = "Maha 2026",
+  scenario = "Middle",
   onOpenSupply,
   onOpenGap,
 }: {
+  crop?: string
+  district?: string
+  season?: string
+  scenario?: "Low" | "Middle" | "High"
   onOpenSupply: () => void
   onOpenGap: () => void
 }) {
-  const heat = [
-    {
-      crop: "Big onion",
-      values: [
-        "balanced",
-        "balanced",
-        "shortage",
-        "balanced",
-        "balanced",
-        "balanced",
-        "oversupply",
-        "oversupply",
-        "balanced",
-        "balanced",
-        "shortage",
-        "shortage",
-      ],
-    },
-    {
-      crop: "Chilli",
-      values: [
-        "balanced",
-        "shortage",
-        "shortage",
-        "balanced",
-        "balanced",
-        "balanced",
-        "balanced",
-        "oversupply",
-        "oversupply",
-        "balanced",
-        "balanced",
-        "balanced",
-      ],
-    },
-    {
-      crop: "Red onion",
-      values: [
-        "balanced",
-        "balanced",
-        "balanced",
-        "balanced",
-        "shortage",
-        "shortage",
-        "balanced",
-        "balanced",
-        "oversupply",
-        "balanced",
-        "balanced",
-        "balanced",
-      ],
-    },
-    {
-      crop: "Potato",
-      values: [
-        "shortage",
-        "shortage",
-        "balanced",
-        "balanced",
-        "balanced",
-        "oversupply",
-        "oversupply",
-        "balanced",
-        "balanced",
-        "balanced",
-        "balanced",
-        "shortage",
-      ],
-    },
-  ] as const
+  const profile = CROP_DATA_CATALOG[crop] || CROP_DATA_CATALOG["Big onion"]
+  const dist = DISTRICT_PROFILES[district] || DISTRICT_PROFILES["Anuradhapura"]
+  const scenarioMultiplier = scenario === "High" ? 1.2 : scenario === "Low" ? 0.85 : 1.0
+  const projectedTons = Math.round(profile.baselineArea * profile.baselineYield * scenarioMultiplier)
+
+  const allCrops = ["Big onion", "Chilli", "Green gram", "Maize", "Red onion", "Potato"]
+  // Place selected crop at the very top of the risk matrix
+  const orderedCrops = [crop, ...allCrops.filter((c) => c !== crop)]
+
+  const heatMapValues: Record<string, string[]> = {
+    "Big onion": ["balanced", "balanced", "shortage", "balanced", "balanced", "balanced", "oversupply", "oversupply", "balanced", "balanced", "shortage", "shortage"],
+    "Chilli": ["balanced", "shortage", "shortage", "balanced", "balanced", "balanced", "balanced", "oversupply", "oversupply", "balanced", "balanced", "balanced"],
+    "Green gram": ["shortage", "shortage", "balanced", "balanced", "balanced", "balanced", "balanced", "balanced", "shortage", "shortage", "balanced", "balanced"],
+    "Maize": ["balanced", "oversupply", "oversupply", "balanced", "balanced", "balanced", "balanced", "balanced", "balanced", "balanced", "balanced", "balanced"],
+    "Red onion": ["balanced", "balanced", "balanced", "balanced", "shortage", "shortage", "balanced", "balanced", "oversupply", "balanced", "balanced", "balanced"],
+    "Potato": ["shortage", "shortage", "balanced", "balanced", "balanced", "oversupply", "oversupply", "balanced", "balanced", "balanced", "balanced", "shortage"],
+  }
+
   return (
     <>
       <PageHeading
-        eyebrow="Season command centre"
+        eyebrow={`Active Filter: ${crop} · ${dist.name} (${dist.zone}) · ${season}`}
         icon={Home}
-        title="Planning overview"
-        description="The decisions that need attention across the next 12 months."
+        title={`Planning overview · ${crop}`}
+        description={`Empirical supply-demand balance and policy decisions for ${crop} in ${dist.name}. Scenario: ${scenario} (${scenario === "High" ? "+20% bumper yield" : scenario === "Low" ? "-15% adverse yield" : "Baseline"}).`}
         actions={
           <Button variant="secondary" icon={Download}>
             Export briefing
           </Button>
         }
       />
-            {/* Real Trained ML Pipeline Live Forecasts */}
-      <div style={{ margin: "24px 0" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-          <div>
-            <h2 style={{ fontSize: "16px", fontWeight: "700", color: "var(--ink)", margin: 0 }}>
-              Live Machine Learning Pipeline Outputs (Trained Models)
-            </h2>
-            <p style={{ fontSize: "12px", color: "var(--ink-muted)", margin: "2px 0 0" }}>
-              Empirical forecasts from AI 1 (Harvest Forecaster), AI 2 (SARIMAX Price Forecaster), AI 3 (SPI), and AI 4 (Linear Optimizer)
-            </p>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--primary)", fontSize: "12px", fontWeight: "600" }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--primary)", display: "inline-block", boxShadow: "0 0 6px var(--primary)" }} />
-            <span>Real Model Pipeline Active</span>
-          </div>
-        </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "16px" }}>
-          {/* Big Onion ML Output */}
-          <div className="panel" style={{ padding: "18px", border: "1px solid var(--glass-border)", background: "var(--bg-card)", backdropFilter: "var(--glass-blur)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
-              <div>
-                <strong style={{ fontSize: "15px", color: "var(--ink)" }}>Big Onion (Anuradhapura)</strong>
-                <small style={{ display: "block", color: "var(--ink-muted)", fontSize: "11px" }}>AI 1 Harvest & AI 3 Supply Pressure</small>
+      {/* Prominent Real ML Pipeline Live Output for Selected Crop */}
+      <div style={{ margin: "16px 0 24px" }}>
+        <div className="panel" style={{ padding: "20px", border: "1px solid var(--glass-border)", background: "var(--bg-card)", backdropFilter: "var(--glass-blur)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--primary)", display: "inline-block", boxShadow: "0 0 8px var(--primary)" }} />
+                <strong style={{ fontSize: "17px", color: "var(--ink)" }}>{crop} Live Intelligence ({dist.name})</strong>
               </div>
-              <span style={{ padding: "3px 10px", borderRadius: "999px", fontSize: "11px", fontWeight: "700", background: "var(--shortage-tint)", color: "var(--shortage)", border: "1px solid var(--shortage-border)" }}>
-                Deficit / Shortage (SPI: -0.63)
+              <small style={{ color: "var(--ink-muted)", fontSize: "12px", display: "block", marginTop: "2px" }}>
+                AI 1 Harvest Forecaster · AI 2 SARIMAX Price · AI 3 SPI · AI 4 Linear Optimizer
+              </small>
+            </div>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <span style={{ padding: "4px 12px", borderRadius: "999px", fontSize: "12px", fontWeight: "700", background: profile.spiAnnualScore < -0.15 ? "var(--shortage-tint)" : profile.spiAnnualScore > 0.15 ? "var(--oversupply-tint)" : "var(--balanced-tint)", color: profile.spiAnnualScore < -0.15 ? "var(--shortage)" : profile.spiAnnualScore > 0.15 ? "var(--oversupply-bright)" : "var(--primary)", border: `1px solid ${profile.spiAnnualScore < -0.15 ? "var(--shortage-border)" : profile.spiAnnualScore > 0.15 ? "var(--oversupply-border)" : "var(--balanced-border)"}` }}>
+                {profile.spiLabel} (SPI: {profile.spiAnnualScore > 0 ? "+" : ""}{profile.spiAnnualScore.toFixed(2)})
               </span>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", margin: "10px 0" }}>
-              <div style={{ padding: "10px", background: "var(--bg-hover)", borderRadius: "8px", border: "1px solid var(--glass-border)" }}>
-                <span style={{ fontSize: "11px", color: "var(--ink-muted)" }}>Point Harvest Forecast (AI 1)</span>
-                <strong style={{ display: "block", fontSize: "16px", color: "var(--ink)" }}>2,963.1 MT</strong>
-                <small style={{ fontSize: "10px", color: "var(--ink-muted)" }}>P10–P90: 1,319 – 9,483 MT</small>
-              </div>
-              <div style={{ padding: "10px", background: "var(--bg-hover)", borderRadius: "8px", border: "1px solid var(--glass-border)" }}>
-                <span style={{ fontSize: "11px", color: "var(--ink-muted)" }}>Wholesale Price (AI 2)</span>
-                <strong style={{ display: "block", fontSize: "16px", color: "var(--primary)" }}>Rs. 364.5 / kg</strong>
-                <small style={{ fontSize: "10px", color: "var(--primary)" }}>Direction: ↗ UP (60% confidence)</small>
-              </div>
-            </div>
-            <div style={{ padding: "10px 12px", background: "rgba(96, 165, 250, 0.1)", borderRadius: "8px", border: "1px solid rgba(96, 165, 250, 0.25)", fontSize: "11px", color: "var(--ink)" }}>
-              <strong style={{ color: "var(--info)" }}>AI 4 Optimization Directive:</strong> Nudge farmers to expand planting by <strong>336.8 ha</strong> within DoA planting window (next 30 days) to fill 5,220 MT deficit and safeguard fair floor (Rs. 120/kg).
+              <span style={{ padding: "4px 12px", borderRadius: "999px", fontSize: "12px", fontWeight: "700", background: "var(--primary-tint)", color: "var(--primary)", border: "1px solid var(--balanced-border)" }}>
+                {scenario} Scenario
+              </span>
             </div>
           </div>
 
-          {/* Chilli ML Output */}
-          <div className="panel" style={{ padding: "18px", border: "1px solid var(--glass-border)", background: "var(--bg-card)", backdropFilter: "var(--glass-blur)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
-              <div>
-                <strong style={{ fontSize: "15px", color: "var(--ink)" }}>Chilli (Anuradhapura)</strong>
-                <small style={{ display: "block", color: "var(--ink-muted)", fontSize: "11px" }}>AI 1 Harvest & AI 3 Supply Pressure</small>
-              </div>
-              <span style={{ padding: "3px 10px", borderRadius: "999px", fontSize: "11px", fontWeight: "700", background: "var(--oversupply-tint)", color: "var(--oversupply-bright)", border: "1px solid var(--oversupply-border)" }}>
-                Glut / Oversupply (SPI: +0.75)
-              </span>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", margin: "14px 0" }}>
+            <div style={{ padding: "12px 14px", background: "var(--bg-hover)", borderRadius: "8px", border: "1px solid var(--glass-border)" }}>
+              <span style={{ fontSize: "11px", color: "var(--ink-muted)", textTransform: "uppercase", fontWeight: "600", display: "block" }}>Projected Harvest</span>
+              <strong style={{ display: "block", fontSize: "20px", color: "var(--ink)", margin: "3px 0" }}>{projectedTons.toLocaleString()} MT</strong>
+              <small style={{ fontSize: "11px", color: "var(--ink-muted)" }}>From {profile.baselineArea.toLocaleString()} ha @ {(profile.baselineYield * scenarioMultiplier).toFixed(2)} t/ha</small>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", margin: "10px 0" }}>
-              <div style={{ padding: "10px", background: "var(--bg-hover)", borderRadius: "8px", border: "1px solid var(--glass-border)" }}>
-                <span style={{ fontSize: "11px", color: "var(--ink-muted)" }}>Point Harvest Forecast (AI 1)</span>
-                <strong style={{ display: "block", fontSize: "16px", color: "var(--ink)" }}>4,844.0 MT</strong>
-                <small style={{ fontSize: "10px", color: "var(--ink-muted)" }}>Surplus: +3,948.6 MT</small>
-              </div>
-              <div style={{ padding: "10px", background: "var(--bg-hover)", borderRadius: "8px", border: "1px solid var(--glass-border)" }}>
-                <span style={{ fontSize: "11px", color: "var(--ink-muted)" }}>Wholesale Price (AI 2)</span>
-                <strong style={{ display: "block", fontSize: "16px", color: "var(--shortage)" }}>Rs. 276.0 / kg</strong>
-                <small style={{ fontSize: "10px", color: "var(--shortage)" }}>Direction: ↘ DOWN (90% confidence)</small>
-              </div>
+            <div style={{ padding: "12px 14px", background: "var(--bg-hover)", borderRadius: "8px", border: "1px solid var(--glass-border)" }}>
+              <span style={{ fontSize: "11px", color: "var(--ink-muted)", textTransform: "uppercase", fontWeight: "600", display: "block" }}>Wholesale Price (AI 2)</span>
+              <strong style={{ display: "block", fontSize: "20px", color: profile.spotPrice < profile.fairFloorPrice ? "var(--shortage)" : "var(--primary)", margin: "3px 0" }}>Rs. {profile.spotPrice.toFixed(2)} / kg</strong>
+              <small style={{ fontSize: "11px", color: "var(--ink-muted)" }}>Trend: {profile.direction === "up" ? "↗ UP" : profile.direction === "down" ? "↘ DOWN" : "→ FLAT"} ({profile.confidence}% conf)</small>
             </div>
-            <div style={{ padding: "10px 12px", background: "rgba(245, 158, 11, 0.1)", borderRadius: "8px", border: "1px solid rgba(245, 158, 11, 0.25)", fontSize: "11px", color: "var(--ink)" }}>
-              <strong style={{ color: "var(--oversupply-bright)" }}>AI 4 Optimization Directive:</strong> Hold <strong>3,948.6 MT</strong> buffer in Dambulla/Anuradhapura dedicated warehouse to prevent spot market price crash below floor (Rs. 350/kg).
+            <div style={{ padding: "12px 14px", background: "var(--bg-hover)", borderRadius: "8px", border: "1px solid var(--glass-border)" }}>
+              <span style={{ fontSize: "11px", color: "var(--ink-muted)", textTransform: "uppercase", fontWeight: "600", display: "block" }}>Supply Gap</span>
+              <strong style={{ display: "block", fontSize: "20px", color: profile.gapMt > 0 ? "var(--oversupply-bright)" : "var(--shortage)", margin: "3px 0" }}>
+                {profile.gapMt > 0 ? "+" : ""}{profile.gapMt.toLocaleString()} MT
+              </strong>
+              <small style={{ fontSize: "11px", color: "var(--ink-muted)" }}>Fair Farmgate Floor: Rs. {profile.fairFloorPrice.toFixed(0)}</small>
             </div>
+            <div style={{ padding: "12px 14px", background: "var(--bg-hover)", borderRadius: "8px", border: "1px solid var(--glass-border)" }}>
+              <span style={{ fontSize: "11px", color: "var(--ink-muted)", textTransform: "uppercase", fontWeight: "600", display: "block" }}>Arable Context</span>
+              <strong style={{ display: "block", fontSize: "20px", color: "var(--ink)", margin: "3px 0" }}>{dist.name}</strong>
+              <small style={{ fontSize: "11px", color: "var(--ink-muted)" }}>{dist.zone} · {dist.rainfallMm}mm rain</small>
+            </div>
+          </div>
+
+          <div style={{ padding: "12px 16px", background: profile.spiAnnualScore < -0.15 ? "rgba(96, 165, 250, 0.12)" : "rgba(245, 158, 11, 0.12)", borderRadius: "8px", border: `1px solid ${profile.spiAnnualScore < -0.15 ? "rgba(96, 165, 250, 0.3)" : "rgba(245, 158, 11, 0.3)"}`, fontSize: "12px", color: "var(--ink)", lineHeight: "1.5" }}>
+            <strong style={{ color: profile.spiAnnualScore < -0.15 ? "var(--info)" : "var(--oversupply-bright)" }}>AI 4 Optimization Directive for {crop}:</strong> {profile.ai4Action}
           </div>
         </div>
       </div>
 
       <div className="kpi-grid">
         <KpiTile
-          label="Oversupply risk"
-          value="3 months"
-          meta="2 more than last run"
-          icon={ArrowUpCircle}
-          tone="warning"
+          label={`National ${crop} balance`}
+          value={profile.spiLabel}
+          meta={profile.gapMt > 0 ? `+${profile.gapMt.toLocaleString()} MT buffer` : `${profile.gapMt.toLocaleString()} MT deficit`}
+          icon={profile.gapMt > 0 ? ArrowUpCircle : ArrowDownCircle}
+          tone={profile.gapMt > 0 ? "warning" : "danger"}
         />
         <KpiTile
-          label="Shortage risk"
-          value="2 months"
-          meta="Chilli · Feb and Mar"
-          icon={ArrowDownCircle}
-          tone="danger"
+          label="Market farmgate price"
+          value={`Rs. ${profile.spotPrice.toFixed(0)}`}
+          meta={`Fair floor: Rs. ${profile.fairFloorPrice} / kg`}
+          icon={DollarSign}
+          tone={profile.spotPrice < profile.fairFloorPrice ? "danger" : "success"}
         />
         <KpiTile
-          label="Next decision deadline"
-          value="18 days"
-          meta="Big onion · act by 18 May"
-          icon={Clock3}
+          label="Allocated district land"
+          value={`${profile.baselineArea.toLocaleString()} ha`}
+          meta={`${dist.name} (Max: ${dist.maxArableHa.toLocaleString()} ha)`}
+          icon={Sprout}
           tone="info"
         />
         <KpiTile
-          label="Data confidence"
-          value="High"
-          meta="5 of 6 sources current"
-          icon={ShieldCheck}
+          label="Scenario model"
+          value={scenario}
+          meta={`Yield: ${(profile.baselineYield * scenarioMultiplier).toFixed(2)} t/ha`}
+          icon={SlidersHorizontal}
           tone="success"
         />
       </div>
+
       <div className="overview-grid">
         <section className="panel heat-panel">
           <div className="panel-heading">
             <div>
-              <h2>12-month risk outlook</h2>
-              <p>Click any month to inspect its supply pressure.</p>
+              <h2>12-month risk outlook (All crops)</h2>
+              <p>Active crop <strong>{crop}</strong> highlighted. Click any month to inspect supply pressure.</p>
             </div>
             <ConfidenceBadge level="High" />
           </div>
@@ -1095,84 +1104,94 @@ function OverviewScreen({
                 <span key={month}>{month}</span>
               ))}
             </div>
-            {heat.map((row) => (
-              <div className="heat-row" key={row.crop}>
-                <strong>{row.crop}</strong>
-                {row.values.map((risk, index) => {
-                  const Icon =
-                    risk === "oversupply"
-                      ? ArrowUpCircle
-                      : risk === "shortage"
-                        ? ArrowDownCircle
-                        : CheckCircle2
-                  return (
-                    <button
-                      onClick={onOpenSupply}
-                      className={`heat-cell heat-cell--${risk}`}
-                      aria-label={`${row.crop}, ${months[index]}, ${risk}`}
-                      type="button"
-                      key={`${row.crop}-${months[index]}`}
-                    >
-                      <Icon size={13} />
-                    </button>
-                  )
-                })}
-              </div>
-            ))}
+            {orderedCrops.map((c) => {
+              const rowValues = heatMapValues[c] || heatMapValues["Big onion"]
+              const isCurrent = c === crop
+              return (
+                <div
+                  className={`heat-row ${isCurrent ? "heat-row--active" : ""}`}
+                  key={c}
+                  style={isCurrent ? { background: "rgba(16, 185, 129, 0.12)", borderLeft: "3px solid var(--primary)" } : {}}
+                >
+                  <strong style={{ color: isCurrent ? "var(--primary)" : "var(--ink)", display: "flex", alignItems: "center", gap: "6px" }}>
+                    {c} {isCurrent && <span style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "4px", background: "var(--primary)", color: "#000", fontWeight: "800" }}>ACTIVE</span>}
+                  </strong>
+                  {rowValues.map((risk, index) => {
+                    const Icon =
+                      risk === "oversupply"
+                        ? ArrowUpCircle
+                        : risk === "shortage"
+                          ? ArrowDownCircle
+                          : CheckCircle2
+                    return (
+                      <button
+                        onClick={onOpenSupply}
+                        className={`heat-cell heat-cell--${risk}`}
+                        aria-label={`${c}, ${months[index]}, ${risk}`}
+                        type="button"
+                        key={`${c}-${months[index]}`}
+                      >
+                        <Icon size={13} />
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            })}
           </div>
           <p className="sr-summary">
-            Chart summary: Big onion has oversupply risk in July and August.
-            Chilli has shortage risk in February and March.
+            Chart summary: Displays 12-month risk matrix across national crops.
           </p>
         </section>
+
         <section className="panel attention-panel">
           <div className="panel-heading">
             <div>
               <h2>Needs your attention</h2>
-              <p>Ordered by decision urgency.</p>
+              <p>Prioritized for {crop} & {dist.name}</p>
             </div>
-            <span className="count-badge">4</span>
+            <span className="count-badge">3</span>
           </div>
+
           <button className="attention-item" type="button" onClick={onOpenGap}>
-            <span className="attention-item__icon attention-item__icon--warning">
-              <Clock3 size={18} />
+            <span className={`attention-item__icon attention-item__icon--${profile.spiAnnualScore < -0.15 ? "warning" : "danger"}`}>
+              {profile.spiAnnualScore < -0.15 ? <Clock3 size={18} /> : <Warehouse size={18} />}
             </span>
             <span>
-              <strong>Import decision due in 18 days</strong>
-              <small>Big onion · July shortage range narrowed</small>
+              <strong>{crop} Action: {profile.spiAnnualScore < -0.15 ? "Import decision due in 18 days" : "Buffer storage procurement required"}</strong>
+              <small>{profile.ai4Action}</small>
             </span>
             <ChevronRight size={17} />
           </button>
-          <button
-            className="attention-item"
-            type="button"
-            onClick={onOpenSupply}
-          >
-            <span className="attention-item__icon attention-item__icon--danger">
-              <ArrowUpCircle size={18} />
+
+          <button className="attention-item" type="button" onClick={onOpenSupply}>
+            <span className="attention-item__icon attention-item__icon--info">
+              <Sprout size={18} />
             </span>
             <span>
-              <strong>August oversupply risk increased</strong>
-              <small>SPI moved from 1.28 to 1.40</small>
+              <strong>{dist.name} Cultivation Target: {profile.baselineArea.toLocaleString()} ha</strong>
+              <small>Agro-ecological suitability: {dist.zone} · {dist.rainfallMm}mm rain</small>
             </span>
             <ChevronRight size={17} />
           </button>
+
           <button className="attention-item" type="button">
             <span className="attention-item__icon">
               <Database size={18} />
             </span>
             <span>
-              <strong>HARTI prices updated</strong>
-              <small>Fresh data added 3 hours ago</small>
+              <strong>HARTI & CBSL daily price feed active</strong>
+              <small>Synced today · Wholesale median Rs. {profile.spotPrice.toFixed(0)} / kg</small>
             </span>
             <ChevronRight size={17} />
           </button>
         </section>
       </div>
+
       <div className="data-footnote">
         <Database size={15} />
         <span>
-          Data version 2026.03 · Model 2.4.1 · Updated 04 Apr 2026, 08:30
+          Data version 2026.04 · District: {dist.name} · Crop: {crop} · Scenario: {scenario}
         </span>
         <ConfidenceBadge level="High" />
       </div>
@@ -2619,6 +2638,10 @@ function OfficerScreen({
             <LoginScreen onLogin={() => setPage("Overview")} />
           ) : page === "Overview" ? (
             <OverviewScreen
+              crop={selectedCrop}
+              district={selectedDistrict}
+              season={selectedSeason}
+              scenario={scenario}
               onOpenSupply={() => setPage("Supply pressure")}
               onOpenGap={() => setPage("Gap & import timeline")}
             />
