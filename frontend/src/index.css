@@ -3830,6 +3830,330 @@
 .tracker-stat > div { width: 120px; }
 .tracker-stat span { color: var(--ink-muted); font-size: 11px; font-weight: 600; }
 
+.adoption-bars {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.adoption-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px 16px;
+  padding: 14px 16px;
+  background: var(--bg-hover);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.adoption-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.adoption-row > strong {
+  grid-row: 1 / 3;
+  align-self: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.adoption-row > div {
+  display: grid;
+  grid-template-columns: 115px 1fr 65px;
+  align-items: center;
+  gap: 12px;
+}
+
+.adoption-row span {
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.adoption-row i {
+  display: block;
+  height: 8px;
+  border-radius: 99px;
+  background: rgba(148, 163, 184, 0.2);
+  overflow: hidden;
+}
+
+.adoption-row i.reported {
+  background: linear-gradient(90deg, var(--primary), #34d399);
+  box-shadow: 0 0 8px var(--primary-glow);
+}
+
+.adoption-row i.reported--overshoot {
+  background: linear-gradient(90deg, #f59e0b, #ef4444);
+  box-shadow: 0 0 8px var(--shortage-glow);
+}
+
+.adoption-row b {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: right;
+}
+
+.checkpoint {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.checkpoint:last-child {
+  border-bottom: none;
+}
+
+.checkpoint > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.checkpoint strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.checkpoint small {
+  color: var(--ink-muted);
+  font-size: 11px;
+}
+
+.checkpoint > b {
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.checkpoint > div {
+  grid-column: 1 / -1;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--neutral-700);
+}
+
+.checkpoint > div i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--primary), #34d399);
+}
+
+/* Adoption scenario simulator */
+.sim-panel {
+  margin: 18px 0;
+  padding: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  backdrop-filter: var(--glass-blur);
+}
+
+.sim-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.sim-header h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.sim-header p {
+  font-size: 12px;
+  color: var(--ink-muted);
+  margin: 0;
+}
+
+.sim-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 14px 0 16px;
+  flex-wrap: wrap;
+}
+
+.sim-btn {
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--glass-border);
+  background: var(--bg-raised);
+  color: var(--ink-muted);
+  transition: all 0.2s ease;
+}
+
+.sim-btn:hover {
+  color: var(--ink);
+  border-color: rgba(255,255,255,0.2);
+}
+
+.sim-btn--active {
+  background: var(--primary-tint);
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 10px var(--primary-glow);
+}
+
+.sim-btn--danger.sim-btn--active {
+  background: var(--shortage-tint);
+  border-color: var(--shortage-bright);
+  color: var(--shortage);
+  box-shadow: 0 0 10px var(--shortage-glow);
+}
+
+.sim-result-card {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+}
+
+.sim-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sim-stat label {
+  font-size: 11px;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.sim-stat strong {
+  font-size: 16px;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.sim-stat small {
+  font-size: 11px;
+}
+
+.sim-action-box {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  line-height: 1.45;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.sim-action-box--danger {
+  background: var(--shortage-tint);
+  border: 1px solid var(--shortage-border);
+  color: var(--shortage);
+}
+
+.sim-action-box--warning {
+  background: var(--oversupply-tint);
+  border: 1px solid var(--oversupply-border);
+  color: var(--oversupply-bright);
+}
+
+.sim-action-box--success {
+  background: var(--balanced-tint);
+  border: 1px solid var(--balanced-border);
+  color: var(--primary);
+}
+
+/* Ground reports feed table */
+.reports-table-panel {
+  margin-top: 22px;
+  padding: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+}
+
+.reports-feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.report-feed-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg-hover);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.report-feed-item__left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.report-feed-item code {
+  font-size: 11px;
+  color: var(--primary);
+  background: var(--primary-tint);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.advisory-notice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: rgba(96, 165, 250, 0.12);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  color: #93c5fd;
+  margin-bottom: 14px;
+  font-size: 12px;
+  text-align: left;
+}
+
+.advisory-notice strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #bfdbfe;
+  margin-bottom: 2px;
+}
+
+.advisory-notice p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #93c5fd;
+}
+
+
 /* ================================================================
    SUPPLY PRESSURE DETAILED SCREEN
    ================================================================ */
