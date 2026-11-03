@@ -2478,70 +2478,117 @@ const farmerExtra = {
   },
 } as const
 
-const crops = [
-  {
-    name: { en: "Green gram", si: "මුං ඇට", ta: "பச்சைப் பயறு" },
-    image:
-      "https://images.unsplash.com/photo-1719846923269-6fdf75444cb8?auto=format&fit=crop&w=900&q=82",
-    photo: "Hannah Shedrow",
-    profit: "Rs 118k – 154k",
-    risk: "balanced" as Risk,
-    score: "0.98",
-    water: 1,
-    plant: {
-      en: "Oct 15 – Nov 05",
-      si: "ඔක් 15 – නොවැ 05",
-      ta: "அக் 15 – நவ 05",
+export interface FarmerProfile {
+  name: string
+  farmerId: string
+  district: string
+  landAcre: number
+  waterSource: "rainfed" | "minor_tank" | "major_canal"
+  soilCondition: "optimal" | "acidic" | "unknown"
+}
+
+export const defaultProfile: FarmerProfile = {
+  name: "Sunil Perera",
+  farmerId: "ANU-01428",
+  district: "Anuradhapura",
+  landAcre: 1.5,
+  waterSource: "rainfed",
+  soilCondition: "optimal",
+}
+
+export function getPersonalizedCrops(profile: FarmerProfile) {
+  const isRainfed = profile.waterSource === "rainfed"
+  const land = Math.max(0.2, Number(profile.landAcre) || 1.5)
+
+  if (isRainfed) {
+    return [
+      {
+        name: { en: "Green gram", si: "මුං ඇට", ta: "பச்சைப் பயறு" },
+        image: "https://images.unsplash.com/photo-1719846923269-6fdf75444cb8?auto=format&fit=crop&w=900&q=82",
+        photo: "Hannah Shedrow",
+        profit: `Rs ${Math.round(85 * land)}k – ${Math.round(125 * land)}k`,
+        risk: "balanced" as Risk,
+        score: "0.98",
+        water: 1,
+        plant: { en: "Oct 15 – Nov 05", si: "ඔක් 15 – නොවැ 05", ta: "அக் 15 – நவ 05" },
+        harvest: { en: "Jan – Feb", si: "ජන – පෙබ", ta: "ஜன – பிப்" },
+        fit: { en: "98% Fit · Rainfed Choice", si: "98% ගැළපේ · හොඳම තේරීම", ta: "98% பொருத்தம் · சிறந்த தேர்வு" },
+        confidence: "High" as Confidence,
+      },
+      {
+        name: { en: "Cowpea", si: "කවුපි", ta: "தட்டப்பயறு" },
+        image: "https://images.unsplash.com/photo-1546860255-95536c19724e?auto=format&fit=crop&w=900&q=82",
+        photo: "Shane Kong",
+        profit: `Rs ${Math.round(70 * land)}k – ${Math.round(98 * land)}k`,
+        risk: "balanced" as Risk,
+        score: "0.94",
+        water: 1,
+        plant: { en: "Oct 20 – Nov 15", si: "ඔක් 20 – නොවැ 15", ta: "அக் 20 – நவ 15" },
+        harvest: { en: "Jan – Feb", si: "ජන – පෙබ", ta: "ஜන – பிப்" },
+        fit: { en: "94% Fit · Drought Hardened", si: "94% ගැළපේ · නියඟයට ඔරොත්තු", ta: "94% பொருத்தம் · வறட்சி தாங்கும்" },
+        confidence: (profile.soilCondition === "unknown" ? "Medium" : "High") as Confidence,
+      },
+      {
+        name: { en: "Chilli", si: "මිරිස්", ta: "மிளகாய்" },
+        image: "https://images.unsplash.com/photo-1588252303782-cb80119abd6d?auto=format&fit=crop&w=900&q=82",
+        photo: "Mufid Majnun",
+        profit: `Rs ${Math.round(120 * land)}k – ${Math.round(175 * land)}k`,
+        risk: "shortage" as Risk,
+        score: "0.77",
+        water: 2,
+        plant: { en: "Oct 25 – Nov 20", si: "ඔක් 25 – නොවැ 20", ta: "அக் 25 – நவ 20" },
+        harvest: { en: "Feb – Apr", si: "පෙබ – අප්‍රේල්", ta: "பிப் – ஏப்" },
+        fit: { en: "82% Fit · Requires Rain Spells", si: "82% ගැළපේ · වැසි අවශ්‍යයි", ta: "82% பொருத்தம் · மழை தேவை" },
+        confidence: "Medium" as Confidence,
+      },
+    ]
+  }
+
+  // Irrigated (Major canal / Minor tank)
+  return [
+    {
+      name: { en: "Chilli", si: "මිරිස්", ta: "மிளகாய்" },
+      image: "https://images.unsplash.com/photo-1546860255-95536c19724e?auto=format&fit=crop&w=900&q=82",
+      photo: "Shane Kong",
+      profit: `Rs ${Math.round(145 * land)}k – ${Math.round(210 * land)}k`,
+      risk: "shortage" as Risk,
+      score: "0.77",
+      water: 2,
+      plant: { en: "Oct 20 – Nov 15", si: "ඔක් 20 – නොවැ 15", ta: "அக் 20 – நவ 15" },
+      harvest: { en: "Feb – Apr", si: "පෙබ – අප්‍රේල්", ta: "பிப் – ஏப்" },
+      fit: { en: "96% Fit · Top Earner", si: "96% ගැළපේ · ඉහළම ආදායම", ta: "96% பொருத்தம் · அதிக வருமானம்" },
+      confidence: "High" as Confidence,
     },
-    harvest: { en: "Jan – Feb", si: "ජන – පෙබ", ta: "ஜன – பிப்" },
-    fit: { en: "Best match", si: "හොඳම තේරීම", ta: "சிறந்த தேர்வு" },
-    confidence: "High" as Confidence,
-  },
-  {
-    name: { en: "Chilli", si: "මිරිස්", ta: "மிளகாய்" },
-    image:
-      "https://images.unsplash.com/photo-1546860255-95536c19724e?auto=format&fit=crop&w=900&q=82",
-    photo: "Shane Kong",
-    profit: "Rs 142k – 196k",
-    risk: "shortage" as Risk,
-    score: "0.77",
-    water: 2,
-    plant: {
-      en: "Oct 20 – Nov 15",
-      si: "ඔක් 20 – නොවැ 15",
-      ta: "அக் 20 – நவ 15",
+    {
+      name: { en: "Big onion", si: "ලොකු ලූනු", ta: "பெரிய வெங்காயம்" },
+      image: "https://images.unsplash.com/photo-1600807644626-fb3c8c8ba40d?auto=format&fit=crop&w=900&q=82",
+      photo: "Mufid Majnun",
+      profit: `Rs ${Math.round(110 * land)}k – ${Math.round(195 * land)}k`,
+      risk: "oversupply" as Risk,
+      score: "1.42",
+      water: 3,
+      plant: { en: "Nov 01 – Nov 25", si: "නොවැ 01 – නොවැ 25", ta: "நව 01 – நவ 25" },
+      harvest: { en: "Mar – Apr", si: "මාර්තු – අප්‍රේල්", ta: "மார் – ஏப்" },
+      fit: { en: "91% Fit · Max 60% Land Cap", si: "91% ගැළපේ · උපරිම 60% ඉඩම", ta: "91% பொருத்தம் · 60% நில வரம்பு" },
+      confidence: (profile.soilCondition === "unknown" ? "Medium" : "High") as Confidence,
     },
-    harvest: {
-      en: "Feb – Apr",
-      si: "පෙබ – අප්‍රේල්",
-      ta: "பிப் – ஏப்",
+    {
+      name: { en: "Green gram", si: "මුං ඇට", ta: "பச்சைப் பயறு" },
+      image: "https://images.unsplash.com/photo-1719846923269-6fdf75444cb8?auto=format&fit=crop&w=900&q=82",
+      photo: "Hannah Shedrow",
+      profit: `Rs ${Math.round(85 * land)}k – ${Math.round(125 * land)}k`,
+      risk: "balanced" as Risk,
+      score: "0.98",
+      water: 1,
+      plant: { en: "Oct 15 – Nov 05", si: "ඔක් 15 – නොවැ 05", ta: "அக் 15 – நவ 05" },
+      harvest: { en: "Jan – Feb", si: "ජන – පෙබ", ta: "ஜன – பிப்" },
+      fit: { en: "88% Fit · Low Risk Buffer", si: "88% ගැළපේ · අඩු වියදම් ආවරණය", ta: "88% பொருத்தம் · குறைந்த செலவு" },
+      confidence: "High" as Confidence,
     },
-    fit: { en: "Strong option", si: "හොඳ විකල්පයක්", ta: "நல்ல விருப்பம்" },
-    confidence: "Medium" as Confidence,
-  },
-  {
-    name: { en: "Big onion", si: "ලොකු ලූනු", ta: "பெரிய வெங்காயம்" },
-    image:
-      "https://images.unsplash.com/photo-1600807644626-fb3c8c8ba40d?auto=format&fit=crop&w=900&q=82",
-    photo: "Mufid Majnun",
-    profit: "Rs 94k – 181k",
-    risk: "oversupply" as Risk,
-    score: "1.42",
-    water: 3,
-    plant: {
-      en: "Nov 01 – Nov 25",
-      si: "නොවැ 01 – නොවැ 25",
-      ta: "நவ 01 – நவ 25",
-    },
-    harvest: {
-      en: "Mar – Apr",
-      si: "මාර්තු – අප්‍රේල්",
-      ta: "மார் – ஏப்",
-    },
-    fit: { en: "Watch supply", si: "සැපයුම බලන්න", ta: "வழங்கலைக் கவனிக்கவும்" },
-    confidence: "High" as Confidence,
-  },
-]
+  ]
+}
+
+const crops = getPersonalizedCrops(defaultProfile)
 
 function WaterDrops({ count }: { count: number }) {
   return (
@@ -2710,10 +2757,14 @@ function FarmerStateView({
 
 function FarmerHome({
   language,
+  profile,
+  crops: currentCrops,
   onCompare,
   onAlerts,
 }: {
   language: Language
+  profile: FarmerProfile
+  crops: ReturnType<typeof getPersonalizedCrops>
   onCompare: () => void
   onAlerts: () => void
 }) {
@@ -2726,7 +2777,7 @@ function FarmerHome({
           <Leaf size={14} />
           {t.season}
         </span>
-        <p>{extra.greeting}</p>
+        <p>{profile.name} · {profile.district} · {profile.landAcre} {extra.acre}</p>
         <h1>{extra.homeTitle}</h1>
       </div>
       <section className="decision-card">
@@ -2756,11 +2807,11 @@ function FarmerHome({
         <div className="home-risk-row">
           <span>
             <CheckCircle2 size={15} />
-            {crops[0].name[language]} · {t.balanced}
+            {currentCrops[0].name[language]} · {t.balanced}
           </span>
           <span>
             <ArrowUpCircle size={15} />
-            {crops[2].name[language]} · {t.high}
+            {currentCrops[2].name[language]} · {t.high}
           </span>
         </div>
       </section>
@@ -2787,10 +2838,14 @@ function FarmerHome({
 
 function FarmerCompare({
   language,
+  profile,
+  crops: currentCrops,
   onChoose,
   onDetails,
 }: {
   language: Language
+  profile: FarmerProfile
+  crops: ReturnType<typeof getPersonalizedCrops>
   onChoose: (name: string) => void
   onDetails: (index: number) => void
 }) {
@@ -2802,10 +2857,14 @@ function FarmerCompare({
       <div className="mobile-title">
         <span className="season-chip">
           <Leaf size={14} />
-          {t.season}
+          {t.season} · {profile.district} · {profile.landAcre} {extra.acre}
         </span>
         <h1>{t.title}</h1>
-        <p>{t.intro}</p>
+        <p>
+          {profile.waterSource === "rainfed"
+            ? (language === "si" ? "වර්ෂාපෝෂිත ඉඩම් සඳහා විශේෂිත වූ බෝග තේරීම." : language === "ta" ? "மானாவாரி நிலத்திற்கான தனிப்பயன் பரிந்துரை." : "Personalized for rainfed drought-resilient production.")
+            : (language === "si" ? "වාරිමාර්ග ජලය සහිත ඉඩම් සඳහා ඉහළ ආදායම් බෝග." : language === "ta" ? "நீர்ப்பாசன நிலத்திற்கான அதிக வருமான பயிர்கள்." : "Personalized for secure irrigation canal / tank production.")}
+        </p>
       </div>
       <div className="mobile-section-head">
         <div>
@@ -2818,7 +2877,7 @@ function FarmerCompare({
         </div>
       </div>
       <div className="crop-carousel">
-        {crops.map((crop, index) => (
+        {currentCrops.map((crop, index) => (
           <CropCard
             key={crop.name.en}
             crop={crop}
@@ -2861,13 +2920,19 @@ function FarmerCompare({
 function FarmerOnboarding({
   language,
   setLanguage,
+  profile,
   onDone,
 }: {
   language: Language
   setLanguage: (language: Language) => void
-  onDone: () => void
+  profile: FarmerProfile
+  onDone: (newProfile: FarmerProfile) => void
 }) {
-  const [consent, setConsent] = useState(false)
+  const [consent, setConsent] = useState(true)
+  const [district, setDistrict] = useState(profile.district)
+  const [landAcre, setLandAcre] = useState(profile.landAcre)
+  const [waterSource, setWaterSource] = useState<"rainfed" | "minor_tank" | "major_canal">(profile.waterSource)
+  const [soilCondition, setSoilCondition] = useState<"optimal" | "acidic" | "unknown">(profile.soilCondition)
   const extra = farmerExtra[language]
   return (
     <div className="onboarding-screen">
@@ -2905,17 +2970,45 @@ function FarmerOnboarding({
       <div className="onboarding-fields">
         <label>
           <span>{extra.district}</span>
-          <select>
-            <option>Anuradhapura</option>
-            <option>Matale</option>
+          <select value={district} onChange={(e) => setDistrict(e.target.value)}>
+            <option value="Anuradhapura">Anuradhapura (Dry Zone)</option>
+            <option value="Dambulla">Dambulla / Matale</option>
+            <option value="Kurunegala">Kurunegala</option>
           </select>
         </label>
         <label>
           <span>{extra.land}</span>
           <div>
-            <input defaultValue="1.5" inputMode="decimal" />
+            <input
+              value={landAcre}
+              onChange={(e) => setLandAcre(Math.max(0.2, Number(e.target.value) || 0))}
+              inputMode="decimal"
+              type="number"
+              step="0.5"
+              min="0.2"
+              max="20"
+            />
             <small>{extra.acre}</small>
           </div>
+        </label>
+      </div>
+
+      <div className="onboarding-fields onboarding-fields--secondary">
+        <label>
+          <span>WATER SOURCE · ජලය</span>
+          <select value={waterSource} onChange={(e) => setWaterSource(e.target.value as any)}>
+            <option value="rainfed">🌧️ Rainfed (වර්ෂාපෝෂිත)</option>
+            <option value="minor_tank">💧 Minor Tank / Well (කුඩා වැව)</option>
+            <option value="major_canal">🌊 Major Canal (මහා ඇළ)</option>
+          </select>
+        </label>
+        <label>
+          <span>SOIL pH · පස</span>
+          <select value={soilCondition} onChange={(e) => setSoilCondition(e.target.value as any)}>
+            <option value="optimal">Normal (pH 6.5)</option>
+            <option value="acidic">Acidic (pH 5.5)</option>
+            <option value="unknown">Not Tested</option>
+          </select>
         </label>
       </div>
       <label className="consent-check">
@@ -2927,7 +3020,19 @@ function FarmerOnboarding({
         <i>{consent && <Check size={14} />}</i>
         <span>{extra.consent}</span>
       </label>
-      <Button disabled={!consent} onClick={onDone}>
+      <Button
+        disabled={!consent}
+        onClick={() =>
+          onDone({
+            name: "Sunil Perera",
+            farmerId: "ANU-01428",
+            district,
+            landAcre: Number(landAcre) || 1.5,
+            waterSource,
+            soilCondition,
+          })
+        }
+      >
         {extra.continue}
       </Button>
       <small className="onboarding-version">
@@ -3195,10 +3300,14 @@ function AlertsScreen({ language }: { language: Language }) {
 
 function FarmerProfile({
   language,
+  profile,
+  setProfile,
   state,
   setState,
 }: {
   language: Language
+  profile: FarmerProfile
+  setProfile: (p: FarmerProfile) => void
   state: ScreenState
   setState: (state: ScreenState) => void
 }) {
@@ -3212,11 +3321,46 @@ function FarmerProfile({
       <div className="profile-summary">
         <span>SU</span>
         <div>
-          <strong>Sunil Perera</strong>
-          <small>{extra.farmerId} · ANU-01428</small>
+          <strong>{profile.name}</strong>
+          <small>{profile.district} · {profile.landAcre} {extra.acre} · {profile.waterSource === "rainfed" ? "Rainfed" : "Irrigated"}</small>
         </div>
-        <Button variant="secondary">{extra.edit}</Button>
       </div>
+
+      <section className="profile-section">
+        <h2>
+          <SlidersHorizontal size={18} />
+          {language === "si" ? "ගොවිපළ තොරතුරු වෙනස් කරන්න" : language === "ta" ? "பண்ணை விவரங்களை மாற்றுக" : "Update Farm Parameters"}
+        </h2>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "12px" }}>
+          <div>
+            <label style={{ fontSize: "11px", color: "var(--ink-muted)", display: "block", marginBottom: "4px" }}>
+              {extra.land} ({extra.acre})
+            </label>
+            <input
+              type="number"
+              step="0.5"
+              min="0.2"
+              value={profile.landAcre}
+              onChange={(e) => setProfile({ ...profile, landAcre: Math.max(0.2, Number(e.target.value) || 0) })}
+              style={{ width: "100%", padding: "8px", borderRadius: "8px", border: "1px solid var(--neutral-300)", background: "#fff", fontWeight: 700 }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: "11px", color: "var(--ink-muted)", display: "block", marginBottom: "4px" }}>
+              Water Source
+            </label>
+            <select
+              value={profile.waterSource}
+              onChange={(e) => setProfile({ ...profile, waterSource: e.target.value as any })}
+              style={{ width: "100%", padding: "8px", borderRadius: "8px", border: "1px solid var(--neutral-300)", background: "#fff", fontSize: "11px" }}
+            >
+              <option value="rainfed">🌧️ Rainfed</option>
+              <option value="minor_tank">💧 Minor Tank</option>
+              <option value="major_canal">🌊 Major Canal</option>
+            </select>
+          </div>
+        </div>
+      </section>
       <section className="profile-section">
         <h2>
           <ShieldCheck size={18} />
@@ -3261,9 +3405,12 @@ function FarmerScreen({
 }) {
   const [language, setLanguage] = useState<Language>("en")
   const [page, setPage] = useState<FarmerPage>("onboarding")
+  const [profile, setProfile] = useState<FarmerProfile>(defaultProfile)
   const [chosen, setChosen] = useState("")
   const [selectedCrop, setSelectedCrop] = useState(0)
   const [screenState, setScreenState] = useState<ScreenState>("ready")
+
+  const currentCrops = useMemo(() => getPersonalizedCrops(profile), [profile])
   const t = copy[language]
   const extra = farmerExtra[language]
   const navItems = [
@@ -3359,17 +3506,25 @@ function FarmerScreen({
             <FarmerOnboarding
               language={language}
               setLanguage={setLanguage}
-              onDone={() => setPage("home")}
+              profile={profile}
+              onDone={(newProfile) => {
+                setProfile(newProfile)
+                setPage("home")
+              }}
             />
           ) : page === "home" ? (
             <FarmerHome
               language={language}
+              profile={profile}
+              crops={currentCrops}
               onCompare={() => setPage("compare")}
               onAlerts={() => setPage("alerts")}
             />
           ) : page === "compare" ? (
             <FarmerCompare
               language={language}
+              profile={profile}
+              crops={currentCrops}
               onChoose={chooseCrop}
               onDetails={(index) => {
                 setSelectedCrop(index)
@@ -3379,8 +3534,8 @@ function FarmerScreen({
           ) : page === "detail" ? (
             <CropDetailScreen
               language={language}
-              crop={crops[selectedCrop]}
-              onChoose={() => chooseCrop(crops[selectedCrop].name[language])}
+              crop={currentCrops[selectedCrop] || currentCrops[0]}
+              onChoose={() => chooseCrop((currentCrops[selectedCrop] || currentCrops[0]).name[language])}
             />
           ) : page === "report" ? (
             <ReportPlantingScreen
@@ -3409,6 +3564,8 @@ function FarmerScreen({
           ) : (
             <FarmerProfile
               language={language}
+              profile={profile}
+              setProfile={setProfile}
               state={screenState}
               setState={setScreenState}
             />
