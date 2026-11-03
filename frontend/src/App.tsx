@@ -1069,7 +1069,7 @@ function OverviewScreen({
           label="Market farmgate price"
           value={`Rs. ${profile.spotPrice.toFixed(0)}`}
           meta={`Fair floor: Rs. ${profile.fairFloorPrice} / kg`}
-          icon={DollarSign}
+          icon={CircleDollarSign}
           tone={profile.spotPrice < profile.fairFloorPrice ? "danger" : "success"}
         />
         <KpiTile
@@ -4264,6 +4264,7 @@ function FarmerScreen({
   const [chosen, setChosen] = useState("")
   const [selectedCrop, setSelectedCrop] = useState(0)
   const [screenState, setScreenState] = useState<ScreenState>("ready")
+  const [lastReport, setLastReport] = useState<GroundReport | null>(null)
 
   const currentCrops = useMemo(() => getPersonalizedCrops(profile), [profile])
   const t = copy[language]
