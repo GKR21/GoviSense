@@ -114,9 +114,17 @@ def main():
         a3 = metrics["a3_supply_forecast"]
         a2 = metrics["a2_price_forecast"]
         spi = metrics["spi_classification"]
-        print(f"  {crop.upper():<12} {'A3 Supply Forecast':<25} {str(a3['wape_model']):>12} {str(a3['wape_baseline']):>14} {a3['source'].upper():>10}")
+        print(f"  {crop.upper():<12} {'A3 Supply Forecast':<25} {str(a3['wape_model']):>12} {str(a3['wape_baseline']):>14} {a3['source'].upper():>10}  (80% CI: {a3.get('interval_80_coverage_pct', 'N/A')}%)")
         print(f"  {'':<12} {'A2 Price Forecast':<25} {str(a2['wape_model']):>12} {str(a2['wape_baseline']):>14} {a2['source'].upper():>10}")
         print(f"  {'':<12} {'SPI hit / P_glut / R_short':<25} {spi['hit_rate_pct']}% / {spi['glut_precision']} / {spi['shortage_recall']}  badge={spi['confidence_badge'].upper()} ({spi.get('label', '')})")
+        print()
+
+    print("  📈 Market Adoption Simulation (0% vs 30% vs 60% Coordination):")
+    for crop, metrics in eval_report.items():
+        sim_data = metrics.get("adoption_simulation", {})
+        print(f"     • {crop.upper()}:")
+        for sc in sim_data.get("scenarios", []):
+            print(f"       - [{sc['adoption_rate_pct']:>2d}% Adoption] SPI: {sc['spi_score']:+.3f} ({sc['spi_label']:<8s}) | Price: Rs {sc['farmgate_price_rs_kg']}/kg | Crash Risk: {sc['price_crash_risk_pct']:>4.1f}% | Total Rev: Rs {sc['total_farmer_revenue_mil_rs']:,.1f}M")
         print()
 
     # 4. Train on Full Data & Generate Next-Period Forecasts

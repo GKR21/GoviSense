@@ -52,6 +52,7 @@ def run_walk_forward_evaluation(crops: List[str] = ["big_onion", "chilli"]) -> D
         spi_engine = SupplyPressureEngine()
 
         a1_true, a1_model_preds, a1_base_preds = [], [], []
+        a1_low_bounds, a1_high_bounds = [], []
         a2_true, a2_model_preds, a2_base_preds = [], [], []
         spi_true_labels, spi_pred_labels = [], []
 
@@ -80,6 +81,8 @@ def run_walk_forward_evaluation(crops: List[str] = ["big_onion", "chilli"]) -> D
                 a1_true.append(actual_vol)
                 a1_model_preds.append(res1.point_forecast)
                 a1_base_preds.append(res1.baseline_pred)
+                a1_low_bounds.append(res1.lower_bound_10)
+                a1_high_bounds.append(res1.upper_bound_90)
 
                 # --- SPI (AI 3) ---
                 res3 = spi_engine.compute_spi(
@@ -137,11 +140,23 @@ def run_walk_forward_evaluation(crops: List[str] = ["big_onion", "chilli"]) -> D
             spi_badge = "medium"
             spi_label_note = "SPI partially confirmed"
 
+        # ── Coverage metric ───────────────────────────────────────────
+        from govisense.simulation.agent_sim import calculate_interval_coverage
+        coverage_res = calculate_interval_coverage(
+            np.array(a1_true), np.array(a1_low_bounds), np.array(a1_high_bounds)
+        )
+
+        # Market Adoption Simulation (0%, 30%, 60%)
+        from govisense.simulation.agent_sim import MarketAdoptionSimulator
+        sim = MarketAdoptionSimulator()
+        sim_res = sim.simulate(crop=crop)
+
         overall_report[crop] = {
             # Primary metrics — WAPE
             "a3_supply_forecast": {
                 "wape_model": round(a1_wape_m, 4) if a1_wape_m is not None else None,
                 "wape_baseline": round(a1_wape_b, 4) if a1_wape_b is not None else None,
+                "interval_80_coverage_pct": coverage_res["coverage_pct"],
                 "source": a1_source,
                 "eval_points": len(a1_true),
             },
@@ -162,6 +177,7 @@ def run_walk_forward_evaluation(crops: List[str] = ["big_onion", "chilli"]) -> D
                 "confidence_badge": spi_badge,
                 "label": spi_label_note,
             },
+            "adoption_simulation": sim_res,
             # Backward-compatible aliases for run_pipeline.py
             "ai1_harvest_volume": {
                 "lgbm_mae_mt": round(

@@ -20,6 +20,9 @@ from govisense.models.a4_gap_deadline import GapFillingOptimizer, FarmerAllocati
 from govisense.models.demand_estimator import DemandEstimator
 from govisense.models.suitability_scorer import SuitabilityScorer
 from govisense.models.target_area import TargetAreaCalculator
+from govisense.feedback.planting_reports import PlantingReportStore, PlantingReport
+from govisense.db.history import DecisionHistoryStore, DecisionRecord, evaluate_confidence_badge
+from govisense.simulation.agent_sim import MarketAdoptionSimulator, calculate_interval_coverage
 
 app = FastAPI(
     title="GoviSense API",
@@ -44,6 +47,9 @@ farmer_optimizer = FarmerAllocationOptimizer()
 demand_estimator = DemandEstimator()
 suitability_scorer = SuitabilityScorer()
 target_area_calc = TargetAreaCalculator()
+report_store = PlantingReportStore()
+history_store = DecisionHistoryStore()
+adoption_sim = MarketAdoptionSimulator()
 a1_models: Dict[str, HarvestVolumeForecaster] = {}
 a2_models: Dict[str, PriceForecaster] = {}
 
@@ -360,3 +366,149 @@ def farmer_top3(
         "area_conditions": area_conditions,
         "top3": top3_results,
     }
+
+
+# ---------------------------------------------------------------------------
+# Day 6 Endpoints: Feedback Loop, Confidence Rules, Decision Audit, Simulation
+# ---------------------------------------------------------------------------
+
+class PlantingReportPayload(BaseModel):
+    crop_id: str
+    season: str = "Maha 2025/2026"
+    planned_area_ha: float
+    actual_area_ha: float
+    consent_given: bool
+    pseudonymous_id: str
+    notes: Optional[str] = None
+
+
+class ReTriggerPayload(BaseModel):
+    crop_id: str
+    season: str = "Maha 2025/2026"
+    target_month: int = 4
+    suitable_land_ha: Optional[float] = None
+
+
+class DecisionLogPayload(BaseModel):
+    crop_id: str
+    season: str = "Maha 2025/2026"
+    officer_id: str
+    action_type: str
+    quantity: float
+    unit: str
+    rationale: str
+    notes: Optional[str] = None
+
+
+@app.post("/api/feedback/planting-report")
+def submit_planting_report(payload: PlantingReportPayload):
+    """
+    Item 7: Ingest actual planting report with consent and pseudonymous ID.
+    Replaces planned area with reported area in the store.
+    """
+    try:
+        report = PlantingReport(
+            crop_id=payload.crop_id,
+            season=payload.season,
+            planned_area_ha=payload.planned_area_ha,
+            actual_area_ha=payload.actual_area_ha,
+            consent_given=payload.consent_given,
+            pseudonymous_id=payload.pseudonymous_id,
+            notes=payload.notes,
+        )
+        return report_store.submit_report(report)
+    except ValueError as e:
+        return {"status": "ERROR", "message": str(e)}
+
+
+@app.post("/api/feedback/retrigger")
+def retrigger_pipeline(payload: ReTriggerPayload):
+    """
+    Item 7: Re-trigger SPI and Target Area Calculator (A_rec) using actual
+    cumulative reported planting area.
+    """
+    result = report_store.retrigger_crop(
+        crop_id=payload.crop_id,
+        season=payload.season,
+        target_month=payload.target_month,
+        suitable_land_ha=payload.suitable_land_ha,
+    )
+    from dataclasses import asdict
+    return asdict(result)
+
+
+@app.get("/api/confidence/badge")
+def get_confidence_badge(
+    crop_id: str = Query("big_onion"),
+    data_age_days: int = Query(15),
+    area_reported_share: float = Query(0.35),
+    soil_ph_available: bool = Query(True),
+):
+    """
+    Item 8: Multi-factor confidence badge evaluation using the 5 operational rules.
+    """
+    # Look up crop model metrics if trained
+    a1 = a1_models.get(crop_id)
+    w_model = getattr(a1, "wape_model", 0.15)
+    w_base = getattr(a1, "wape_baseline", 0.20)
+    spi_val = crop_id != "chilli"  # chilli fails historical thesis correlation
+
+    eval_res = evaluate_confidence_badge(
+        crop_id=crop_id,
+        data_age_days=data_age_days,
+        area_reported_share=area_reported_share,
+        model_wape=w_model,
+        baseline_wape=w_base,
+        spi_validated=spi_val,
+        soil_ph_available=soil_ph_available,
+    )
+    from dataclasses import asdict
+    return asdict(eval_res)
+
+
+@app.post("/api/history/log-action")
+def log_officer_action(payload: DecisionLogPayload):
+    """
+    Item 8: Save officer action with model version, data version, and assumptions snapshot.
+    """
+    record = DecisionRecord(
+        crop_id=payload.crop_id,
+        season=payload.season,
+        officer_id=payload.officer_id,
+        action_type=payload.action_type,
+        quantity=payload.quantity,
+        unit=payload.unit,
+        rationale=payload.rationale,
+    )
+    return history_store.log_decision(record)
+
+
+@app.get("/api/history/decisions")
+def get_decision_history(
+    crop_id: Optional[str] = Query(None),
+    season: Optional[str] = Query(None),
+    limit: int = Query(50),
+):
+    """
+    Item 8: Retrieve audit decision log records.
+    """
+    records = history_store.list_decisions(crop_id=crop_id, season=season, limit=limit)
+    from dataclasses import asdict
+    return [asdict(r) for r in records]
+
+
+@app.get("/api/simulation/adoption")
+def get_adoption_simulation(
+    crop_id: str = Query("big_onion"),
+    season_demand_mt: float = Query(26667.0),
+    uncoordinated_supply_mt: float = Query(46000.0),
+):
+    """
+    Item 9: Multi-agent market simulation at 0%, 30%, and 60% farmer adoption tiers.
+    """
+    return adoption_sim.simulate(
+        crop=crop_id,
+        season_demand_mt=season_demand_mt,
+        uncoordinated_supply_mt=uncoordinated_supply_mt,
+    )
+
