@@ -193,6 +193,49 @@ function DemoRibbon() {
   return <div className="demo-ribbon">SAMPLE DATA</div>
 }
 
+function WorkspaceSwitcher({
+  view,
+  setView,
+  compact = false,
+}: {
+  view: View
+  setView: (view: View) => void
+  compact?: boolean
+}) {
+  return (
+    <div
+      className={cx("workspace-switcher", compact && "workspace-switcher--compact")}
+      role="navigation"
+      aria-label="Workspace views"
+    >
+      {!compact && (
+        <span className="workspace-switcher__brand">
+          <Sprout size={16} />
+          GoviSense
+        </span>
+      )}
+      <div className="workspace-switcher__buttons">
+        <button
+          className={view === "officer" ? "active" : ""}
+          onClick={() => setView("officer")}
+          type="button"
+        >
+          <BarChart3 size={15} />
+          Officer dashboard
+        </button>
+        <button
+          className={view === "farmer" ? "active" : ""}
+          onClick={() => setView("farmer")}
+          type="button"
+        >
+          <Menu size={15} />
+          Farmer app
+        </button>
+      </div>
+    </div>
+  )
+}
+
 const baseSupply = [
   1760, 2010, 2320, 2850, 3150, 3620, 4480, 4310, 3340, 2750, 2210, 1870,
 ]
@@ -1716,7 +1759,13 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
   )
 }
 
-function OfficerScreen() {
+function OfficerScreen({
+  view,
+  setView,
+}: {
+  view: View
+  setView: (view: View) => void
+}) {
   const [area, setArea] = useState(2131)
   const [yieldValue, setYieldValue] = useState(16.45)
   const [selectedMonth, setSelectedMonth] = useState(6)
@@ -1822,6 +1871,7 @@ function OfficerScreen() {
             </div>
           </div>
           <div className="topbar-actions">
+            <WorkspaceSwitcher view={view} setView={setView} compact />
             <label className="state-preview">
               <span>Preview state</span>
               <select
@@ -3202,7 +3252,13 @@ function FarmerProfile({
   )
 }
 
-function FarmerScreen() {
+function FarmerScreen({
+  view,
+  setView,
+}: {
+  view: View
+  setView: (view: View) => void
+}) {
   const [language, setLanguage] = useState<Language>("en")
   const [page, setPage] = useState<FarmerPage>("onboarding")
   const [chosen, setChosen] = useState("")
@@ -3227,6 +3283,9 @@ function FarmerScreen() {
   }
   return (
     <div className="farmer-stage">
+      <div className="farmer-stage-switcher">
+        <WorkspaceSwitcher view={view} setView={setView} />
+      </div>
       <div className="mobile-note">
         <span>Connected mobile flow</span>
         <strong>390 × 844</strong>
@@ -3736,36 +3795,8 @@ export default function App() {
   const [view, setView] = useState<View>("officer")
   return (
     <div className="app-shell">
-      <div
-        className="workspace-switcher"
-        role="navigation"
-        aria-label="Workspace views"
-      >
-        <span>
-          <Sprout size={16} />
-          GoviSense
-        </span>
-        <div>
-          <button
-            className={view === "officer" ? "active" : ""}
-            onClick={() => setView("officer")}
-            type="button"
-          >
-            <BarChart3 size={15} />
-            Officer dashboard
-          </button>
-          <button
-            className={view === "farmer" ? "active" : ""}
-            onClick={() => setView("farmer")}
-            type="button"
-          >
-            <Menu size={15} />
-            Farmer app
-          </button>
-        </div>
-      </div>
-      {view === "officer" && <OfficerScreen />}
-      {view === "farmer" && <FarmerScreen />}
+      {view === "officer" && <OfficerScreen view={view} setView={setView} />}
+      {view === "farmer" && <FarmerScreen view={view} setView={setView} />}
     </div>
   )
 }

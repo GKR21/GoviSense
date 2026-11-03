@@ -136,65 +136,84 @@
 }
 
 /* ================================================================
-   WORKSPACE SWITCHER (Top Pill)
+   WORKSPACE SWITCHER
    ================================================================ */
 .workspace-switcher {
-  position: fixed;
-  z-index: 100;
-  top: 14px;
-  left: 50%;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  transform: translateX(-50%);
-  padding: 5px;
+  padding: 4px;
   border: 1px solid var(--glass-border);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--glass-bg);
-  box-shadow: var(--shadow-lg), var(--glow-primary);
+  box-shadow: var(--shadow-sm);
   backdrop-filter: var(--glass-blur);
-  transition: box-shadow 0.3s ease;
+  transition: all 0.2s ease;
 }
 
 .workspace-switcher:hover {
-  box-shadow: var(--shadow-lg), 0 0 30px rgba(16,185,129,0.2);
+  border-color: rgba(16, 185, 129, 0.35);
+  box-shadow: var(--shadow-md), 0 0 16px var(--primary-glow);
 }
 
-.workspace-switcher > span {
+.workspace-switcher--compact {
+  padding: 3px;
+}
+
+.workspace-switcher > span,
+.workspace-switcher__brand {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 0 12px;
+  padding: 0 10px;
   color: var(--primary);
   font-size: 13px;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 
-.workspace-switcher > div { display: flex; gap: 3px; }
+.workspace-switcher > div,
+.workspace-switcher__buttons {
+  display: flex;
+  gap: 4px;
+}
 
 .workspace-switcher button {
   display: flex;
-  min-height: 34px;
+  min-height: 32px;
   align-items: center;
   gap: 6px;
-  padding: 0 12px;
+  padding: 0 11px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 8px;
   background: transparent;
   color: var(--ink-muted);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.18s ease;
+  white-space: nowrap;
 }
 
-.workspace-switcher button:hover { color: var(--ink); background: var(--bg-hover); }
+.workspace-switcher button:hover {
+  color: var(--ink);
+  background: var(--bg-hover);
+}
 
 .workspace-switcher button.active {
   background: var(--primary);
   color: #fff;
-  box-shadow: 0 0 14px var(--primary-glow);
+  box-shadow: 0 0 12px var(--primary-glow);
+}
+
+.farmer-stage-switcher {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0 12px;
+}
+
+.farmer-stage-switcher .workspace-switcher {
+  box-shadow: var(--shadow-lg), var(--glow-primary);
 }
 
 /* ================================================================
@@ -592,15 +611,29 @@
   min-height: 72px;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding: 10px 28px;
+  gap: 16px;
+  padding: 10px 24px;
   border-bottom: 1px solid var(--glass-border);
-  background: rgba(7, 14, 20, 0.88);
+  background: rgba(7, 14, 20, 0.92);
   backdrop-filter: var(--glass-blur);
+  flex-wrap: wrap;
 }
 
-.context-controls,
-.topbar-actions,
+.context-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
 .heading-actions {
   display: flex;
   align-items: center;
