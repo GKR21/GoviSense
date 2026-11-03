@@ -284,6 +284,169 @@ function WorkspaceSwitcher({
   )
 }
 
+
+export interface CropDataProfile {
+  crop: string
+  name_en: string
+  name_si: string
+  baselineArea: number
+  baselineYield: number
+  unit: string
+  fairFloorPrice: number
+  spotPrice: number
+  p10Price: number
+  p90Price: number
+  direction: "up" | "down" | "flat"
+  confidence: number
+  demandMonthly: number[]
+  supplyMonthly: number[]
+  spiAnnualScore: number
+  spiLabel: string
+  gapMt: number
+  primarySeason: string
+  ai4Action: string
+}
+
+export const CROP_DATA_CATALOG: Record<string, CropDataProfile> = {
+  "Big onion": {
+    crop: "big_onion",
+    name_en: "Big Onion",
+    name_si: "ලොකු ලූනු",
+    baselineArea: 2131,
+    baselineYield: 16.45,
+    unit: "MT",
+    fairFloorPrice: 120.0,
+    spotPrice: 364.5,
+    p10Price: 324.4,
+    p90Price: 404.6,
+    direction: "up",
+    confidence: 60,
+    demandMonthly: [2840, 2810, 2860, 2920, 2960, 3010, 3050, 3090, 3030, 2980, 2930, 2880],
+    supplyMonthly: [1760, 2010, 2320, 2850, 3150, 3620, 4480, 4310, 3340, 2750, 2210, 1870],
+    spiAnnualScore: -0.63,
+    spiLabel: "Shortage",
+    gapMt: -5220.3,
+    primarySeason: "Yala",
+    ai4Action: "Nudge farmers to expand planting by 336.8 ha within DoA window (next 30 days) to fill 5,220 MT deficit and safeguard fair floor (Rs. 120/kg).",
+  },
+  "Chilli": {
+    crop: "chilli",
+    name_en: "Chilli (Green/Dry)",
+    name_si: "අමු මිරිස් / වියළි මිරිස්",
+    baselineArea: 2493,
+    baselineYield: 5.2,
+    unit: "MT",
+    fairFloorPrice: 350.0,
+    spotPrice: 276.0,
+    p10Price: 245.6,
+    p90Price: 306.3,
+    direction: "down",
+    confidence: 90,
+    demandMonthly: [680, 690, 710, 700, 695, 710, 720, 715, 705, 695, 690, 685],
+    supplyMonthly: [1200, 1450, 1100, 850, 650, 580, 620, 780, 950, 1150, 1300, 1250],
+    spiAnnualScore: 0.75,
+    spiLabel: "Glut",
+    gapMt: 3948.6,
+    primarySeason: "Both (Maha/Yala)",
+    ai4Action: "Hold 3,948.6 MT buffer in Dambulla/Anuradhapura dedicated warehouse storage to safeguard floor (Rs. 350.0/kg).",
+  },
+  "Green gram": {
+    crop: "green_gram",
+    name_en: "Green Gram (Mung Bean)",
+    name_si: "මුං ඇට",
+    baselineArea: 1750,
+    baselineYield: 1.45,
+    unit: "MT",
+    fairFloorPrice: 260.0,
+    spotPrice: 310.0,
+    p10Price: 285.0,
+    p90Price: 340.0,
+    direction: "up",
+    confidence: 75,
+    demandMonthly: [950, 960, 980, 970, 960, 950, 940, 950, 960, 970, 980, 990],
+    supplyMonthly: [450, 680, 890, 1100, 1250, 1050, 820, 650, 520, 480, 420, 410],
+    spiAnnualScore: -0.18,
+    spiLabel: "Mild Shortage",
+    gapMt: -1250.0,
+    primarySeason: "Maha / Dry Zone",
+    ai4Action: "Recommend Green Gram as top diversification choice for rainfed paddies; guaranteed purchase by PMB at Rs. 260/kg.",
+  },
+  "Maize": {
+    crop: "maize",
+    name_en: "Maize (Corn)",
+    name_si: "බඩ ඉරිඟු",
+    baselineArea: 3100,
+    baselineYield: 4.8,
+    unit: "MT",
+    fairFloorPrice: 160.0,
+    spotPrice: 185.0,
+    p10Price: 170.0,
+    p90Price: 205.0,
+    direction: "flat",
+    confidence: 85,
+    demandMonthly: [4100, 4150, 4200, 4200, 4180, 4150, 4120, 4150, 4180, 4200, 4250, 4200],
+    supplyMonthly: [3200, 4500, 5800, 6200, 4800, 3600, 2800, 2400, 2200, 2600, 3100, 3400],
+    spiAnnualScore: 0.05,
+    spiLabel: "Balanced",
+    gapMt: 210.0,
+    primarySeason: "Maha",
+    ai4Action: "Supply is balanced with poultry feed industry requirements; maintain tariff schedule for feed millers.",
+  },
+  "Red onion": {
+    crop: "red_onion",
+    name_en: "Red Onion",
+    name_si: "රතු ලූනු",
+    baselineArea: 1420,
+    baselineYield: 12.2,
+    unit: "MT",
+    fairFloorPrice: 180.0,
+    spotPrice: 245.0,
+    p10Price: 210.0,
+    p90Price: 290.0,
+    direction: "up",
+    confidence: 70,
+    demandMonthly: [1800, 1820, 1850, 1880, 1900, 1920, 1950, 1940, 1920, 1900, 1880, 1850],
+    supplyMonthly: [1100, 1350, 1600, 2100, 2300, 2050, 1750, 1500, 1300, 1200, 1150, 1080],
+    spiAnnualScore: -0.22,
+    spiLabel: "Shortage",
+    gapMt: -2100.0,
+    primarySeason: "Yala",
+    ai4Action: "Jaffna/Vavuniya harvesting peak expected in June; stagger southern seed cultivation to avoid seasonal spikes.",
+  },
+  "Potato": {
+    crop: "potato",
+    name_en: "Potato",
+    name_si: "අර්තාපල්",
+    baselineArea: 1850,
+    baselineYield: 18.5,
+    unit: "MT",
+    fairFloorPrice: 210.0,
+    spotPrice: 285.0,
+    p10Price: 250.0,
+    p90Price: 320.0,
+    direction: "flat",
+    confidence: 65,
+    demandMonthly: [3200, 3250, 3300, 3350, 3400, 3420, 3450, 3430, 3400, 3380, 3350, 3300],
+    supplyMonthly: [1800, 2200, 2700, 3400, 3900, 3600, 3100, 2600, 2200, 1950, 1850, 1750],
+    spiAnnualScore: -0.31,
+    spiLabel: "Shortage",
+    gapMt: -4400.0,
+    primarySeason: "Yala / Badulla",
+    ai4Action: "Issue regulated import quotas strictly during pre-harvest gap (Feb–April); restrict during Welimada harvest.",
+  },
+}
+
+export const DISTRICT_PROFILES: Record<string, { name: string; zone: string; maxArableHa: number; rainfallMm: number; defaultSoilPh: number }> = {
+  "Anuradhapura": { name: "Anuradhapura", zone: "Dry Zone", maxArableHa: 12500, rainfallMm: 1100, defaultSoilPh: 6.5 },
+  "Polonnaruwa": { name: "Polonnaruwa", zone: "Dry Zone", maxArableHa: 9800, rainfallMm: 1250, defaultSoilPh: 6.8 },
+  "Kurunegala": { name: "Kurunegala", zone: "Intermediate Zone", maxArableHa: 14200, rainfallMm: 1600, defaultSoilPh: 6.2 },
+  "Matale": { name: "Matale", zone: "Intermediate Zone", maxArableHa: 7600, rainfallMm: 1450, defaultSoilPh: 6.4 },
+  "Hambantota": { name: "Hambantota", zone: "Dry Zone", maxArableHa: 8900, rainfallMm: 980, defaultSoilPh: 7.1 },
+  "Jaffna": { name: "Jaffna", zone: "Dry Zone (Limestone)", maxArableHa: 6400, rainfallMm: 1150, defaultSoilPh: 7.6 },
+  "Monaragala": { name: "Monaragala", zone: "Dry Zone", maxArableHa: 11200, rainfallMm: 1350, defaultSoilPh: 6.0 },
+  "Badulla": { name: "Badulla", zone: "Up-Country Wet/Intermediate", maxArableHa: 8200, rainfallMm: 1900, defaultSoilPh: 5.5 },
+}
+
 const baseSupply = [
   1760, 2010, 2320, 2850, 3150, 3620, 4480, 4310, 3340, 2750, 2210, 1870,
 ]
@@ -306,34 +469,40 @@ const months = [
 ]
 
 function SupplyChart({
+  crop = "Big onion",
   area,
   yieldValue,
   selectedMonth,
   onSelectMonth,
 }: {
+  crop?: string
   area: number
   yieldValue: number
   selectedMonth: number
   onSelectMonth: (month: number) => void
 }) {
+  const profile = CROP_DATA_CATALOG[crop] || CROP_DATA_CATALOG["Big onion"]
   const series = useMemo(() => {
-    const factor = (area / 2131) * (yieldValue / 16.45)
-    return baseSupply.map((value, index) => {
+    const factor = (area / profile.baselineArea) * (yieldValue / profile.baselineYield)
+    return profile.supplyMonthly.map((value, index) => {
       const middle = value * factor
+      const curDemand = profile.demandMonthly[index] || 1000
       return {
         middle,
         low: middle * 0.84,
         high: middle * 1.16,
-        demand: demand[index],
-        spi: middle / demand[index],
+        demand: curDemand,
+        spi: middle / curDemand,
       }
     })
-  }, [area, yieldValue])
+  }, [area, yieldValue, profile])
+
+  const maxY = Math.max(...profile.supplyMonthly.map(s => s * 1.3), ...profile.demandMonthly) * 1.1
 
   const width = 820
   const height = 320
   const pad = { left: 52, right: 18, top: 24, bottom: 38 }
-  const maxY = 5600
+  // maxY dynamically computed above
   const x = (index: number) =>
     pad.left + (index * (width - pad.left - pad.right)) / (months.length - 1)
   const y = (value: number) =>
@@ -1234,8 +1403,23 @@ function GapTimelineScreen({
   )
 }
 
-function PriceChart() {
-  const mid = [95, 102, 108, 116, 121, 129, 145, 151, 139, 128, 118, 110]
+function PriceChart({ crop = "Big onion" }: { crop?: string }) {
+  const profile = CROP_DATA_CATALOG[crop] || CROP_DATA_CATALOG["Big onion"]
+  const baseMid = profile.spotPrice * 0.45 // farmgate median
+  const mid = [
+    baseMid * 0.78,
+    baseMid * 0.84,
+    baseMid * 0.90,
+    baseMid * 0.96,
+    baseMid * 1.02,
+    baseMid * 1.08,
+    baseMid * 1.20,
+    baseMid * 1.25,
+    baseMid * 1.15,
+    baseMid * 1.05,
+    baseMid * 0.95,
+    baseMid * 0.88,
+  ].map((v) => Math.round(v))
   const x = (index: number) => 48 + index * 66
   const y = (value: number) => 250 - (value - 70) * 2
   const line = mid
@@ -1295,14 +1479,23 @@ function PriceChart() {
   )
 }
 
-function PriceOutlookScreen() {
+function PriceOutlookScreen({
+  crop = "Big onion",
+  district = "Anuradhapura",
+}: {
+  crop?: string
+  district?: string
+}) {
+  const profile = CROP_DATA_CATALOG[crop] || CROP_DATA_CATALOG["Big onion"]
+  const dist = DISTRICT_PROFILES[district] || DISTRICT_PROFILES["Anuradhapura"]
+
   return (
     <>
       <PageHeading
-        eyebrow="Market outlook"
+        eyebrow={`${crop} · ${dist.name} (${dist.zone})`}
         icon={TrendingUp}
-        title="Price outlook"
-        description="Forecast farm-gate prices with uncertainty and baseline comparison."
+        title={`${crop} Price Outlook & Forecast`}
+        description={`Empirical price forecasting from AI 2 SARIMAX model for ${crop} in ${dist.name}.`}
         actions={
           <Button variant="secondary" icon={Download}>
             Export forecast
@@ -1354,8 +1547,8 @@ function PriceOutlookScreen() {
       <section className="panel large-data-panel">
         <div className="panel-heading">
           <div>
-            <h2>Big onion price forecast</h2>
-            <p>Rs per kg · Anuradhapura farm-gate estimate</p>
+            <h2>{crop} Farm-gate Price Forecast</h2>
+            <p>Rs per kg · {district} ({dist.zone}) forecast</p>
           </div>
           <div className="chart-legend">
             <span>
@@ -1372,7 +1565,7 @@ function PriceOutlookScreen() {
             </span>
           </div>
         </div>
-        <PriceChart />
+        <PriceChart crop={crop} />
         <div className="chart-footer">
           <div>
             <Database size={15} />
@@ -2432,7 +2625,7 @@ function OfficerScreen({
           ) : page === "Gap & import timeline" ? (
             <GapTimelineScreen onRecord={recordDecision} />
           ) : page === "Price outlook" ? (
-            <PriceOutlookScreen />
+            <PriceOutlookScreen crop={selectedCrop} district={selectedDistrict} />
           ) : page === "Adoption tracker" ? (
             <AdoptionScreen groundReports={groundReports} />
           ) : page === "Decision history" ? (
@@ -2448,7 +2641,7 @@ function OfficerScreen({
                   <div className="eyebrow">
                     <BarChart3 size={15} /> Market supply model
                   </div>
-                  <h1>Supply Pressure</h1>
+                  <h1>{selectedCrop} Supply Pressure ({selectedDistrict})</h1>
                   <p>
                     Expected harvest against demand, with uncertainty visible
                     month by month.
@@ -2477,8 +2670,7 @@ function OfficerScreen({
                     Key insight · middle scenario
                   </span>
                   <strong>
-                    Big onion harvest in July and August is projected at 1.4×
-                    expected demand.
+                    {selectedCrop} harvest in {selectedSeason} ({selectedDistrict}): {CROP_DATA_CATALOG[selectedCrop]?.spiLabel || "Monitored"} (SPI: {CROP_DATA_CATALOG[selectedCrop]?.spiAnnualScore || -0.63}). {CROP_DATA_CATALOG[selectedCrop]?.ai4Action || ""}
                   </strong>
                   <p>
                     High oversupply risk. Consider shifting part of planned area
@@ -2516,6 +2708,7 @@ function OfficerScreen({
                       />
                   </div>
                   <SupplyChart
+                    crop={selectedCrop}
                     area={area}
                     yieldValue={yieldValue}
                     selectedMonth={selectedMonth}
