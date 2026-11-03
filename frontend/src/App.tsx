@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
+  Activity,
   AlertCircle,
   ArrowDownCircle,
   ArrowLeft,
+  ArrowRight,
   ArrowUpCircle,
   BarChart3,
   Bell,
   BookOpen,
   CalendarDays,
   Check,
+  CheckCheck,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
@@ -18,16 +21,23 @@ import {
   ClipboardCheck,
   Clock3,
   CloudOff,
+  Copy,
+  Cpu,
   Database,
   Download,
   Droplets,
+  ExternalLink,
   Eye,
+  FileCheck,
   FileClock,
+  FileSpreadsheet,
   FileText,
+  Filter,
   History,
   Home,
   Info,
   Languages,
+  Layers,
   Leaf,
   LockKeyhole,
   LogIn,
@@ -37,17 +47,22 @@ import {
   PackageOpen,
   PencilLine,
   Plus,
+  Radio,
   RefreshCw,
   RotateCcw,
   Save,
   Search,
   Send,
+  Server,
   Settings,
+  Shield,
   ShieldCheck,
+  Ship,
   SlidersHorizontal,
   Smartphone,
   Sparkles,
   Sprout,
+  TrendingDown,
   TrendingUp,
   TriangleAlert,
   UploadCloud,
@@ -55,6 +70,7 @@ import {
   Users,
   Warehouse,
   X,
+  Zap,
   type LucideIcon,
 } from "lucide-react"
 
@@ -77,6 +93,110 @@ export const INITIAL_GROUND_REPORTS: GroundReport[] = [
   { id: "REP-83B1", crop: "Chilli", areaAcres: 1.5, areaHa: 0.61, date: "2026-10-21", district: "Anuradhapura", timestamp: "Yesterday 16:45", pseudonymousId: "LK-NC-0911", status: "Followed recommendation" },
   { id: "REP-77C4", crop: "Green gram", areaAcres: 3.0, areaHa: 1.21, date: "2026-10-22", district: "Anuradhapura", timestamp: "Today 09:15", pseudonymousId: "LK-NC-0105", status: "Followed recommendation" },
   { id: "REP-62D9", crop: "Big onion", areaAcres: 2.5, areaHa: 1.01, date: "2026-10-23", district: "Anuradhapura", timestamp: "Today 11:30", pseudonymousId: "LK-NC-0419", status: "Independent choice" },
+]
+
+export interface PolicyDecision {
+  id: string
+  date: string
+  timestamp: string
+  crop: string
+  district: string
+  modelVersion: string
+  dataVersion: string
+  assumptions: string
+  leadTime: number
+  action: string
+  category: "Import quota" | "Tariff adjustment" | "Planting advisory" | "Storage buffer" | "Price stabilization"
+  officer: string
+  designation: string
+  status: "Active" | "Executed" | "Superseded"
+  notes?: string
+  confidence?: string
+  sha256Hash: string
+  impactEstimate?: string
+}
+
+export const INITIAL_DECISION_HISTORY: PolicyDecision[] = [
+  {
+    id: "RUN-260404-18",
+    date: "04 Apr 2026",
+    timestamp: "14:32:10 UTC",
+    crop: "Big onion",
+    district: "Anuradhapura",
+    modelVersion: "v2.4.1",
+    dataVersion: "CPP 3.2 · HARTI 04/04 · 2,418 Live Ground Reports",
+    assumptions: "Loss 12% · Lead 7w · Farmgate floor Rs. 280/kg",
+    leadTime: 7,
+    action: "Dynamic JIT Import (Import later)",
+    category: "Import quota",
+    officer: "Dr. N. Ranasinghe",
+    designation: "Chief Agricultural Economist, Dept of Agriculture",
+    status: "Active",
+    notes: "Awaiting Week 21 farmer planting verification before authorizing 1,200 MT quota. Ground reports indicate Anuradhapura planting at 64% of seasonal target.",
+    confidence: "High (94%)",
+    sha256Hash: "e4b98c3f710a82d015c328ef6902a7b8c2d159a4b3f81e7d9036cfae2417b120",
+    impactEstimate: "Maintains consumer price stability at Rs. 355/kg; zero early harvest market depression.",
+  },
+  {
+    id: "RUN-260321-07",
+    date: "21 Mar 2026",
+    timestamp: "10:15:42 UTC",
+    crop: "Chilli",
+    district: "Polonnaruwa",
+    modelVersion: "v2.4.0",
+    dataVersion: "CPP 3.1 · HARTI 21/03 · 1,840 Ground Reports",
+    assumptions: "Loss 14% · Lead 6w · Target farmgate Rs. 260/kg",
+    leadTime: 6,
+    action: "Buffer Storage Reservation",
+    category: "Storage buffer",
+    officer: "H. M. Wickramasinghe",
+    designation: "Director of Agribusiness, Ministry of Agriculture",
+    status: "Executed",
+    notes: "Allocated 450 MT cold chain space at Keppetipola facility to absorb pre-monsoon green chilli flush.",
+    confidence: "High (91%)",
+    sha256Hash: "9f82d1c5a7b304e289f61b0c8d4512e9871a34b2cf60981e2547bca89104fa3e",
+    impactEstimate: "Preserved Rs. 38.5M farmer value; prevented distress sales below Rs. 180/kg.",
+  },
+  {
+    id: "RUN-260307-12",
+    date: "07 Mar 2026",
+    timestamp: "09:44:18 UTC",
+    crop: "Big onion",
+    district: "Matale",
+    modelVersion: "v2.3.8",
+    dataVersion: "CPP 3.1 · HARTI 07/03 · Pre-season baseline",
+    assumptions: "Loss 10% · Lead 8w · Special Commodity Levy Rs. 40",
+    leadTime: 8,
+    action: "Delay Imports / Tariff Shield",
+    category: "Tariff adjustment",
+    officer: "K. B. Tennakoon",
+    designation: "Trade Policy Specialist, Ministry of Trade",
+    status: "Superseded",
+    notes: "Special Commodity Levy (SCL) maintained at Rs. 50/kg to incentivize local Yala seed nursery prep.",
+    confidence: "Medium (82%)",
+    sha256Hash: "6c7104b2a89df41e70258b3c914e6d20984a15b3c8f7091e2478bcd01934ef52",
+    impactEstimate: "Local planting area expanded by +14% relative to 2025 baseline.",
+  },
+  {
+    id: "RUN-260218-03",
+    date: "18 Feb 2026",
+    timestamp: "16:20:05 UTC",
+    crop: "Green gram",
+    district: "Kurunegala",
+    modelVersion: "v2.3.5",
+    dataVersion: "CPP 3.0 · CBSL Feb Bulletin",
+    assumptions: "Loss 8% · Zero import duty · Rainfed threshold 110mm",
+    leadTime: 7,
+    action: "Planting Advisory Quota Boost",
+    category: "Planting advisory",
+    officer: "Dr. S. Alahakoon",
+    designation: "Agro-Meteorology Officer, Natural Resources Mgmt",
+    status: "Executed",
+    notes: "Issued inter-monsoonal planting advisory for rainfed Kurunegala paddies following positive CHIRPS rainfall anomaly.",
+    confidence: "High (96%)",
+    sha256Hash: "4b19c8d207f5e3a19b8402c918e76a5403b218f7c9e018a45279bcdf30128e46",
+    impactEstimate: "Added 1,120 MT domestic pulse supply; reduced national import reliance by 18%.",
+  },
 ]
 
 type Language = "en" | "si" | "ta"
@@ -1200,223 +1320,629 @@ function OverviewScreen({
 }
 
 function GapTimelineScreen({
+  crop = "Big onion",
+  district = "Anuradhapura",
   onRecord,
 }: {
-  onRecord: (decision: string) => void
+  crop?: string
+  district?: string
+  onRecord: (decision: string, details?: Partial<PolicyDecision>) => void
 }) {
+  const profile = CROP_DATA_CATALOG[crop] || CROP_DATA_CATALOG["Big onion"]
   const [leadTime, setLeadTime] = useState(7)
-  const [selected, setSelected] = useState("Import later")
-  const options = [
-    [
-      "Import now",
-      "Protects against the worst-case shortage.",
-      "Higher storage and price risk.",
-      UploadCloud,
-    ],
-    [
-      "Import later",
-      "Uses fresher supply and price information.",
-      "Less buffer if shipping is delayed.",
-      Clock3,
-    ],
-    [
-      "Delay imports",
-      "Avoids adding supply during a balanced month.",
-      "Shortage may deepen if harvest slips.",
-      CalendarDays,
-    ],
-    [
-      "Store",
-      "Moves local surplus into the next demand window.",
-      "Requires verified capacity and quality.",
-      Warehouse,
-    ],
-  ] as const
+  const [selectedStrategy, setSelectedStrategy] = useState("Dynamic Just-In-Time")
+  const [selectedMonthIdx, setSelectedMonthIdx] = useState(6) // July
+  const [metricMode, setMetricMode] = useState<"gap" | "coverage" | "price">("gap")
+  const [assumptionsOpen, setAssumptionsOpen] = useState(false)
+  const [signoffModalOpen, setSignoffModalOpen] = useState(false)
+  const [officerName, setOfficerName] = useState("Dr. N. Ranasinghe")
+  const [officerDesignation, setOfficerDesignation] = useState("Chief Agricultural Economist, Dept of Agriculture")
+  const [officerNotes, setOfficerNotes] = useState(
+    "Authorize dynamic JIT procurement window. Hold release until Week 21 farmer planting report verification to prevent domestic market suppression."
+  )
+  const [exportNotice, setExportNotice] = useState(false)
+
+  // Dynamic calculations based on lead time
+  const deadlineDate = leadTime === 6 ? "25 May 2026" : leadTime === 8 ? "11 May 2026" : "18 May 2026"
+  const daysLeft = leadTime === 6 ? 51 : leadTime === 8 ? 37 : 44
+
+  // Monthly values calibrated to crop
+  const monthlyData = useMemo(() => {
+    const baseDemand = crop === "Chilli" ? 5200 : crop === "Green gram" ? 2800 : 7800
+    const gaps = crop === "Chilli"
+      ? [-450, -320, 80, 190, -110, 60, 680, 540, 160, -70, 260, 390]
+      : crop === "Green gram"
+      ? [-300, -210, 50, 110, -80, 40, 410, 320, 90, -40, 150, 230]
+      : [-620, -480, 130, 240, -180, 90, 920, 780, 210, -90, 340, 510]
+
+    return months.map((month, idx) => {
+      const gap = gaps[idx]
+      const harvest = baseDemand - gap
+      const coverage = Math.min(140, Math.max(40, Math.round((harvest / baseDemand) * 100)))
+      const priceImpact = gap > 0
+        ? Math.round(profile.spotPrice * (1 + (gap / baseDemand) * 0.45))
+        : Math.round(profile.spotPrice * (1 - Math.abs(gap / baseDemand) * 0.25))
+      return { month, gap, harvest, demand: baseDemand, coverage, priceImpact }
+    })
+  }, [crop, profile.spotPrice])
+
+  const selectedMonthData = monthlyData[selectedMonthIdx]
+
+  // Strategies
+  const strategies = [
+    {
+      id: "Early Import Buffer",
+      title: "Early Import Buffer (Import now)",
+      tag: "Conservative Safety Buffer",
+      tagClass: "strategy-tag--warn",
+      icon: UploadCloud,
+      security: "98%",
+      estPrice: `Rs. ${(profile.spotPrice * 0.88).toFixed(0)} - ${(profile.spotPrice * 0.94).toFixed(0)}/kg`,
+      carryingCost: "Rs. 18.5M",
+      category: "Import quota" as const,
+      pro: "Completely eliminates stockout and retail spike risks in major urban centres.",
+      con: "High warehouse holding cost; risks depressing farmgate prices for local growers at harvest.",
+    },
+    {
+      id: "Dynamic Just-In-Time",
+      title: "Dynamic Just-In-Time (Import later)",
+      tag: "AI Recommended · Optimal Welfare",
+      tagClass: "strategy-tag--rec",
+      icon: Clock3,
+      security: "93%",
+      estPrice: `Rs. ${(profile.spotPrice * 0.96).toFixed(0)} - ${(profile.spotPrice * 1.02).toFixed(0)}/kg`,
+      carryingCost: "Rs. 4.2M",
+      category: "Import quota" as const,
+      pro: "Synchronizes with live farmer planting telemetry to size import quotas with zero surplus wastage.",
+      con: "Requires 7-day alert trigger window; tight margin if port customs encounters congestion.",
+    },
+    {
+      id: "Tariff Shield",
+      title: "Tariff Shield (Delay imports)",
+      tag: "Farmer Margin Protection",
+      tagClass: "strategy-tag--warn",
+      icon: CalendarDays,
+      security: "74%",
+      estPrice: `Rs. ${(profile.spotPrice * 1.12).toFixed(0)} - ${(profile.spotPrice * 1.24).toFixed(0)}/kg`,
+      carryingCost: "Rs. 0.0M",
+      category: "Tariff adjustment" as const,
+      pro: "Guarantees premium farmgate returns (>Rs. 280/kg) for local farming communities.",
+      con: "Shortage may deepen by up to 28% if late Yala rainfall slips below 90mm.",
+    },
+    {
+      id: "Domestic Buffer Stock",
+      title: "Domestic Buffer Stock (Store locally)",
+      tag: "Zero Forex Outflow",
+      tagClass: "strategy-tag--rec",
+      icon: Warehouse,
+      security: "86%",
+      estPrice: `Rs. ${(profile.spotPrice * 0.92).toFixed(0)} - ${(profile.spotPrice * 0.98).toFixed(0)}/kg`,
+      carryingCost: "Rs. 9.1M",
+      category: "Storage buffer" as const,
+      pro: "Absorbs local surplus into temperature-controlled facilities without foreign exchange outflow.",
+      con: "Constrained by certified national cold storage capacity (1,200 MT ceiling).",
+    },
+  ]
+
+  const currentStrategy = strategies.find((s) => s.id === selectedStrategy) || strategies[1]
+
+  const handleExportCSV = () => {
+    const headers = ["Month", "Demand_MT", "Domestic_Harvest_MT", "Net_Gap_MT", "Coverage_Pct", "Est_Retail_Price_Rs_kg"]
+    const rows = monthlyData.map((d) => [d.month, d.demand, d.harvest, d.gap, `${d.coverage}%`, d.priceImpact])
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n")
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement("a")
+    link.setAttribute("href", encodedUri)
+    link.setAttribute("download", `GoviSense_Gap_Timeline_${crop.replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    setExportNotice(true)
+    setTimeout(() => setExportNotice(false), 3000)
+  }
+
+  const handleCommitDecision = () => {
+    onRecord(currentStrategy.title, {
+      leadTime,
+      category: currentStrategy.category,
+      officer: officerName,
+      designation: officerDesignation,
+      notes: officerNotes,
+      assumptions: `Lead time ${leadTime}w · Post-harvest loss 12% · Decision cutoff ${deadlineDate}`,
+      impactEstimate: `${currentStrategy.title} deployed: Security score ${currentStrategy.security}, Est Price ${currentStrategy.estPrice}.`,
+    })
+    setSignoffModalOpen(false)
+  }
+
   return (
     <>
       <PageHeading
-        eyebrow="Decision planning"
+        eyebrow="Decision Planning & Logistics"
         icon={FileClock}
-        title="Gap & import timeline"
-        description="Translate projected supply gaps into dated, traceable actions."
+        title={`Gap & Import Timeline: ${crop}`}
+        description={`Synchronize international shipping lead-time with domestic ${crop} harvest in ${district}.`}
         actions={
           <>
-            <Button variant="secondary" icon={BookOpen}>
-              Assumptions
+            <Button
+              variant="secondary"
+              icon={BookOpen}
+              onClick={() => setAssumptionsOpen(!assumptionsOpen)}
+            >
+              {assumptionsOpen ? "Hide Assumptions" : "Model Assumptions"}
             </Button>
-            <Button icon={Download}>Export timeline</Button>
+            <Button icon={Download} onClick={handleExportCSV}>
+              Export Timeline
+            </Button>
           </>
         }
       />
-      <div className="deadline-summary">
-        <div>
-          <span className="deadline-summary__icon">
-            <Clock3 size={22} />
-          </span>
-          <span>
-            <small>NEXT DECISION DEADLINE</small>
-            <strong>Act by 18 May 2026</strong>
-            <p>For July big onion coverage · 44 days remaining</p>
-          </span>
-        </div>
-        <div className="lead-control">
-          <span>Import lead time</span>
-          <strong>{leadTime} weeks</strong>
-          <input
-            aria-label="Import lead time in weeks"
-            type="range"
-            min="6"
-            max="8"
-            step="1"
-            value={leadTime}
-            onChange={(event) => setLeadTime(Number(event.target.value))}
-          />
-          <small>6 weeks · default 7 · 8 weeks</small>
-        </div>
-      </div>
-      <div className="timeline-layout">
-        <section className="panel gap-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Monthly gap range</h2>
-              <p>Demand minus expected harvest · tonnes</p>
-            </div>
-            <div className="range-legend">
-              <span>
-                <i />
-                Worst case
-              </span>
-              <span>
-                <i />
-                Best case
-              </span>
-            </div>
-          </div>
-          <div className="gap-bars">
-            {months.map((month, index) => {
-              const value = [
-                -620, -480, 130, 240, -180, 90, 920, 780, 210, -90, 340, 510,
-              ][index]
-              return (
-                <div className="gap-bar-row" key={month}>
-                  <span>{month}</span>
-                  <div>
-                    <i
-                      className={value > 0 ? "positive" : "negative"}
-                      style={{
-                        width: `${Math.max(12, Math.abs(value) / 10)}%`,
-                      }}
-                    />
-                  </div>
-                  <strong
-                    className={value > 0 ? "text-shortage" : "text-balanced"}
-                  >
-                    {value > 0 ? "+" : ""}
-                    {value} t
-                  </strong>
-                  {index === 6 && <button type="button">Deadline</button>}
-                </div>
-              )
-            })}
-          </div>
-          <p className="sr-summary">
-            Chart summary: July has the largest potential shortage at 920
-            tonnes. August follows at 780 tonnes. January and February show
-            surplus.
-          </p>
-        </section>
-        <aside className="deadline-column">
-          <div className="decision-deadline-card decision-deadline-card--urgent">
-            <div className="deadline-card__top">
-              <RiskBadge risk="shortage" />
-              <span>44 days left</span>
-            </div>
-            <span className="deadline-card__month">JULY 2026 · BIG ONION</span>
-            <h2>Act by 18 May</h2>
-            <p>
-              Projected gap: <strong>+420 to +920 t</strong>
-            </p>
-            <div className="deadline-rule">
-              <CalendarDays size={16} />
-              <span>1 Jul shortage start</span>
-              <ChevronLeft size={14} />
-              <span>{leadTime}-week lead time</span>
-            </div>
-          </div>
-          <div className="decision-deadline-card">
-            <div className="deadline-card__top">
-              <RiskBadge risk="shortage" />
-              <span>73 days left</span>
-            </div>
-            <span className="deadline-card__month">
-              AUGUST 2026 · BIG ONION
-            </span>
-            <h2>Act by 16 June</h2>
-            <p>
-              Projected gap: <strong>+260 to +780 t</strong>
-            </p>
-          </div>
-        </aside>
-      </div>
-      <section className="decision-options">
-        <div className="panel-heading">
+
+      {exportNotice && (
+        <div className="alert-banner alert-banner--success" style={{ marginBottom: "16px" }}>
+          <CheckCircle2 size={18} />
           <div>
-            <h2>Response options</h2>
-            <p>
-              Select an option to compare trade-offs before recording a
-              decision.
-            </p>
+            <strong>Timeline CSV Exported Successfully</strong>
+            <p>Monthly supply gap and price projection downloaded for {crop}.</p>
           </div>
-          <span className="code-label">July 2026</span>
         </div>
-        <div className="option-grid">
-          {options.map(([name, pro, con, Icon]) => (
+      )}
+
+      {assumptionsOpen && (
+        <div className="panel" style={{ padding: "18px 22px", marginBottom: "20px", border: "1px solid var(--primary-glow)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+            <h3 style={{ margin: 0, fontSize: "14px", color: "var(--ink)", display: "flex", alignItems: "center", gap: "8px" }}>
+              <Cpu size={16} color="var(--primary)" />
+              Algorithmic Calibration & Assumptions (Model v2.4.1)
+            </h3>
             <button
-              className={cx(
-                "option-card",
-                selected === name && "option-card--selected",
-              )}
               type="button"
-              onClick={() => setSelected(name)}
-              key={name}
+              onClick={() => setAssumptionsOpen(false)}
+              style={{ background: "none", border: "none", color: "var(--ink-muted)", cursor: "pointer" }}
             >
-              <span className="option-card__check">
-                {selected === name ? <Check size={14} /> : <Icon size={18} />}
-              </span>
-              <strong>{name}</strong>
-              <div>
-                <span className="pro">
-                  <CheckCircle2 size={13} />
-                  {pro}
-                </span>
-                <span className="con">
-                  <AlertCircle size={13} />
-                  {con}
-                </span>
-              </div>
+              <X size={16} />
             </button>
-          ))}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", fontSize: "12px" }}>
+            <div>
+              <span style={{ color: "var(--ink-muted)", display: "block" }}>Post-Harvest Loss</span>
+              <strong style={{ color: "var(--ink)" }}>12.0% (DoA Benchmark)</strong>
+            </div>
+            <div>
+              <span style={{ color: "var(--ink-muted)", display: "block" }}>Marine Transit Corridors</span>
+              <strong style={{ color: "var(--ink)" }}>Nhava Sheva / Tuticorin</strong>
+            </div>
+            <div>
+              <span style={{ color: "var(--ink-muted)", display: "block" }}>Quarantine Turnaround</span>
+              <strong style={{ color: "var(--ink)" }}>5 Business Days (NPQS)</strong>
+            </div>
+            <div>
+              <span style={{ color: "var(--ink-muted)", display: "block" }}>Farmgate Floor Shield</span>
+              <strong style={{ color: "var(--ink)" }}>Rs. {(profile.spotPrice * 0.42).toFixed(0)} / kg</strong>
+            </div>
+          </div>
         </div>
-        <div className="record-bar">
-          <div>
-            <ClipboardCheck size={20} />
-            <span>
-              <strong>{selected}</strong>
-              <small>Selected for July · Middle scenario</small>
+      )}
+
+      {/* Top Strategic KPI Grid */}
+      <div className="gap-kpi-grid">
+        <div className="gap-kpi-card gap-kpi-card--urgent">
+          <div className="gap-kpi-card__top">
+            <small>DECISION CUTOFF DEADLINE</small>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", fontWeight: "700", color: "#fcd34d" }}>
+              <Clock3 size={13} />
+              {daysLeft} days left
             </span>
           </div>
-          <Button icon={Save} onClick={() => onRecord(selected)}>
-            Record decision
-          </Button>
+          <div className="gap-kpi-card__val" style={{ color: "#fcd34d" }}>
+            Act by {deadlineDate}
+          </div>
+          <p className="gap-kpi-card__sub">
+            Target window for July deficit coverage · Lead: {leadTime} weeks
+          </p>
+        </div>
+
+        <div className="gap-kpi-card">
+          <div className="gap-kpi-card__top">
+            <small>PEAK DEFICIT MONTH</small>
+            <RiskBadge risk="shortage" />
+          </div>
+          <div className="gap-kpi-card__val">
+            July 2026 (+{monthlyData[6].gap} MT)
+          </div>
+          <p className="gap-kpi-card__sub">
+            Demand {monthlyData[6].demand} MT vs Expected Harvest {monthlyData[6].harvest} MT
+          </p>
+        </div>
+
+        <div className="gap-kpi-card">
+          <div className="gap-kpi-card__top">
+            <small>MARITIME TRANSIT MODE</small>
+            <Ship size={14} color="#38bdf8" />
+          </div>
+          <div className="gap-kpi-card__val" style={{ color: "#38bdf8" }}>
+            {leadTime} Weeks Transit
+          </div>
+          <p className="gap-kpi-card__sub">
+            Indian Ocean Bulk Carrier · Tuticorin to Colombo Port
+          </p>
+        </div>
+
+        <div className="gap-kpi-card">
+          <div className="gap-kpi-card__top">
+            <small>ALGORITHMIC GUIDANCE</small>
+            <Sparkles size={14} color="var(--primary)" />
+          </div>
+          <div className="gap-kpi-card__val" style={{ color: "var(--primary)" }}>
+            Dynamic JIT Import
+          </div>
+          <p className="gap-kpi-card__sub">
+            Confidence 93% · Syncs with live farmer planting telemetry
+          </p>
+        </div>
+      </div>
+
+      {/* Visual Supply Chain Stepper */}
+      <div className="transit-flow-card">
+        <div className="transit-flow-header">
+          <h2>
+            <Ship size={18} color="var(--primary)" />
+            Supply Chain & Import Lead-Time Simulator
+          </h2>
+          <div className="lead-pill-group">
+            <button
+              type="button"
+              className={cx("lead-pill-btn", leadTime === 6 && "lead-pill-btn--active")}
+              onClick={() => setLeadTime(6)}
+            >
+              <Zap size={13} />
+              6 Weeks (Fast Freight)
+            </button>
+            <button
+              type="button"
+              className={cx("lead-pill-btn", leadTime === 7 && "lead-pill-btn--active")}
+              onClick={() => setLeadTime(7)}
+            >
+              <Clock3 size={13} />
+              7 Weeks (Standard Bulk · Default)
+            </button>
+            <button
+              type="button"
+              className={cx("lead-pill-btn", leadTime === 8 && "lead-pill-btn--active")}
+              onClick={() => setLeadTime(8)}
+            >
+              <CalendarDays size={13} />
+              8 Weeks (Monsoon Buffer)
+            </button>
+          </div>
+        </div>
+
+        <div className="transit-pipeline">
+          <div className={cx("transit-node", "transit-node--active")}>
+            <div className="transit-node__icon">
+              <UploadCloud size={20} />
+            </div>
+            <strong>1. Order & Letter of Credit</strong>
+            <span>Port of Nhava Sheva / Tuticorin</span>
+            <small style={{ color: "var(--primary)", fontWeight: "700", marginTop: "3px" }}>
+              Cutoff: {deadlineDate}
+            </small>
+          </div>
+
+          <div className={cx("transit-node", "transit-node--active")}>
+            <div className="transit-node__icon">
+              <Ship size={20} />
+            </div>
+            <strong>2. Maritime Cargo Transit</strong>
+            <span>Indian Ocean Shipping Lane</span>
+            <small style={{ color: "#38bdf8", fontWeight: "700", marginTop: "3px" }}>
+              {leadTime - 2} Weeks Sailing Time
+            </small>
+          </div>
+
+          <div className="transit-node">
+            <div className="transit-node__icon">
+              <ShieldCheck size={20} />
+            </div>
+            <strong>3. Customs & Plant Quarantine</strong>
+            <span>Colombo Port (SLA / NPQS)</span>
+            <small style={{ color: "var(--ink-muted)", marginTop: "3px" }}>
+              5 Working Days Inspection
+            </small>
+          </div>
+
+          <div className="transit-node">
+            <div className="transit-node__icon">
+              <Warehouse size={20} />
+            </div>
+            <strong>4. Wholesale Distribution</strong>
+            <span>Dambulla & Regional DECs</span>
+            <small style={{ color: "#fcd34d", fontWeight: "700", marginTop: "3px" }}>
+              Arrival: 01 July 2026
+            </small>
+          </div>
+        </div>
+      </div>
+
+      {/* Monthly Interactive Visualizer */}
+      <section className="gap-chart-panel">
+        <div className="gap-chart-toolbar">
+          <div>
+            <h2 style={{ fontSize: "16px", fontWeight: "800", color: "var(--ink)", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+              <BarChart3 size={18} color="var(--primary)" />
+              12-Month Supply-Demand Gap Range
+            </h2>
+            <p style={{ margin: "2px 0 0", fontSize: "12px", color: "var(--ink-muted)" }}>
+              Domestic consumption requirement minus forecasted harvest in {district}.
+            </p>
+          </div>
+          <div className="gap-metric-pills">
+            <button
+              type="button"
+              className={cx("gap-metric-btn", metricMode === "gap" && "gap-metric-btn--active")}
+              onClick={() => setMetricMode("gap")}
+            >
+              Net Gap (Tonnes)
+            </button>
+            <button
+              type="button"
+              className={cx("gap-metric-btn", metricMode === "coverage" && "gap-metric-btn--active")}
+              onClick={() => setMetricMode("coverage")}
+            >
+              Domestic Coverage %
+            </button>
+            <button
+              type="button"
+              className={cx("gap-metric-btn", metricMode === "price" && "gap-metric-btn--active")}
+              onClick={() => setMetricMode("price")}
+            >
+              Est. Retail Price
+            </button>
+          </div>
+        </div>
+
+        <div className="gap-bars-grid">
+          <div className="gap-zero-line" />
+          {monthlyData.map((d, index) => {
+            const isShortage = d.gap > 0
+            const maxScale = 1000
+            const heightPct = Math.min(92, Math.max(14, (Math.abs(d.gap) / maxScale) * 85))
+            const isSelected = selectedMonthIdx === index
+            const isDeadlineMonth = index === 6
+
+            return (
+              <div
+                key={d.month}
+                className={cx(
+                  "gap-bar-col",
+                  isSelected && "gap-bar-col--selected",
+                  isDeadlineMonth && "gap-bar-col--deadline",
+                )}
+                onClick={() => setSelectedMonthIdx(index)}
+              >
+                <span
+                  className={cx(
+                    "gap-bar-pill",
+                    isShortage ? "gap-bar-pill--shortage" : "gap-bar-pill--surplus",
+                  )}
+                >
+                  {metricMode === "gap"
+                    ? `${isShortage ? "+" : ""}${d.gap}t`
+                    : metricMode === "coverage"
+                    ? `${d.coverage}%`
+                    : `Rs.${d.priceImpact}`}
+                </span>
+                <div
+                  className={cx(
+                    "gap-bar-fill",
+                    isShortage ? "gap-bar-fill--shortage" : "gap-bar-fill--surplus",
+                  )}
+                  style={{ height: `${heightPct}%` }}
+                />
+                <span className="gap-bar-month">{d.month}</span>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Selected Month Details Strip */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px", padding: "12px 16px", background: "rgba(0,0,0,0.2)", borderRadius: "var(--radius-md)", flexWrap: "wrap", gap: "10px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <span style={{ fontSize: "14px", fontWeight: "800", color: "var(--ink)" }}>
+              {selectedMonthData.month} 2026 Profile:
+            </span>
+            <span style={{ fontSize: "12px", color: "var(--ink-muted)" }}>
+              Demand: <strong>{selectedMonthData.demand} MT</strong>
+            </span>
+            <span style={{ fontSize: "12px", color: "var(--ink-muted)" }}>
+              Expected Harvest: <strong>{selectedMonthData.harvest} MT</strong>
+            </span>
+            <span style={{ fontSize: "12px", color: selectedMonthData.gap > 0 ? "#fca5a5" : "#6ee7b7", fontWeight: "700" }}>
+              Net Balance: {selectedMonthData.gap > 0 ? `Shortage +${selectedMonthData.gap} MT` : `Surplus ${selectedMonthData.gap} MT`}
+            </span>
+          </div>
+          <div style={{ fontSize: "12px", color: "var(--primary)", fontWeight: "600" }}>
+            Estimated Retail Price: Rs. {selectedMonthData.priceImpact} / kg
+          </div>
         </div>
       </section>
+
+      {/* Strategic Response Options Matrix */}
+      <section style={{ marginBottom: "24px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+          <div>
+            <h2 style={{ fontSize: "16px", fontWeight: "800", color: "var(--ink)", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+              <Layers size={18} color="var(--primary)" />
+              Strategic Response Options for July 2026
+            </h2>
+            <p style={{ margin: "2px 0 0", fontSize: "12px", color: "var(--ink-muted)" }}>
+              Compare welfare trade-offs across consumer prices, farmer protection, and state carrying costs.
+            </p>
+          </div>
+          <span style={{ fontSize: "11px", fontWeight: "700", padding: "4px 10px", borderRadius: "999px", background: "var(--bg-raised)", color: "var(--primary)", border: "1px solid var(--glass-border)" }}>
+            Middle Scenario · {crop}
+          </span>
+        </div>
+
+        <div className="strategy-matrix-grid">
+          {strategies.map((strat) => {
+            const isSelected = selectedStrategy === strat.id
+            const Icon = strat.icon
+            return (
+              <div
+                key={strat.id}
+                className={cx("strategy-card", isSelected && "strategy-card--selected")}
+                onClick={() => setSelectedStrategy(strat.id)}
+              >
+                <div className="strategy-card__header">
+                  <h3>
+                    <span className="strategy-card__icon">
+                      <Icon size={18} />
+                    </span>
+                    {strat.title}
+                  </h3>
+                  <span className={cx("strategy-tag", strat.tagClass)}>
+                    {strat.tag}
+                  </span>
+                </div>
+
+                <div className="strategy-metrics-row">
+                  <div className="strategy-metric-item">
+                    <small>Supply Security</small>
+                    <strong style={{ color: "var(--primary)" }}>{strat.security}</strong>
+                  </div>
+                  <div className="strategy-metric-item">
+                    <small>Est. Price Band</small>
+                    <strong style={{ color: "var(--ink)" }}>{strat.estPrice}</strong>
+                  </div>
+                  <div className="strategy-metric-item">
+                    <small>Carrying Cost</small>
+                    <strong style={{ color: "#38bdf8" }}>{strat.carryingCost}</strong>
+                  </div>
+                </div>
+
+                <div className="strategy-pros-cons">
+                  <span className="strategy-pro">
+                    <CheckCircle2 size={14} style={{ flex: "0 0 auto", marginTop: "1px" }} />
+                    {strat.pro}
+                  </span>
+                  <span className="strategy-con">
+                    <AlertCircle size={14} style={{ flex: "0 0 auto", marginTop: "1px" }} />
+                    {strat.con}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Docked Action Bar */}
+        <div className="record-action-dock">
+          <div className="record-action-dock__info">
+            <span className="record-action-dock__icon">
+              <ClipboardCheck size={22} />
+            </span>
+            <div>
+              <strong>Selected Directive: {currentStrategy.title}</strong>
+              <p>
+                Lead-Time: {leadTime} Weeks · Decision Cutoff: {deadlineDate} ({daysLeft} days remaining)
+              </p>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "10px" }}>
+            <Button
+              variant="secondary"
+              icon={Eye}
+              onClick={() => setSignoffModalOpen(true)}
+            >
+              Review Directive
+            </Button>
+            <Button
+              icon={Save}
+              onClick={() => setSignoffModalOpen(true)}
+            >
+              Record Policy Decision
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Ministerial Sign-off Modal */}
+      {signoffModalOpen && (
+        <div className="gov-modal-overlay">
+          <div className="gov-modal-card">
+            <div className="gov-modal-header">
+              <h2>
+                <ShieldCheck size={22} color="var(--primary)" />
+                Record Policy Directive Sign-Off
+              </h2>
+              <button
+                type="button"
+                onClick={() => setSignoffModalOpen(false)}
+                style={{ background: "none", border: "none", color: "var(--ink-muted)", cursor: "pointer" }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="gov-modal-body">
+              <div style={{ padding: "12px 14px", borderRadius: "var(--radius-md)", background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
+                <strong style={{ color: "#6ee7b7", fontSize: "14px", display: "block" }}>
+                  {currentStrategy.title}
+                </strong>
+                <span style={{ fontSize: "12px", color: "var(--ink-muted)", display: "block", marginTop: "2px" }}>
+                  Target Crop: {crop} · District: {district} · Lead Time: {leadTime} Weeks · Cutoff: {deadlineDate}
+                </span>
+              </div>
+
+              <div className="form-field">
+                <label>Signing Officer</label>
+                <input
+                  type="text"
+                  value={officerName}
+                  onChange={(e) => setOfficerName(e.target.value)}
+                  style={{ padding: "9px 12px", borderRadius: "6px", background: "var(--bg-raised)", border: "1px solid var(--glass-border)", color: "var(--ink)" }}
+                />
+              </div>
+
+              <div className="form-field">
+                <label>Designation & Department</label>
+                <input
+                  type="text"
+                  value={officerDesignation}
+                  onChange={(e) => setOfficerDesignation(e.target.value)}
+                  style={{ padding: "9px 12px", borderRadius: "6px", background: "var(--bg-raised)", border: "1px solid var(--glass-border)", color: "var(--ink)" }}
+                />
+              </div>
+
+              <div className="form-field">
+                <label>Policy Memo & Ministerial Justification</label>
+                <textarea
+                  value={officerNotes}
+                  onChange={(e) => setOfficerNotes(e.target.value)}
+                  rows={3}
+                  style={{ padding: "9px 12px", borderRadius: "6px", background: "var(--bg-raised)", border: "1px solid var(--glass-border)", color: "var(--ink)", resize: "vertical" }}
+                />
+              </div>
+            </div>
+
+            <div className="gov-modal-footer">
+              <Button variant="ghost" onClick={() => setSignoffModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button icon={CheckCheck} onClick={handleCommitDecision}>
+                Authorize & Log Directive
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="data-footnote">
         <Database size={15} />
         <span>
-          Gap model version 2.4.1 · Import lead-time assumption: {leadTime}{" "}
-          weeks
+          Supply Gap Model v2.4.1 · District: {district} · Lead-Time: {leadTime} weeks · Cryptographic seal: SHA-256 verified
         </span>
-        <ConfidenceBadge level="Medium" />
+        <ConfidenceBadge level="High" />
       </div>
     </>
   )
@@ -1980,237 +2506,910 @@ function AdoptionScreen({
   )
 }
 
-function HistoryScreen({ decision }: { decision: string }) {
-  const [filter, setFilter] = useState("All actions")
-  const rawRows = [
-    [
-      "RUN-260404-18",
-      "04 Apr 2026",
-      "2.4.1",
-      "CPP 3.2 · HARTI 04/04",
-      "Loss 12% · Lead 7w",
-      decision || "Import later",
-    ],
-    [
-      "RUN-260321-07",
-      "21 Mar 2026",
-      "2.4.0",
-      "CPP 3.1 · HARTI 21/03",
-      "Loss 12% · Lead 7w",
-      "Monitor",
-    ],
-    [
-      "RUN-260307-12",
-      "07 Mar 2026",
-      "2.3.8",
-      "CPP 3.1 · HARTI 07/03",
-      "Loss 10% · Lead 8w",
-      "Delay imports",
-    ],
-  ]
+function HistoryScreen({
+  decision = "",
+  decisionHistory = INITIAL_DECISION_HISTORY,
+  crop = "Big onion",
+}: {
+  decision?: string
+  decisionHistory?: PolicyDecision[]
+  crop?: string
+}) {
+  const [searchQuery, setSearchQuery] = useState("")
+  const [categoryFilter, setCategoryFilter] = useState("All policies")
+  const [selectedRun, setSelectedRun] = useState<PolicyDecision | null>(null)
+  const [copiedHash, setCopiedHash] = useState<string | null>(null)
+  const [exportNotice, setExportNotice] = useState(false)
+
+  // Merge runtime decision with history
+  const allRuns = useMemo(() => {
+    return decisionHistory
+  }, [decisionHistory])
+
+  // Real-time filtering across all metadata
+  const filteredRuns = useMemo(() => {
+    return allRuns.filter((item) => {
+      const matchesCategory =
+        categoryFilter === "All policies" ||
+        item.category.toLowerCase().includes(categoryFilter.toLowerCase()) ||
+        item.action.toLowerCase().includes(categoryFilter.toLowerCase())
+
+      const q = searchQuery.toLowerCase().trim()
+      const matchesSearch =
+        !q ||
+        item.id.toLowerCase().includes(q) ||
+        item.action.toLowerCase().includes(q) ||
+        item.crop.toLowerCase().includes(q) ||
+        item.officer.toLowerCase().includes(q) ||
+        item.district.toLowerCase().includes(q) ||
+        (item.notes && item.notes.toLowerCase().includes(q))
+
+      return matchesCategory && matchesSearch
+    })
+  }, [allRuns, categoryFilter, searchQuery])
+
+  // Count active directives
+  const activeCount = useMemo(() => {
+    return allRuns.filter((r) => r.status === "Active").length
+  }, [allRuns])
+
+  // Copy hash action
+  const handleCopyHash = (hash: string) => {
+    navigator.clipboard?.writeText(hash)
+    setCopiedHash(hash)
+    setTimeout(() => setCopiedHash(null), 2200)
+  }
+
+  // Working CSV Export action
+  const handleExportCSV = () => {
+    const headers = [
+      "Run_ID",
+      "Date",
+      "Timestamp",
+      "Crop",
+      "District",
+      "Policy_Action",
+      "Category",
+      "Model_Version",
+      "Data_Version",
+      "Assumptions",
+      "Officer",
+      "Designation",
+      "Status",
+      "SHA256_Provenance_Hash",
+      "Policy_Notes",
+    ]
+    const rows = filteredRuns.map((r) => [
+      r.id,
+      `"${r.date}"`,
+      `"${r.timestamp}"`,
+      `"${r.crop}"`,
+      `"${r.district}"`,
+      `"${r.action}"`,
+      `"${r.category}"`,
+      `"${r.modelVersion}"`,
+      `"${r.dataVersion}"`,
+      `"${r.assumptions}"`,
+      `"${r.officer}"`,
+      `"${r.designation}"`,
+      `"${r.status}"`,
+      `"${r.sha256Hash}"`,
+      `"${(r.notes || "").replace(/"/g, '""')}"`,
+    ])
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n")
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement("a")
+    link.setAttribute("href", encodedUri)
+    link.setAttribute("download", `GoviSense_Policy_Audit_Log_${new Date().toISOString().slice(0, 10)}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    setExportNotice(true)
+    setTimeout(() => setExportNotice(false), 3000)
+  }
+
   return (
     <>
       <PageHeading
-        eyebrow="Audit trail"
+        eyebrow="Audit Trail & Model Governance"
         icon={History}
-        title="Decision history"
-        description="Trace every model run, assumption set and officer action."
+        title="Decision History & Directives"
+        description="Immutable audit trail recording every model run, assumption set, and signed officer action."
         actions={
-          <Button variant="secondary" icon={Download}>
-            Export CSV
+          <Button icon={Download} onClick={handleExportCSV}>
+            Export Audit Log (CSV)
           </Button>
         }
       />
-      <section className="panel table-panel">
-        <div className="table-toolbar">
-          <div className="table-search">
-            <Search size={16} />
-            <input
-              aria-label="Search runs"
-              placeholder="Search run ID or action"
-            />
+
+      {exportNotice && (
+        <div className="alert-banner alert-banner--success" style={{ marginBottom: "16px" }}>
+          <CheckCircle2 size={18} />
+          <div>
+            <strong>Audit Log Exported Successfully</strong>
+            <p>Downloaded {filteredRuns.length} policy directive records with cryptographic provenance hashes.</p>
           </div>
-          <SelectControl
-            compact
-            label="Filter"
-            value={filter}
-            options={["All actions", "Tariff adjustment", "Planting advisory", "Storage buffer", "Import quota"]}
-            onChange={setFilter}
-          />
         </div>
-        <div className="data-table-wrap">
-          <table className="data-table">
+      )}
+
+      {/* Audit KPI Governance Grid */}
+      <div className="audit-kpi-grid">
+        <div className="audit-kpi-tile">
+          <small>RECORDED DIRECTIVES</small>
+          <strong>{allRuns.length} Logged Runs</strong>
+          <p>Traceable to baseline dataset and model weights</p>
+        </div>
+
+        <div className="audit-kpi-tile">
+          <small>ACTIVE IN-MARKET POLICIES</small>
+          <strong style={{ color: "var(--primary)" }}>{activeCount} Active Directives</strong>
+          <p>Currently governing import licenses & storage quotas</p>
+        </div>
+
+        <div className="audit-kpi-tile">
+          <small>CRYPTOGRAPHIC PROVENANCE</small>
+          <strong style={{ color: "#38bdf8" }}>100% SHA-256</strong>
+          <p>Sealed with input data digests & sign-off timestamps</p>
+        </div>
+
+        <div className="audit-kpi-tile">
+          <small>AVG SHIPPING LEAD TIME</small>
+          <strong>7.0 Weeks</strong>
+          <p>Standard marine bulk carrier assumption across runs</p>
+        </div>
+      </div>
+
+      {/* Toolbar: Real-time Search & Filter Chips */}
+      <div className="audit-toolbar-panel">
+        <div className="audit-toolbar-top">
+          <div className="audit-search-box">
+            <Search size={16} color="var(--ink-muted)" />
+            <input
+              type="text"
+              placeholder="Search by Run ID, Officer, Crop, or Directive..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                style={{ background: "none", border: "none", color: "var(--ink-muted)", cursor: "pointer" }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          <div style={{ fontSize: "12px", color: "var(--ink-muted)" }}>
+            Showing <strong>{filteredRuns.length}</strong> of {allRuns.length} entries
+          </div>
+        </div>
+
+        <div className="audit-chips-bar">
+          <span style={{ fontSize: "11px", fontWeight: "700", color: "var(--ink-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginRight: "4px" }}>
+            Filter Category:
+          </span>
+          {[
+            "All policies",
+            "Import quota",
+            "Tariff adjustment",
+            "Planting advisory",
+            "Storage buffer",
+          ].map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              className={cx("audit-filter-chip", categoryFilter === cat && "audit-filter-chip--active")}
+              onClick={() => setCategoryFilter(cat)}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Executive Audit Log Table */}
+      <section className="audit-table-panel">
+        <div className="audit-table-wrap">
+          <table className="audit-table">
             <thead>
               <tr>
-                {[
-                  "Run ID",
-                  "Date",
-                  "Model",
-                  "Data versions",
-                  "Assumptions",
-                  "Officer action",
-                  "",
-                ].map((item) => (
-                  <th key={item}>{item}</th>
-                ))}
+                <th>Run ID & Provenance</th>
+                <th>Date & Time</th>
+                <th>Crop & District</th>
+                <th>Policy Directive</th>
+                <th>Assumptions & Version</th>
+                <th>Sign-Off Officer</th>
+                <th>Status</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
-              {rawRows
-                .filter((r) => filter === "All actions" || r[5].toLowerCase().includes(filter.toLowerCase()))
-                .map((row) => (
-                <tr key={row[0]}>
-                  {row.map((cell, index) => (
-                    <td key={cell}>
-                      {index === 0 ? (
-                        <strong>{cell}</strong>
-                      ) : index === 5 ? (
-                        <span className="action-pill">{cell}</span>
-                      ) : (
-                        cell
-                      )}
-                    </td>
-                  ))}
-                  <td>
-                    <IconButton icon={ChevronRight} label={`Open ${row[0]}`} />
+              {filteredRuns.length === 0 ? (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: "center", padding: "40px 20px", color: "var(--ink-muted)" }}>
+                    <History size={32} style={{ margin: "0 auto 10px", opacity: 0.4 }} />
+                    <p style={{ margin: 0, fontWeight: "600" }}>No matching policy directives found.</p>
+                    <small>Try broadening your search query or selecting "All policies".</small>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredRuns.map((row) => {
+                  const isQuota = row.category === "Import quota"
+                  const isTariff = row.category === "Tariff adjustment"
+                  const isStorage = row.category === "Storage buffer"
+                  const isAdvisory = row.category === "Planting advisory"
+
+                  return (
+                    <tr key={row.id}>
+                      <td>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                          <span className="audit-hash-chip">
+                            {row.id}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyHash(row.sha256Hash)}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              padding: 0,
+                              color: copiedHash === row.sha256Hash ? "var(--primary)" : "var(--ink-muted)",
+                              fontSize: "10px",
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "3px",
+                              textAlign: "left",
+                            }}
+                          >
+                            {copiedHash === row.sha256Hash ? (
+                              <>
+                                <CheckCheck size={11} /> Hash copied
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={11} /> Copy SHA-256
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </td>
+
+                      <td>
+                        <strong style={{ fontSize: "13px", color: "var(--ink)", display: "block" }}>
+                          {row.date}
+                        </strong>
+                        <small style={{ color: "var(--ink-muted)", fontSize: "11px" }}>
+                          {row.timestamp}
+                        </small>
+                      </td>
+
+                      <td>
+                        <strong style={{ fontSize: "13px", color: "var(--ink)", display: "block" }}>
+                          {row.crop}
+                        </strong>
+                        <span style={{ fontSize: "11px", color: "var(--primary)", fontWeight: "600" }}>
+                          {row.district}
+                        </span>
+                      </td>
+
+                      <td>
+                        <span
+                          className={cx(
+                            "policy-action-pill",
+                            isQuota && "policy-action-pill--quota",
+                            isTariff && "policy-action-pill--tariff",
+                            isStorage && "policy-action-pill--storage",
+                            isAdvisory && "policy-action-pill--advisory",
+                          )}
+                        >
+                          {row.action}
+                        </span>
+                        {row.impactEstimate && (
+                          <small style={{ display: "block", color: "var(--ink-muted)", fontSize: "11px", marginTop: "4px", maxWidth: "220px" }}>
+                            {row.impactEstimate}
+                          </small>
+                        )}
+                      </td>
+
+                      <td>
+                        <div style={{ fontSize: "12px", color: "var(--ink)" }}>
+                          {row.assumptions}
+                        </div>
+                        <small style={{ color: "var(--ink-muted)", fontSize: "10px", display: "block", marginTop: "2px" }}>
+                          Model {row.modelVersion} · {row.dataVersion}
+                        </small>
+                      </td>
+
+                      <td>
+                        <strong style={{ fontSize: "12px", color: "var(--ink)", display: "block" }}>
+                          {row.officer}
+                        </strong>
+                        <small style={{ color: "var(--ink-muted)", fontSize: "10px", display: "block", marginTop: "1px" }}>
+                          {row.designation}
+                        </small>
+                      </td>
+
+                      <td>
+                        <span
+                          className={cx(
+                            "status-pill",
+                            row.status === "Active" && "status-pill--active",
+                            row.status === "Executed" && "status-pill--executed",
+                            row.status === "Superseded" && "status-pill--superseded",
+                          )}
+                        >
+                          <span
+                            style={{
+                              width: "6px",
+                              height: "6px",
+                              borderRadius: "50%",
+                              background: row.status === "Active" ? "#10b981" : row.status === "Executed" ? "#38bdf8" : "#94a3b8",
+                            }}
+                          />
+                          {row.status}
+                        </span>
+                      </td>
+
+                      <td>
+                        <Button
+                          variant="ghost"
+                          icon={Eye}
+                          onClick={() => setSelectedRun(row)}
+                        >
+                          Inspect
+                        </Button>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
             </tbody>
           </table>
         </div>
       </section>
+
+      {/* Slide-out Provenance Inspector Drawer */}
+      {selectedRun && (
+        <div className="audit-drawer-overlay">
+          <div className="audit-drawer-card">
+            <div className="drawer-header">
+              <div>
+                <span style={{ fontSize: "11px", fontWeight: "700", color: "var(--primary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Run Provenance Inspector
+                </span>
+                <h3 style={{ margin: "2px 0 0", fontSize: "18px", fontWeight: "800", color: "var(--ink)" }}>
+                  {selectedRun.id}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedRun(null)}
+                style={{ background: "none", border: "none", color: "var(--ink-muted)", cursor: "pointer" }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="drawer-section">
+              <h4>
+                <ShieldCheck size={14} color="var(--primary)" />
+                Cryptographic Integrity Hash
+              </h4>
+              <div className="hash-box">{selectedRun.sha256Hash}</div>
+              <small style={{ color: "var(--ink-muted)", fontSize: "11px" }}>
+                SHA-256 seal guarantees dataset snapshot and assumption integrity cannot be altered retrospectively.
+              </small>
+            </div>
+
+            <div className="drawer-section">
+              <h4>
+                <FileText size={14} color="var(--primary)" />
+                Policy Directive Parameters
+              </h4>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "12px" }}>
+                <div>
+                  <span style={{ color: "var(--ink-muted)", display: "block" }}>Action</span>
+                  <strong style={{ color: "var(--ink)" }}>{selectedRun.action}</strong>
+                </div>
+                <div>
+                  <span style={{ color: "var(--ink-muted)", display: "block" }}>Category</span>
+                  <strong style={{ color: "var(--ink)" }}>{selectedRun.category}</strong>
+                </div>
+                <div>
+                  <span style={{ color: "var(--ink-muted)", display: "block" }}>Target Commodity</span>
+                  <strong style={{ color: "var(--ink)" }}>{selectedRun.crop} ({selectedRun.district})</strong>
+                </div>
+                <div>
+                  <span style={{ color: "var(--ink-muted)", display: "block" }}>Import Lead-Time</span>
+                  <strong style={{ color: "var(--ink)" }}>{selectedRun.leadTime} Weeks</strong>
+                </div>
+              </div>
+            </div>
+
+            <div className="drawer-section">
+              <h4>
+                <Database size={14} color="var(--primary)" />
+                Data Feeds Ingested at Run Time
+              </h4>
+              <ul style={{ margin: 0, paddingLeft: "18px", fontSize: "12px", color: "var(--ink)", display: "flex", flexDirection: "column", gap: "6px" }}>
+                <li>HARTI Daily Wholesale Price Feed (DEC Spot Series)</li>
+                <li>Crop Production Programme 2026 (DoA Peradeniya Targets)</li>
+                <li>GoviSense Farmer Mobile Ground Truth Stream (Live Telemetry)</li>
+                <li>Central Bank Inflation & Special Commodity Levy Series</li>
+              </ul>
+            </div>
+
+            <div className="drawer-section">
+              <h4>
+                <UserRound size={14} color="var(--primary)" />
+                Authorizing Sign-off
+              </h4>
+              <div style={{ fontSize: "12px" }}>
+                <strong style={{ color: "var(--ink)", display: "block" }}>{selectedRun.officer}</strong>
+                <span style={{ color: "var(--ink-muted)", display: "block" }}>{selectedRun.designation}</span>
+                <small style={{ color: "var(--primary)", display: "block", marginTop: "4px" }}>
+                  Signed: {selectedRun.date} at {selectedRun.timestamp}
+                </small>
+                {selectedRun.notes && (
+                  <p style={{ margin: "8px 0 0", padding: "8px 10px", borderRadius: "6px", background: "rgba(0,0,0,0.25)", color: "var(--ink)", fontSize: "12px", fontStyle: "italic" }}>
+                    "{selectedRun.notes}"
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "auto" }}>
+              <Button variant="secondary" onClick={() => setSelectedRun(null)}>
+                Close Drawer
+              </Button>
+              <Button icon={Download} onClick={handleExportCSV}>
+                Download Certification Slip
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
 
 function DataSourcesScreen() {
-  const sources = [
-    [
-      "Farmer Mobile Ground Truth Feed",
-      "Live stream",
-      "First-party pseudonymous",
-      "Anuradhapura pilot",
-      "Real-time",
-      "High",
-    ],
-    [
-      "Crop Production Programme 2026",
-      "01 Apr 2026",
-      "Government Open Data",
-      "District + national",
-      "Current",
-      "High",
-    ],
-    [
-      "CBSL Daily Price Reports",
-      "04 Apr 2026",
-      "Open publication",
-      "National",
-      "Current",
-      "High",
-    ],
-    [
-      "HARTI market prices",
-      "04 Apr 2026",
-      "Attribution",
-      "Selected markets",
-      "Current",
-      "High",
-    ],
-    [
-      "WFP / HDX food prices",
-      "12 Mar 2026",
-      "CC BY 4.0",
-      "National",
-      "Current",
-      "Medium",
-    ],
-    [
-      "NASA POWER / CHIRPS",
-      "28 Mar 2026",
-      "Public domain",
-      "Grid coverage",
-      "Current",
-      "Medium",
-    ],
-    [
-      "District storage capacity",
-      "14 Jan 2026",
-      "Internal",
-      "Anuradhapura",
-      "Outdated",
-      "Outdated",
-    ],
-  ] as const
+  const [pingingId, setPingingId] = useState<string | null>(null)
+  const [pingResults, setPingResults] = useState<Record<string, { latency: number; time: string }>>({})
+  const [syncingAll, setSyncingAll] = useState(false)
+  const [syncStep, setSyncStep] = useState(0)
+  const [lastRefreshedTimes, setLastRefreshedTimes] = useState<Record<string, string>>({})
+  const [inspectModalSource, setInspectModalSource] = useState<any | null>(null)
+
+  const sourcesList = [
+    {
+      id: "SRC-001",
+      name: "Farmer Mobile Ground Truth Feed",
+      category: "Real-Time Ground Telemetry",
+      provider: "GoviSense Farmer App (LK-DoA Pilot)",
+      frequency: "Continuous WebSocket Stream",
+      coverage: "Anuradhapura & Kurunegala Pilots",
+      status: "Active (Streaming)",
+      confidence: "High",
+      confidenceScore: "99%",
+      latency: "0.4s",
+      recordsCount: "2,418 submissions today",
+      licence: "First-Party Encrypted (LK-DoA)",
+      isAlert: false,
+      lastSync: "4 mins ago",
+      nextSync: "Real-time",
+      description: "Direct cryptographically signed ground planting declarations from registered smallholder farmers. Provides empirical acreage updates before market arrival.",
+      apiEndpoint: "wss://api.govisense.agr.gov.lk/v1/telemetry/ground-stream",
+    },
+    {
+      id: "SRC-002",
+      name: "HARTI Wholesale & Retail Daily Bulletin",
+      category: "Market Commodity Prices",
+      provider: "Hector Kobbekaduwa Agrarian Research & Training Institute",
+      frequency: "Daily at 06:30 LKST",
+      coverage: "Dambulla, Pettah, Meegoda, Keppetipola DECs",
+      status: "Current",
+      confidence: "High",
+      confidenceScore: "98%",
+      latency: "112ms",
+      recordsCount: "38 market series",
+      licence: "Government Attribution",
+      isAlert: false,
+      lastSync: "Today 06:30",
+      nextSync: "Tomorrow 06:30",
+      description: "Official wholesale spot prices, daily arrival volumes, and retail market price spreads collected across major Dedicated Economic Centres.",
+      apiEndpoint: "https://data.harti.gov.lk/api/v2/prices/daily.json",
+    },
+    {
+      id: "SRC-003",
+      name: "Central Bank Daily Price & Commodity Series",
+      category: "Macro & Financial Data",
+      provider: "Central Bank of Sri Lanka (Economic Research Dept)",
+      frequency: "Daily at 09:00 LKST",
+      coverage: "National Benchmark Series",
+      status: "Current",
+      confidence: "High",
+      confidenceScore: "99%",
+      latency: "94ms",
+      recordsCount: "12 macro series",
+      licence: "Open Publication",
+      isAlert: false,
+      lastSync: "Today 09:00",
+      nextSync: "Tomorrow 09:00",
+      description: "Daily macroeconomic indicators, Special Commodity Levy rates, exchange rates (USD/LKR, INR/LKR), and headline food inflation metrics.",
+      apiEndpoint: "https://cbsl.gov.lk/api/economic-indicators/prices",
+    },
+    {
+      id: "SRC-004",
+      name: "Crop Production Programme (CPP 2026)",
+      category: "Government Target Baseline",
+      provider: "Department of Agriculture Sri Lanka (Peradeniya)",
+      frequency: "Seasonal Baseline Target",
+      coverage: "25 Agrarian Districts (Yala & Maha)",
+      status: "Current",
+      confidence: "High",
+      confidenceScore: "96%",
+      latency: "145ms",
+      recordsCount: "148 district-crop targets",
+      licence: "Government Open Data",
+      isAlert: false,
+      lastSync: "01 Apr 2026",
+      nextSync: "15 Oct 2026",
+      description: "Official pre-season national food security targets establishing baseline cultivating quotas, seed allocation, and target yields.",
+      apiEndpoint: "https://doa.gov.lk/opendata/cpp/2026-yala.json",
+    },
+    {
+      id: "SRC-005",
+      name: "NASA POWER / CHIRPS Precipitation & Agro-Climate",
+      category: "Earth Observation & Climate",
+      provider: "NASA Langley & UCSB Climate Hazards Center",
+      frequency: "Daily Gridded Satellite (0.05° resolution)",
+      coverage: "Island-wide Agro-Ecological Zones",
+      status: "Current",
+      confidence: "Medium-High",
+      confidenceScore: "89%",
+      latency: "210ms",
+      recordsCount: "1,240 grid points",
+      licence: "Public Domain (US Gov)",
+      isAlert: false,
+      lastSync: "28 Mar 2026",
+      nextSync: "In 6 hours",
+      description: "Daily precipitation anomaly, topsoil moisture index, and solar radiation estimations powering the Yield Stress AI module.",
+      apiEndpoint: "https://power.larc.nasa.gov/api/temporal/daily/point",
+    },
+    {
+      id: "SRC-006",
+      name: "WFP / HDX Regional Food Price Index",
+      category: "Market Commodity Prices",
+      provider: "UN OCHA & World Food Programme",
+      frequency: "Fortnightly Bulletin",
+      coverage: "South Asia Regional Corridor",
+      status: "Current",
+      confidence: "Medium",
+      confidenceScore: "85%",
+      latency: "178ms",
+      recordsCount: "220 commodity tracks",
+      licence: "CC BY 4.0",
+      isAlert: false,
+      lastSync: "12 Mar 2026",
+      nextSync: "In 4 days",
+      description: "Regional border commodity prices (Tuticorin, Mumbai, Chittagong) used for import parity price benchmarking and tariff sensitivity modeling.",
+      apiEndpoint: "https://data.humdata.org/api/3/action/package_show",
+    },
+    {
+      id: "SRC-007",
+      name: "District Certified Storage Capacity Registry",
+      category: "Logistics Infrastructure",
+      provider: "Provincial Departments of Agrarian Development",
+      frequency: "Quarterly Audited Survey",
+      coverage: "Anuradhapura, Polonnaruwa, Matale",
+      status: "Outdated (>60 days)",
+      confidence: "Low",
+      confidenceScore: "64%",
+      latency: "340ms",
+      recordsCount: "14 certified cold rooms",
+      licence: "Internal Government Register",
+      isAlert: true,
+      lastSync: "14 Jan 2026 (78 days ago)",
+      nextSync: "Overdue by 18 days",
+      description: "Audited warehouse and cold-storage capacity listings. Currently 18 days past freshness SLA; requires provincial survey verification.",
+      apiEndpoint: "https://agrarian.gov.lk/internal/storage/v1/capacity",
+    },
+  ]
+
+  const handleTestPing = (id: string) => {
+    setPingingId(id)
+    setTimeout(() => {
+      setPingingId(null)
+      const lat = Math.floor(75 + Math.random() * 90)
+      setPingResults((prev) => ({
+        ...prev,
+        [id]: { latency: lat, time: "Just now" },
+      }))
+    }, 700)
+  }
+
+  const handleForceSync = (id: string) => {
+    setPingingId(id)
+    setTimeout(() => {
+      setPingingId(null)
+      setLastRefreshedTimes((prev) => ({
+        ...prev,
+        [id]: "Just synced",
+      }))
+      const lat = Math.floor(65 + Math.random() * 60)
+      setPingResults((prev) => ({
+        ...prev,
+        [id]: { latency: lat, time: "Just now" },
+      }))
+    }, 900)
+  }
+
+  const handleTriggerGlobalSync = () => {
+    setSyncingAll(true)
+    setSyncStep(1)
+    setTimeout(() => {
+      setSyncStep(2)
+      setTimeout(() => {
+        setSyncStep(3)
+        setTimeout(() => {
+          setSyncingAll(false)
+          setSyncStep(0)
+          const updated: Record<string, string> = {}
+          sourcesList.forEach((s) => {
+            updated[s.id] = "Just synced"
+          })
+          setLastRefreshedTimes(updated)
+        }, 1000)
+      }, 1000)
+    }, 1000)
+  }
+
   return (
     <>
       <PageHeading
-        eyebrow="Data governance"
+        eyebrow="Data Governance & Pipeline Telemetry"
         icon={Database}
-        title="Data sources"
-        description="Coverage, freshness, licence and confidence for every model input."
-        actions={<Button icon={RefreshCw}>Check for updates</Button>}
+        title="Data Sources & Health Telemetry"
+        description="Freshness SLA, cryptographic provenance, license compliance, and live ping telemetry across all model feeds."
+        actions={
+          <Button
+            icon={RefreshCw}
+            disabled={syncingAll}
+            onClick={handleTriggerGlobalSync}
+          >
+            {syncingAll ? "Syncing Feeds..." : "Ingest All Feeds"}
+          </Button>
+        }
       />
-      <div className="alert-banner alert-banner--warning">
-        <TriangleAlert size={18} />
+
+      {/* Global Ingestion Orchestration Banner */}
+      <div className="pipeline-trigger-banner">
         <div>
-          <strong>1 source needs attention</strong>
+          <strong style={{ fontSize: "15px", color: "var(--ink)", display: "flex", alignItems: "center", gap: "8px" }}>
+            <Server size={18} color="var(--primary)" />
+            Automated Ingestion Pipeline Status
+          </strong>
+          <p style={{ margin: "3px 0 0", fontSize: "12px", color: "var(--ink-muted)" }}>
+            Aggregating wholesale price bulletins, satellite weather, and first-party farmer ground telemetry.
+          </p>
+          {syncingAll && (
+            <div className="pipeline-sync-steps">
+              <span className={cx("pipeline-step-item", syncStep >= 1 && "pipeline-step-item--done")}>
+                <Radio size={14} /> 1. Ingesting HARTI & CBSL
+              </span>
+              <span className={cx("pipeline-step-item", syncStep >= 2 && "pipeline-step-item--done")}>
+                <Radio size={14} /> 2. Aggregating Farmer Telemetry
+              </span>
+              <span className={cx("pipeline-step-item", syncStep >= 3 && "pipeline-step-item--done")}>
+                <Radio size={14} /> 3. Recomputing SPI Matrix
+              </span>
+            </div>
+          )}
+        </div>
+        <div>
+          <Button
+            variant="secondary"
+            icon={RefreshCw}
+            disabled={syncingAll}
+            onClick={handleTriggerGlobalSync}
+          >
+            {syncingAll ? "Running Pipeline..." : "Trigger Full Ingestion"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Governance Health KPI Grid */}
+      <div className="data-kpi-grid">
+        <div className="data-kpi-tile">
+          <small>CONNECTED FEEDS</small>
+          <strong style={{ color: "var(--primary)" }}>7 Active Feeds</strong>
+          <p>6 verified healthy · 1 pending review</p>
+        </div>
+
+        <div className="data-kpi-tile">
+          <small>PIPELINE UPTIME SLA</small>
+          <strong style={{ color: "#38bdf8" }}>99.4% Compliance</strong>
+          <p>Scheduled daily crawls and webhook listeners</p>
+        </div>
+
+        <div className="data-kpi-tile">
+          <small>FARMER GROUND STREAM</small>
+          <strong style={{ color: "var(--primary)" }}>0.4s Latency</strong>
+          <p>2,418 live planting records synced today</p>
+        </div>
+
+        <div className="data-kpi-tile">
+          <small>GOVERNANCE ATTENTION</small>
+          <strong style={{ color: "#fcd34d" }}>1 Stale Alert</strong>
+          <p>District storage capacity &gt; 60 days</p>
+        </div>
+      </div>
+
+      {/* Attention Banner */}
+      <div className="alert-banner alert-banner--warning" style={{ marginBottom: "22px" }}>
+        <TriangleAlert size={18} />
+        <div style={{ flex: 1 }}>
+          <strong>Attention: District Storage Capacity Registry Stale (78 Days)</strong>
           <p>
-            District storage capacity is older than the 60-day freshness
-            threshold.
+            The storage capacity register for Anuradhapura has exceeded the 60-day freshness SLA.
+            Buffer allocations currently rely on fallback conservative limits (1,200 MT ceiling).
           </p>
         </div>
-        <Button variant="secondary">Review source</Button>
+        <Button variant="secondary" onClick={() => handleForceSync("SRC-007")}>
+          Force Survey Sync
+        </Button>
       </div>
-      <section className="panel table-panel">
-        <div className="data-table-wrap">
-          <table className="data-table">
+
+      {/* High-Tech Governance Feed Cards Grid */}
+      <div className="datasource-grid">
+        {sourcesList.map((feed) => {
+          const ping = pingResults[feed.id]
+          const isPinging = pingingId === feed.id
+          const customLastSync = lastRefreshedTimes[feed.id] || feed.lastSync
+
+          return (
+            <div
+              key={feed.id}
+              className={cx("gov-feed-card", feed.isAlert && "gov-feed-card--alert")}
+            >
+              <div className="feed-header">
+                <div className="feed-header-left">
+                  <div className="feed-avatar">
+                    <Database size={20} />
+                  </div>
+                  <div className="feed-title-block">
+                    <h3>{feed.name}</h3>
+                    <span>{feed.provider}</span>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span className={cx("feed-live-dot", feed.isAlert && "feed-live-dot--alert")} style={feed.isAlert ? { background: "#f59e0b", boxShadow: "0 0 8px #f59e0b" } : {}} />
+                  <span style={{ fontSize: "11px", fontWeight: "700", color: feed.isAlert ? "#fcd34d" : "#6ee7b7" }}>
+                    {feed.status}
+                  </span>
+                </div>
+              </div>
+
+              <div className="feed-metrics-grid">
+                <div className="feed-metric-col">
+                  <small>Freshness</small>
+                  <strong>{customLastSync}</strong>
+                </div>
+                <div className="feed-metric-col">
+                  <small>Reliability</small>
+                  <strong style={{ color: feed.confidence === "High" ? "var(--primary)" : feed.confidence === "Low" ? "#fca5a5" : "#38bdf8" }}>
+                    {feed.confidence} ({feed.confidenceScore})
+                  </strong>
+                </div>
+                <div className="feed-metric-col">
+                  <small>Volume / Rate</small>
+                  <strong>{feed.recordsCount}</strong>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--ink-muted)" }}>
+                  <span>SLA Freshness Window</span>
+                  <span>{feed.nextSync}</span>
+                </div>
+                <div className="sla-progress-track">
+                  <div
+                    className={cx("sla-progress-bar", feed.isAlert && "sla-progress-bar--alert")}
+                    style={{ width: feed.isAlert ? "35%" : "88%" }}
+                  />
+                </div>
+              </div>
+
+              <p style={{ margin: 0, fontSize: "12px", color: "var(--ink-muted)", lineHeight: 1.4 }}>
+                {feed.description}
+              </p>
+
+              <div className="feed-footer">
+                <span className="license-pill">
+                  {feed.licence}
+                </span>
+
+                <div className="feed-buttons">
+                  {ping && (
+                    <span className="ping-result-pill">
+                      <CheckCircle2 size={12} />
+                      {ping.latency}ms · 200 OK
+                    </span>
+                  )}
+                  <Button
+                    variant="ghost"
+                    icon={Activity}
+                    disabled={isPinging}
+                    onClick={() => handleTestPing(feed.id)}
+                  >
+                    {isPinging ? "Pinging..." : "Test Ping"}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    icon={RefreshCw}
+                    disabled={isPinging}
+                    onClick={() => handleForceSync(feed.id)}
+                  >
+                    Sync Feed
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Governance SLA Stewardship Matrix */}
+      <section className="panel" style={{ padding: "22px 24px" }}>
+        <h3 style={{ fontSize: "15px", fontWeight: "800", color: "var(--ink)", margin: "0 0 14px", display: "flex", alignItems: "center", gap: "8px" }}>
+          <ShieldCheck size={18} color="var(--primary)" />
+          Data Governance & Stewardship Protocols
+        </h3>
+        <div style={{ overflowX: "auto" }}>
+          <table className="audit-table">
             <thead>
               <tr>
-                {[
-                  "Source",
-                  "Latest date",
-                  "Licence",
-                  "Coverage",
-                  "Status",
-                  "Confidence",
-                ].map((item) => (
-                  <th key={item}>{item}</th>
-                ))}
+                <th>Data Feed Domain</th>
+                <th>Primary Custodian</th>
+                <th>SLA Refresh Frequency</th>
+                <th>Fallback Policy</th>
+                <th>Encryption & Integrity</th>
               </tr>
             </thead>
             <tbody>
-              {sources.map(
-                ([source, date, licence, coverage, status, confidence]) => (
-                  <tr key={source}>
-                    <td>
-                      <strong>{source}</strong>
-                    </td>
-                    <td>{date}</td>
-                    <td>{licence}</td>
-                    <td>{coverage}</td>
-                    <td>
-                      <span
-                        className={cx(
-                          "source-status",
-                          status === "Outdated" && "source-status--outdated",
-                        )}
-                      >
-                        {status === "Outdated" ? (
-                          <FileClock size={14} />
-                        ) : (
-                          <CheckCircle2 size={14} />
-                        )}
-                        {status}
-                      </span>
-                    </td>
-                    <td>
-                      <ConfidenceBadge level={confidence as Confidence} />
-                    </td>
-                  </tr>
-                ),
-              )}
+              <tr>
+                <td><strong>Ground Truth Telemetry</strong></td>
+                <td>DoA Extension Division (Peradeniya)</td>
+                <td>Real-time streaming (sub-second)</td>
+                <td>Pre-season target baseline interpolation</td>
+                <td>TLS 1.3 · SHA-256 Signature</td>
+              </tr>
+              <tr>
+                <td><strong>Wholesale Market Prices</strong></td>
+                <td>HARTI Data Analytics Unit</td>
+                <td>Daily 06:30 LKST</td>
+                <td>7-day moving median imputation</td>
+                <td>HTTPS · REST JSON API</td>
+              </tr>
+              <tr>
+                <td><strong>Macro & Tariff Indicators</strong></td>
+                <td>Central Bank of Sri Lanka (ERD)</td>
+                <td>Daily 09:00 LKST</td>
+                <td>Prior business day official gazette</td>
+                <td>HTTPS · Public Open Data</td>
+              </tr>
+              <tr>
+                <td><strong>Cold Storage Registry</strong></td>
+                <td>Provincial Agrarian Services Dept</td>
+                <td>Quarterly (60-day threshold)</td>
+                <td>Conservative 1,200 MT cap rule</td>
+                <td>Internal Secure VPN</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -2424,6 +3623,7 @@ function OfficerScreen({
   const [screenState, setScreenState] = useState<ScreenState>("ready")
   const [lastReport, setLastReport] = useState<GroundReport | null>(null)
   const [decision, setDecision] = useState("")
+  const [decisionHistory, setDecisionHistory] = useState<PolicyDecision[]>(INITIAL_DECISION_HISTORY)
   const changed = area !== 2131 || yieldValue !== 16.45
 
   const reset = () => {
@@ -2436,8 +3636,29 @@ function OfficerScreen({
     window.setTimeout(() => setSaved(false), 2600)
   }
 
-  const recordDecision = (value: string) => {
+  const recordDecision = (value: string, details?: Partial<PolicyDecision>) => {
     setDecision(value)
+    const newEntry: PolicyDecision = {
+      id: `RUN-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}-${Math.floor(10 + Math.random() * 90)}`,
+      date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+      timestamp: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) + " UTC",
+      crop: selectedCrop,
+      district: selectedDistrict,
+      modelVersion: "v2.4.1",
+      dataVersion: "CPP 3.2 · HARTI Live · 2,418 Ground Reports",
+      assumptions: details?.assumptions || `Loss 12% · Lead ${details?.leadTime || 7}w`,
+      leadTime: details?.leadTime || 7,
+      action: value,
+      category: details?.category || "Import quota",
+      officer: details?.officer || "Dr. N. Ranasinghe",
+      designation: details?.designation || "Chief Agricultural Economist, Dept of Agriculture",
+      status: "Active",
+      notes: details?.notes || `Executive directive recorded from Gap & Import Timeline simulator for ${selectedCrop} in ${selectedDistrict}.`,
+      confidence: "High (94%)",
+      sha256Hash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(""),
+      impactEstimate: details?.impactEstimate || "Dynamic buffer adjustment deployed to prevent retail price divergence.",
+    }
+    setDecisionHistory((prev) => [newEntry, ...prev])
     setSaved(true)
     window.setTimeout(() => {
       setSaved(false)
@@ -2646,13 +3867,21 @@ function OfficerScreen({
               onOpenGap={() => setPage("Gap & import timeline")}
             />
           ) : page === "Gap & import timeline" ? (
-            <GapTimelineScreen onRecord={recordDecision} />
+            <GapTimelineScreen
+              crop={selectedCrop}
+              district={selectedDistrict}
+              onRecord={recordDecision}
+            />
           ) : page === "Price outlook" ? (
             <PriceOutlookScreen crop={selectedCrop} district={selectedDistrict} />
           ) : page === "Adoption tracker" ? (
             <AdoptionScreen groundReports={groundReports} />
           ) : page === "Decision history" ? (
-            <HistoryScreen decision={decision} />
+            <HistoryScreen
+              decision={decision}
+              decisionHistory={decisionHistory}
+              crop={selectedCrop}
+            />
           ) : page === "Data sources" ? (
             <DataSourcesScreen />
           ) : page === "Settings" ? (
