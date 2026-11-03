@@ -3286,7 +3286,8 @@ function FarmerScreen({
       <div className="farmer-stage-switcher">
         <WorkspaceSwitcher view={view} setView={setView} />
       </div>
-      <div className="mobile-note">
+      <div className="farmer-stage-content">
+        <div className="mobile-note">
         <span>Connected mobile flow</span>
         <strong>390 × 844</strong>
         <p>
@@ -3431,6 +3432,7 @@ function FarmerScreen({
             ))}
           </nav>
         )}
+      </div>
       </div>
     </div>
   )
