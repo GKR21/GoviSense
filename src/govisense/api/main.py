@@ -2,6 +2,7 @@
 GoviSense FastAPI Backend Server
 Provides REST endpoints for AI 1 (Harvest Forecast), AI 2 (Price Forecast),
 AI 3 (Supply Pressure Index), and AI 4 (Gap-Filling Optimization).
+Also provides WP2 endpoints: /api/farmer/top3 (farmer crop recommendation).
 """
 
 from fastapi import FastAPI, Query
@@ -15,7 +16,13 @@ from govisense.data.clean import load_monthly_dataset, engineer_features
 from govisense.models.a1_allocation import HarvestVolumeForecaster
 from govisense.models.a2_price_forecast import PriceForecaster
 from govisense.models.a3_supply_pressure import SupplyPressureEngine, SPIResult
-from govisense.models.a4_gap_deadline import GapFillingOptimizer
+from govisense.models.a4_gap_deadline import GapFillingOptimizer, FarmerAllocationOptimizer
+from govisense.models.demand_estimator import DemandEstimator
+from govisense.models.suitability_scorer import SuitabilityScorer
+from govisense.models.target_area import TargetAreaCalculator
+from govisense.feedback.planting_reports import PlantingReportStore, PlantingReport
+from govisense.db.history import DecisionHistoryStore, DecisionRecord, evaluate_confidence_badge
+from govisense.simulation.agent_sim import MarketAdoptionSimulator, calculate_interval_coverage
 
 app = FastAPI(
     title="GoviSense API",
@@ -36,6 +43,13 @@ app.add_middleware(
 cached_df: Optional[pd.DataFrame] = None
 spi_engine = SupplyPressureEngine()
 optimizer = GapFillingOptimizer()
+farmer_optimizer = FarmerAllocationOptimizer()
+demand_estimator = DemandEstimator()
+suitability_scorer = SuitabilityScorer()
+target_area_calc = TargetAreaCalculator()
+report_store = PlantingReportStore()
+history_store = DecisionHistoryStore()
+adoption_sim = MarketAdoptionSimulator()
 a1_models: Dict[str, HarvestVolumeForecaster] = {}
 a2_models: Dict[str, PriceForecaster] = {}
 
@@ -187,3 +201,314 @@ def simulate_scenario(req: SimulationRequest):
         "simulated_label": spi_res.spi_label,
         "action_summary": spi_res.action_summary
     }
+
+
+# ---------------------------------------------------------------------------
+# Item 6 – Farmer Top-3 Comparison Endpoint
+# ---------------------------------------------------------------------------
+
+@app.get("/api/farmer/top3")
+def farmer_top3(
+    farmer_id: str = Query(..., description="Pseudonymous farmer identifier"),
+    season: str = Query("Maha", description="Season: 'Maha' or 'Yala'"),
+    land_ha: float = Query(3.0, description="Farmer's available land in hectares"),
+    current_month: int = Query(10, description="Current calendar month (1-12)"),
+    is_rainfed: bool = Query(False, description="Whether the farm area is rainfed (no irrigation)"),
+    annual_rainfall_mm: float = Query(1100.0, description="Mean annual rainfall at site (mm)"),
+    avg_temp_c: float = Query(28.0, description="Mean growing-season temperature (°C)"),
+    soil_ph: Optional[float] = Query(None, description="Site soil pH (omit if unknown)"),
+    zone: str = Query("dry", description="Agro-climatic zone: 'dry', 'intermediate', or 'wet'"),
+):
+    """
+    Returns the top-3 recommended crops for a given farmer plus contextual
+    metadata for each crop: fit_score, profit_range (P10–P90 price),
+    risk_level, water_need, planting_window, harvest_period,
+    spi_band_at_harvest, and confidence_badge.
+
+    The endpoint uses:
+    - SuitabilityScorer (WP2) for fit scores and hard filtering
+    - DemandEstimator (WP1) for demand context
+    - SPI engine for supply pressure at harvest
+    - A2 price forecaster for profit range (if model is loaded)
+    - TargetAreaCalculator for area recommendations
+    """
+    area_conditions = {
+        "current_month": current_month,
+        "is_rainfed": is_rainfed,
+        "annual_rainfall_mm": annual_rainfall_mm,
+        "avg_temp_c": avg_temp_c,
+        "soil_ph": soil_ph,
+        "zone": zone,
+    }
+
+    # Get suitability ranking for all crops
+    ranking = suitability_scorer.rank_crops(area_conditions)
+
+    if not ranking:
+        return {
+            "farmer_id": farmer_id,
+            "season": season,
+            "message": "No suitable crops found for the given area conditions.",
+            "top3": [],
+        }
+
+    top3_results = []
+    for scored_crop in ranking[:3]:
+        crop_id = scored_crop.crop_id
+        fit_score = scored_crop.score_0_100
+        confidence_badge = scored_crop.confidence
+
+        # Load crop requirements for this crop
+        try:
+            from govisense.data.crop_requirements import get_crop_requirements
+            all_reqs = get_crop_requirements()
+            req = all_reqs.get(crop_id)
+        except Exception:
+            req = None
+
+        # Demand context
+        demand_month = current_month
+        try:
+            dem_result = demand_estimator.estimate(crop_id, demand_month, scenario="mid")
+            demand_info = {
+                "monthly_demand_mt": dem_result.demand_mt,
+                "seasonal_factor": dem_result.seasonal_factor,
+            }
+        except Exception:
+            demand_info = {}
+
+        # SPI at harvest (approx harvest = planting + duration)
+        harvest_month = ((current_month + (req.duration_months if req else 3) - 1) % 12) + 1
+        try:
+            spi_harvest = spi_engine.compute_spi(
+                crop=crop_id if crop_id in ("big_onion", "chilli") else "big_onion",
+                forecast_supply_mt=1000.0,  # placeholder; real supply from AI 1
+                month=harvest_month,
+                target_date=f"Month {harvest_month}",
+            )
+            spi_band = spi_harvest.spi_label
+        except Exception:
+            spi_band = "Unknown"
+
+        # Price range from A2 model (if available, else use config floor + margin)
+        cfg = settings.crops.get(crop_id) or settings.crops.get(
+            "chilli" if "chilli" in crop_id else "big_onion"
+        )
+        if cfg and a2_models.get(
+            "chilli" if "chilli" in crop_id else
+            "big_onion" if "onion" in crop_id else crop_id
+        ):
+            model_key = "chilli" if "chilli" in crop_id else "big_onion"
+            a2 = a2_models[model_key]
+            floor = cfg.min_fair_farmgate_price
+            p10 = round(floor * 0.85, 0)
+            p90 = round(a2.last_known_price * 1.30, 0)
+            profit_range = {"p10_rs_kg": p10, "p90_rs_kg": p90}
+        elif cfg:
+            floor = cfg.min_fair_farmgate_price
+            profit_range = {
+                "p10_rs_kg": round(floor * 0.85, 0),
+                "p90_rs_kg": round(floor * 1.60, 0),
+            }
+        else:
+            profit_range = {"p10_rs_kg": None, "p90_rs_kg": None}
+
+        # Risk level based on SPI + fit score
+        if fit_score >= 75 and spi_band != "Shortage":
+            risk_level = "Low"
+        elif fit_score >= 55:
+            risk_level = "Medium"
+        else:
+            risk_level = "High"
+
+        # Target area for this farmer's land allocation
+        if req:
+            try:
+                ta = target_area_calc.compute(
+                    crop=crop_id,
+                    season=season,
+                    demand_mt=demand_info.get("monthly_demand_mt", 5000) * 4,
+                    yield_mid=req.yield_mid_mt_ha,
+                    loss_pct=req.loss_pct,
+                    buffer=0.05,
+                    a_reported=0.0,
+                    suitable_land_ha=land_ha,
+                )
+                rec_ha = min(ta.a_rec_ha, land_ha)
+            except Exception:
+                rec_ha = round(land_ha * 0.5, 1)
+        else:
+            rec_ha = round(land_ha * 0.5, 1)
+
+        top3_results.append({
+            "rank": len(top3_results) + 1,
+            "crop_id": crop_id,
+            "crop_name": scored_crop.crop_name,
+            "fit_score": fit_score,
+            "confidence_badge": confidence_badge,
+            "profit_range_rs_kg": profit_range,
+            "risk_level": risk_level,
+            "water_need_mm_season": req.water_mm_season if req else None,
+            "planting_window": (
+                f"Month {req.plant_start_month}–{req.plant_end_month}" if req else "N/A"
+            ),
+            "harvest_period": f"Month {harvest_month} (approx)",
+            "duration_months": req.duration_months if req else None,
+            "spi_band_at_harvest": spi_band,
+            "recommended_ha": rec_ha,
+            "demand_context": demand_info,
+            "suitability_reasons": scored_crop.reasons,
+        })
+
+    return {
+        "farmer_id": farmer_id,
+        "season": season,
+        "area_conditions": area_conditions,
+        "top3": top3_results,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Day 6 Endpoints: Feedback Loop, Confidence Rules, Decision Audit, Simulation
+# ---------------------------------------------------------------------------
+
+class PlantingReportPayload(BaseModel):
+    crop_id: str
+    season: str = "Maha 2025/2026"
+    planned_area_ha: float
+    actual_area_ha: float
+    consent_given: bool
+    pseudonymous_id: str
+    notes: Optional[str] = None
+
+
+class ReTriggerPayload(BaseModel):
+    crop_id: str
+    season: str = "Maha 2025/2026"
+    target_month: int = 4
+    suitable_land_ha: Optional[float] = None
+
+
+class DecisionLogPayload(BaseModel):
+    crop_id: str
+    season: str = "Maha 2025/2026"
+    officer_id: str
+    action_type: str
+    quantity: float
+    unit: str
+    rationale: str
+    notes: Optional[str] = None
+
+
+@app.post("/api/feedback/planting-report")
+def submit_planting_report(payload: PlantingReportPayload):
+    """
+    Item 7: Ingest actual planting report with consent and pseudonymous ID.
+    Replaces planned area with reported area in the store.
+    """
+    try:
+        report = PlantingReport(
+            crop_id=payload.crop_id,
+            season=payload.season,
+            planned_area_ha=payload.planned_area_ha,
+            actual_area_ha=payload.actual_area_ha,
+            consent_given=payload.consent_given,
+            pseudonymous_id=payload.pseudonymous_id,
+            notes=payload.notes,
+        )
+        return report_store.submit_report(report)
+    except ValueError as e:
+        return {"status": "ERROR", "message": str(e)}
+
+
+@app.post("/api/feedback/retrigger")
+def retrigger_pipeline(payload: ReTriggerPayload):
+    """
+    Item 7: Re-trigger SPI and Target Area Calculator (A_rec) using actual
+    cumulative reported planting area.
+    """
+    result = report_store.retrigger_crop(
+        crop_id=payload.crop_id,
+        season=payload.season,
+        target_month=payload.target_month,
+        suitable_land_ha=payload.suitable_land_ha,
+    )
+    from dataclasses import asdict
+    return asdict(result)
+
+
+@app.get("/api/confidence/badge")
+def get_confidence_badge(
+    crop_id: str = Query("big_onion"),
+    data_age_days: int = Query(15),
+    area_reported_share: float = Query(0.35),
+    soil_ph_available: bool = Query(True),
+):
+    """
+    Item 8: Multi-factor confidence badge evaluation using the 5 operational rules.
+    """
+    # Look up crop model metrics if trained
+    a1 = a1_models.get(crop_id)
+    w_model = getattr(a1, "wape_model", 0.15)
+    w_base = getattr(a1, "wape_baseline", 0.20)
+    spi_val = crop_id != "chilli"  # chilli fails historical thesis correlation
+
+    eval_res = evaluate_confidence_badge(
+        crop_id=crop_id,
+        data_age_days=data_age_days,
+        area_reported_share=area_reported_share,
+        model_wape=w_model,
+        baseline_wape=w_base,
+        spi_validated=spi_val,
+        soil_ph_available=soil_ph_available,
+    )
+    from dataclasses import asdict
+    return asdict(eval_res)
+
+
+@app.post("/api/history/log-action")
+def log_officer_action(payload: DecisionLogPayload):
+    """
+    Item 8: Save officer action with model version, data version, and assumptions snapshot.
+    """
+    record = DecisionRecord(
+        crop_id=payload.crop_id,
+        season=payload.season,
+        officer_id=payload.officer_id,
+        action_type=payload.action_type,
+        quantity=payload.quantity,
+        unit=payload.unit,
+        rationale=payload.rationale,
+    )
+    return history_store.log_decision(record)
+
+
+@app.get("/api/history/decisions")
+def get_decision_history(
+    crop_id: Optional[str] = Query(None),
+    season: Optional[str] = Query(None),
+    limit: int = Query(50),
+):
+    """
+    Item 8: Retrieve audit decision log records.
+    """
+    records = history_store.list_decisions(crop_id=crop_id, season=season, limit=limit)
+    from dataclasses import asdict
+    return [asdict(r) for r in records]
+
+
+@app.get("/api/simulation/adoption")
+def get_adoption_simulation(
+    crop_id: str = Query("big_onion"),
+    season_demand_mt: float = Query(26667.0),
+    uncoordinated_supply_mt: float = Query(46000.0),
+):
+    """
+    Item 9: Multi-agent market simulation at 0%, 30%, and 60% farmer adoption tiers.
+    """
+    return adoption_sim.simulate(
+        crop=crop_id,
+        season_demand_mt=season_demand_mt,
+        uncoordinated_supply_mt=uncoordinated_supply_mt,
+    )
+

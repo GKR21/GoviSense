@@ -58,6 +58,26 @@ import {
 } from "lucide-react"
 
 type View = "officer" | "farmer" | "system"
+
+export interface GroundReport {
+  id: string
+  crop: string
+  areaAcres: number
+  areaHa: number
+  date: string
+  district: string
+  timestamp: string
+  pseudonymousId: string
+  status?: string
+}
+
+export const INITIAL_GROUND_REPORTS: GroundReport[] = [
+  { id: "REP-91A2", crop: "Big onion", areaAcres: 2.0, areaHa: 0.81, date: "2026-10-20", district: "Anuradhapura", timestamp: "Yesterday 14:20", pseudonymousId: "LK-NC-0842", status: "Independent choice" },
+  { id: "REP-83B1", crop: "Chilli", areaAcres: 1.5, areaHa: 0.61, date: "2026-10-21", district: "Anuradhapura", timestamp: "Yesterday 16:45", pseudonymousId: "LK-NC-0911", status: "Followed recommendation" },
+  { id: "REP-77C4", crop: "Green gram", areaAcres: 3.0, areaHa: 1.21, date: "2026-10-22", district: "Anuradhapura", timestamp: "Today 09:15", pseudonymousId: "LK-NC-0105", status: "Followed recommendation" },
+  { id: "REP-62D9", crop: "Big onion", areaAcres: 2.5, areaHa: 1.01, date: "2026-10-23", district: "Anuradhapura", timestamp: "Today 11:30", pseudonymousId: "LK-NC-0419", status: "Independent choice" },
+]
+
 type Language = "en" | "si" | "ta"
 type Risk = "shortage" | "balanced" | "oversupply"
 type Confidence = "High" | "Medium" | "Low" | "Outdated"
@@ -191,6 +211,49 @@ function ConfidenceBadge({ level }: { level: Confidence }) {
 
 function DemoRibbon() {
   return <div className="demo-ribbon">SAMPLE DATA</div>
+}
+
+function WorkspaceSwitcher({
+  view,
+  setView,
+  compact = false,
+}: {
+  view: View
+  setView: (view: View) => void
+  compact?: boolean
+}) {
+  return (
+    <div
+      className={cx("workspace-switcher", compact && "workspace-switcher--compact")}
+      role="navigation"
+      aria-label="Workspace views"
+    >
+      {!compact && (
+        <span className="workspace-switcher__brand">
+          <Sprout size={16} />
+          GoviSense
+        </span>
+      )}
+      <div className="workspace-switcher__buttons">
+        <button
+          className={view === "officer" ? "active" : ""}
+          onClick={() => setView("officer")}
+          type="button"
+        >
+          <BarChart3 size={15} />
+          Officer dashboard
+        </button>
+        <button
+          className={view === "farmer" ? "active" : ""}
+          onClick={() => setView("farmer")}
+          type="button"
+        >
+          <Menu size={15} />
+          Farmer app
+        </button>
+      </div>
+    </div>
+  )
 }
 
 const baseSupply = [
@@ -1210,104 +1273,271 @@ function PriceOutlookScreen() {
   )
 }
 
-function AdoptionScreen() {
+function AdoptionScreen({
+  groundReports = INITIAL_GROUND_REPORTS,
+}: {
+  groundReports?: GroundReport[]
+}) {
+  const [simAdoption, setSimAdoption] = useState<0 | 30 | 60>(30)
+
+  // Aggregate user submitted reports onto baseline
+  const dynamicReportedMap: Record<string, number> = {
+    "Big onion": 1880,
+    "Chilli": 2210,
+    "Green gram": 1960,
+    "Maize": 2870,
+  }
+
+  groundReports.forEach((r) => {
+    if (dynamicReportedMap[r.crop] !== undefined) {
+      dynamicReportedMap[r.crop] += r.areaHa
+    }
+  })
+
+  // Simulated scenarios from Item 9 agent simulation
+  const scenarioData = {
+    0: {
+      label: "0% Adoption (Cobweb Over-planting)",
+      desc: "Farmers ignore recommendations and plant historical favorite (Big onion). Severe supply overshoot occurs.",
+      bigOnionHa: 2750,
+      supplyMt: 46000,
+      spi: 1.35,
+      spiTone: "danger" as const,
+      spiLabel: "Severe Oversupply (Glut)",
+      spotPrice: 75,
+      floorPrice: 120,
+      crashRisk: 64,
+      action: "Glut Alert: Freeze July/August import permits immediately. Activate buffer warehouse purchases.",
+    },
+    30: {
+      label: "30% Adoption (Partial Coordination)",
+      desc: "30% of farmers coordinate with recommendations. Moderates peak overshoot and stabilizes farmgate prices.",
+      bigOnionHa: 2050,
+      supplyMt: 34000,
+      spi: 1.14,
+      spiTone: "warning" as const,
+      spiLabel: "Moderate Buffer (+14%)",
+      spotPrice: 132,
+      floorPrice: 120,
+      crashRisk: 14,
+      action: "Moderate vigilance: Narrow import issuance window. Monitor weekly harvesting.",
+    },
+    60: {
+      label: "60% Adoption (Balanced Coordination)",
+      desc: "High coordination with recommendations. Supply lands within optimal ±15% balance band.",
+      bigOnionHa: 1880,
+      supplyMt: 26667,
+      spi: 1.02,
+      spiTone: "success" as const,
+      spiLabel: "Balanced Band (|SPI| ≤ 0.15)",
+      spotPrice: 158,
+      floorPrice: 120,
+      crashRisk: 2,
+      action: "Optimal balance: Proceed with planned scheduled imports during pre-harvest deficit only.",
+    },
+  }[simAdoption]
+
   const rows = [
-    ["Big onion", 2131, 1880],
-    ["Chilli", 2493, 2210],
-    ["Green gram", 1750, 1960],
-    ["Maize", 3100, 2870],
+    ["Big onion", 2131, simAdoption === 0 ? 2750 : Math.round(dynamicReportedMap["Big onion"])],
+    ["Chilli", 2493, Math.round(dynamicReportedMap["Chilli"])],
+    ["Green gram", 1750, Math.round(dynamicReportedMap["Green gram"])],
+    ["Maize", 3100, Math.round(dynamicReportedMap["Maize"])],
   ]
+
+  const totalReportedHa = rows.reduce((acc, curr) => acc + Number(curr[2]), 0)
+  const bigOnionRow = rows[0]
+  const isBigOnionOver = Number(bigOnionRow[2]) > Number(bigOnionRow[1])
+
   return (
     <>
       <PageHeading
-        eyebrow="Aggregate monitoring"
+        eyebrow="Ground truth monitoring"
         icon={Users}
-        title="Adoption tracker"
-        description="Compare recommendations, reported plans and actual outcomes without personal data."
+        title="Adoption tracker & Ground truth"
+        description="Dynamic feedback loop: GoviSense gives non-binding suggestions to farmers and captures actual planting reports to safeguard harvest prices."
         actions={
           <Button variant="secondary" icon={Download}>
             Export aggregate
           </Button>
         }
       />
+
       <div className="privacy-banner">
         <ShieldCheck size={19} />
         <div>
-          <strong>Aggregate view only</strong>
-          <p>No names, phone numbers or individual farm records are shown.</p>
+          <strong>Closed-loop ground truth feedback</strong>
+          <p>
+            Suggestions in the mobile app are advisory only. When farmers report what they actually planted, national supply estimates (SPI) dynamically recalculate here to trigger timely import adjustments.
+          </p>
         </div>
       </div>
+
       <div className="kpi-grid">
         <KpiTile
-          label="Participation rate"
-          value="62%"
-          meta="1,248 of 2,012 invited"
+          label="Farmer participation"
+          value="64%"
+          meta="1,289 of 2,012 registered"
           icon={Users}
         />
         <KpiTile
           label="Reported planting"
-          value="8,920 ha"
-          meta="87% of planned area"
+          value={`${totalReportedHa.toLocaleString()} ha`}
+          meta={`${Math.round((totalReportedHa / 9474) * 100)}% of target extent`}
           icon={Sprout}
         />
         <KpiTile
-          label="Prediction error"
-          value="8.4%"
-          meta="Within target range"
-          icon={BarChart3}
+          label="Ground reports"
+          value={`${groundReports.length + 128}`}
+          meta="Live pseudonymous submissions"
+          icon={FileText}
         />
         <KpiTile
-          label="Complete outcomes"
-          value="742"
-          meta="Harvest and sale reported"
-          icon={CheckCircle2}
+          label="Advisory adherence"
+          value={simAdoption === 0 ? "Cobweb glut" : simAdoption === 30 ? "Partial (30%)" : "Aligned (60%)"}
+          meta={simAdoption === 0 ? "Independent overshooting" : "Price floor protected"}
+          icon={BarChart3}
+          tone={scenarioData.spiTone}
         />
       </div>
+
+      {/* Adoption Scenario Simulator */}
+      <div className="sim-panel">
+        <div className="sim-header">
+          <div>
+            <h3>Interactive Adoption Simulator (Agent-Based Model)</h3>
+            <p>
+              Simulate market outcomes when farmers follow recommendations vs. when they independently over-plant:
+            </p>
+          </div>
+          <ConfidenceBadge level="High" />
+        </div>
+
+        <div className="sim-tabs">
+          <button
+            type="button"
+            className={`sim-btn sim-btn--danger ${simAdoption === 0 ? "sim-btn--active" : ""}`}
+            onClick={() => setSimAdoption(0)}
+          >
+            0% Adoption (Uncoordinated Cobweb)
+          </button>
+          <button
+            type="button"
+            className={`sim-btn ${simAdoption === 30 ? "sim-btn--active" : ""}`}
+            onClick={() => setSimAdoption(30)}
+          >
+            30% Adoption (Partial Coordination)
+          </button>
+          <button
+            type="button"
+            className={`sim-btn ${simAdoption === 60 ? "sim-btn--active" : ""}`}
+            onClick={() => setSimAdoption(60)}
+          >
+            60% Adoption (Target Coordination)
+          </button>
+        </div>
+
+        <div className="sim-result-card">
+          <div className="sim-stat">
+            <label>Projected Supply</label>
+            <strong>{scenarioData.supplyMt.toLocaleString()} MT</strong>
+            <small style={{ color: "var(--ink-muted)" }}>Demand: 26,667 MT</small>
+          </div>
+          <div className="sim-stat">
+            <label>Supply Pressure Index</label>
+            <strong style={{ color: simAdoption === 0 ? "var(--shortage)" : simAdoption === 30 ? "var(--oversupply-bright)" : "var(--primary)" }}>
+              {scenarioData.spi.toFixed(2)}
+            </strong>
+            <small style={{ color: simAdoption === 0 ? "var(--shortage)" : "var(--ink-muted)" }}>
+              {scenarioData.spiLabel}
+            </small>
+          </div>
+          <div className="sim-stat">
+            <label>Farmgate Price Forecast</label>
+            <strong>Rs. {scenarioData.spotPrice} / kg</strong>
+            <small style={{ color: scenarioData.spotPrice < scenarioData.floorPrice ? "var(--shortage)" : "var(--primary)" }}>
+              Floor: Rs. {scenarioData.floorPrice} / kg
+            </small>
+          </div>
+          <div className="sim-stat">
+            <label>Price Crash Risk</label>
+            <strong style={{ color: scenarioData.crashRisk > 50 ? "var(--shortage)" : "var(--ink)" }}>
+              {scenarioData.crashRisk}%
+            </strong>
+            <small style={{ color: "var(--ink-muted)" }}>Probability of loss</small>
+          </div>
+        </div>
+
+        <div className={`sim-action-box sim-action-box--${scenarioData.spiTone}`}>
+          {scenarioData.spiTone === "danger" ? (
+            <TriangleAlert size={18} />
+          ) : scenarioData.spiTone === "warning" ? (
+            <AlertCircle size={18} />
+          ) : (
+            <CheckCircle2 size={18} />
+          )}
+          <span>
+            <strong>Required Policy Action:</strong> {scenarioData.action}
+          </span>
+        </div>
+      </div>
+
       <div className="overview-grid">
         <section className="panel adoption-panel">
           <div className="panel-heading">
             <div>
-              <h2>Recommended vs planned area</h2>
-              <p>Hectares by crop</p>
+              <h2>Recommended Quota vs. Actual Reported Extent</h2>
+              <p>Hectares by crop (Anuradhapura district)</p>
             </div>
+            {isBigOnionOver && (
+              <span className="count-badge" style={{ background: "var(--shortage-tint)", color: "var(--shortage)", borderColor: "var(--shortage-border)" }}>
+                Over-target
+              </span>
+            )}
           </div>
           <div className="adoption-bars">
-            {rows.map(([name, recommended, planned]) => (
-              <div className="adoption-row" key={name}>
-                <strong>{name}</strong>
-                <div>
-                  <span>Recommended</span>
-                  <i style={{ width: `${Number(recommended) / 35}%` }} />
-                  <b>{recommended.toLocaleString()}</b>
+            {rows.map(([name, recommended, planned]) => {
+              const recNum = Number(recommended)
+              const planNum = Number(planned)
+              const isOver = planNum > recNum
+              return (
+                <div className="adoption-row" key={name}>
+                  <strong>{name}</strong>
+                  <div>
+                    <span>Recommended target</span>
+                    <i style={{ width: `${Math.min(recNum / 35, 100)}%` }} />
+                    <b>{recNum.toLocaleString()} ha</b>
+                  </div>
+                  <div>
+                    <span>Actual reported</span>
+                    <i
+                      className={`reported ${isOver ? "reported--overshoot" : ""}`}
+                      style={{ width: `${Math.min(planNum / 35, 100)}%` }}
+                    />
+                    <b style={{ color: isOver ? "var(--shortage)" : "var(--ink)" }}>
+                      {planNum.toLocaleString()} ha {isOver ? "(+)" : ""}
+                    </b>
+                  </div>
                 </div>
-                <div>
-                  <span>Farmer reported</span>
-                  <i
-                    className="reported"
-                    style={{ width: `${Number(planned) / 35}%` }}
-                  />
-                  <b>{planned.toLocaleString()}</b>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
           <p className="sr-summary">
-            Chart summary: Green gram reported area exceeds the recommendation.
-            Big onion, chilli and maize remain below recommended area.
+            Chart summary: Ground reports track whether farmers adhere to crop advice or over-plant.
           </p>
         </section>
+
         <section className="panel attention-panel">
           <div className="panel-heading">
             <div>
-              <h2>Outcome checkpoints</h2>
+              <h2>Outcome Checkpoints</h2>
               <p>Current Maha reporting cycle</p>
             </div>
           </div>
           {[
-            ["Planned area", "92%", "Complete"],
-            ["Actual planting", "71%", "In progress"],
-            ["Harvest reported", "38%", "In progress"],
-            ["Sale outcome", "24%", "Early"],
+            ["Planned advisory views", "92%", "Complete"],
+            ["Ground planting reports", "74%", "In progress"],
+            ["Satellite NDVI verification", "41%", "Active scan"],
+            ["Harvest & wholesale tracking", "24%", "Upcoming"],
           ].map(([label, value, status]) => (
             <div className="checkpoint" key={label}>
               <span>
@@ -1322,6 +1552,53 @@ function AdoptionScreen() {
           ))}
         </section>
       </div>
+
+      {/* Feed of Recent Ground Submissions */}
+      <section className="reports-table-panel">
+        <div className="panel-heading">
+          <div>
+            <h2>Recent Ground Planting Reports (Anonymous)</h2>
+            <p>Field submissions from Farmer Mobile APK and Agrarian Service Officers</p>
+          </div>
+          <span className="count-badge">{groundReports.length}</span>
+        </div>
+        <div className="reports-feed-list">
+          {groundReports.slice(0, 5).map((r) => (
+            <div className="report-feed-item" key={r.id}>
+              <div className="report-feed-item__left">
+                <code>{r.pseudonymousId}</code>
+                <div>
+                  <strong style={{ display: "block", color: "var(--ink)" }}>
+                    {r.crop} · {r.areaAcres} Acres ({r.areaHa} ha)
+                  </strong>
+                  <small style={{ color: "var(--ink-muted)" }}>
+                    {r.district} · Planted {r.date}
+                  </small>
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <span
+                  style={{
+                    display: "inline-block",
+                    padding: "3px 8px",
+                    borderRadius: "999px",
+                    fontSize: "11px",
+                    fontWeight: "600",
+                    background: r.status === "Independent choice" ? "var(--oversupply-tint)" : "var(--primary-tint)",
+                    color: r.status === "Independent choice" ? "var(--oversupply-bright)" : "var(--primary)",
+                    border: `1px solid ${r.status === "Independent choice" ? "var(--oversupply-border)" : "var(--balanced-border)"}`,
+                  }}
+                >
+                  {r.status || "Verified"}
+                </span>
+                <small style={{ display: "block", color: "var(--ink-muted)", marginTop: "2px" }}>
+                  {r.timestamp}
+                </small>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
     </>
   )
 }
@@ -1716,7 +1993,17 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
   )
 }
 
-function OfficerScreen() {
+function OfficerScreen({
+  view,
+  setView,
+  groundReports,
+  onAddReport,
+}: {
+  view: View
+  setView: (view: View) => void
+  groundReports?: GroundReport[]
+  onAddReport?: (report: GroundReport) => void
+}) {
   const [area, setArea] = useState(2131)
   const [yieldValue, setYieldValue] = useState(16.45)
   const [selectedMonth, setSelectedMonth] = useState(6)
@@ -1724,6 +2011,7 @@ function OfficerScreen() {
   const [saved, setSaved] = useState(false)
   const [page, setPage] = useState<OfficerPage>("Overview")
   const [screenState, setScreenState] = useState<ScreenState>("ready")
+  const [lastReport, setLastReport] = useState<GroundReport | null>(null)
   const [decision, setDecision] = useState("")
   const changed = area !== 2131 || yieldValue !== 16.45
 
@@ -1822,6 +2110,7 @@ function OfficerScreen() {
             </div>
           </div>
           <div className="topbar-actions">
+            <WorkspaceSwitcher view={view} setView={setView} compact />
             <label className="state-preview">
               <span>Preview state</span>
               <select
@@ -1860,7 +2149,7 @@ function OfficerScreen() {
           ) : page === "Price outlook" ? (
             <PriceOutlookScreen />
           ) : page === "Adoption tracker" ? (
-            <AdoptionScreen />
+            <AdoptionScreen groundReports={groundReports} />
           ) : page === "Decision history" ? (
             <HistoryScreen decision={decision} />
           ) : page === "Data sources" ? (
@@ -2428,70 +2717,117 @@ const farmerExtra = {
   },
 } as const
 
-const crops = [
-  {
-    name: { en: "Green gram", si: "මුං ඇට", ta: "பச்சைப் பயறு" },
-    image:
-      "https://images.unsplash.com/photo-1719846923269-6fdf75444cb8?auto=format&fit=crop&w=900&q=82",
-    photo: "Hannah Shedrow",
-    profit: "Rs 118k – 154k",
-    risk: "balanced" as Risk,
-    score: "0.98",
-    water: 1,
-    plant: {
-      en: "Oct 15 – Nov 05",
-      si: "ඔක් 15 – නොවැ 05",
-      ta: "அக் 15 – நவ 05",
+export interface FarmerProfile {
+  name: string
+  farmerId: string
+  district: string
+  landAcre: number
+  waterSource: "rainfed" | "minor_tank" | "major_canal"
+  soilCondition: "optimal" | "acidic" | "unknown"
+}
+
+export const defaultProfile: FarmerProfile = {
+  name: "Sunil Perera",
+  farmerId: "ANU-01428",
+  district: "Anuradhapura",
+  landAcre: 1.5,
+  waterSource: "rainfed",
+  soilCondition: "optimal",
+}
+
+export function getPersonalizedCrops(profile: FarmerProfile) {
+  const isRainfed = profile.waterSource === "rainfed"
+  const land = Math.max(0.2, Number(profile.landAcre) || 1.5)
+
+  if (isRainfed) {
+    return [
+      {
+        name: { en: "Green gram", si: "මුං ඇට", ta: "பச்சைப் பயறு" },
+        image: "https://images.unsplash.com/photo-1719846923269-6fdf75444cb8?auto=format&fit=crop&w=900&q=82",
+        photo: "Hannah Shedrow",
+        profit: `Rs ${Math.round(85 * land)}k – ${Math.round(125 * land)}k`,
+        risk: "balanced" as Risk,
+        score: "0.98",
+        water: 1,
+        plant: { en: "Oct 15 – Nov 05", si: "ඔක් 15 – නොවැ 05", ta: "அக் 15 – நவ 05" },
+        harvest: { en: "Jan – Feb", si: "ජන – පෙබ", ta: "ஜன – பிப்" },
+        fit: { en: "98% Fit · Rainfed Choice", si: "98% ගැළපේ · හොඳම තේරීම", ta: "98% பொருத்தம் · சிறந்த தேர்வு" },
+        confidence: "High" as Confidence,
+      },
+      {
+        name: { en: "Cowpea", si: "කවුපි", ta: "தட்டப்பயறு" },
+        image: "https://images.unsplash.com/photo-1546860255-95536c19724e?auto=format&fit=crop&w=900&q=82",
+        photo: "Shane Kong",
+        profit: `Rs ${Math.round(70 * land)}k – ${Math.round(98 * land)}k`,
+        risk: "balanced" as Risk,
+        score: "0.94",
+        water: 1,
+        plant: { en: "Oct 20 – Nov 15", si: "ඔක් 20 – නොවැ 15", ta: "அக் 20 – நவ 15" },
+        harvest: { en: "Jan – Feb", si: "ජන – පෙබ", ta: "ஜන – பிப்" },
+        fit: { en: "94% Fit · Drought Hardened", si: "94% ගැළපේ · නියඟයට ඔරොත්තු", ta: "94% பொருத்தம் · வறட்சி தாங்கும்" },
+        confidence: (profile.soilCondition === "unknown" ? "Medium" : "High") as Confidence,
+      },
+      {
+        name: { en: "Chilli", si: "මිරිස්", ta: "மிளகாய்" },
+        image: "https://images.unsplash.com/photo-1588252303782-cb80119abd6d?auto=format&fit=crop&w=900&q=82",
+        photo: "Mufid Majnun",
+        profit: `Rs ${Math.round(120 * land)}k – ${Math.round(175 * land)}k`,
+        risk: "shortage" as Risk,
+        score: "0.77",
+        water: 2,
+        plant: { en: "Oct 25 – Nov 20", si: "ඔක් 25 – නොවැ 20", ta: "அக் 25 – நவ 20" },
+        harvest: { en: "Feb – Apr", si: "පෙබ – අප්‍රේල්", ta: "பிப் – ஏப்" },
+        fit: { en: "82% Fit · Requires Rain Spells", si: "82% ගැළපේ · වැසි අවශ්‍යයි", ta: "82% பொருத்தம் · மழை தேவை" },
+        confidence: "Medium" as Confidence,
+      },
+    ]
+  }
+
+  // Irrigated (Major canal / Minor tank)
+  return [
+    {
+      name: { en: "Chilli", si: "මිරිස්", ta: "மிளகாய்" },
+      image: "https://images.unsplash.com/photo-1546860255-95536c19724e?auto=format&fit=crop&w=900&q=82",
+      photo: "Shane Kong",
+      profit: `Rs ${Math.round(145 * land)}k – ${Math.round(210 * land)}k`,
+      risk: "shortage" as Risk,
+      score: "0.77",
+      water: 2,
+      plant: { en: "Oct 20 – Nov 15", si: "ඔක් 20 – නොවැ 15", ta: "அக் 20 – நவ 15" },
+      harvest: { en: "Feb – Apr", si: "පෙබ – අප්‍රේල්", ta: "பிப் – ஏப்" },
+      fit: { en: "96% Fit · Top Earner", si: "96% ගැළපේ · ඉහළම ආදායම", ta: "96% பொருத்தம் · அதிக வருமானம்" },
+      confidence: "High" as Confidence,
     },
-    harvest: { en: "Jan – Feb", si: "ජන – පෙබ", ta: "ஜன – பிப்" },
-    fit: { en: "Best match", si: "හොඳම තේරීම", ta: "சிறந்த தேர்வு" },
-    confidence: "High" as Confidence,
-  },
-  {
-    name: { en: "Chilli", si: "මිරිස්", ta: "மிளகாய்" },
-    image:
-      "https://images.unsplash.com/photo-1546860255-95536c19724e?auto=format&fit=crop&w=900&q=82",
-    photo: "Shane Kong",
-    profit: "Rs 142k – 196k",
-    risk: "shortage" as Risk,
-    score: "0.77",
-    water: 2,
-    plant: {
-      en: "Oct 20 – Nov 15",
-      si: "ඔක් 20 – නොවැ 15",
-      ta: "அக் 20 – நவ 15",
+    {
+      name: { en: "Big onion", si: "ලොකු ලූනු", ta: "பெரிய வெங்காயம்" },
+      image: "https://images.unsplash.com/photo-1600807644626-fb3c8c8ba40d?auto=format&fit=crop&w=900&q=82",
+      photo: "Mufid Majnun",
+      profit: `Rs ${Math.round(110 * land)}k – ${Math.round(195 * land)}k`,
+      risk: "oversupply" as Risk,
+      score: "1.42",
+      water: 3,
+      plant: { en: "Nov 01 – Nov 25", si: "නොවැ 01 – නොවැ 25", ta: "நව 01 – நவ 25" },
+      harvest: { en: "Mar – Apr", si: "මාර්තු – අප්‍රේල්", ta: "மார் – ஏப்" },
+      fit: { en: "91% Fit · Max 60% Land Cap", si: "91% ගැළපේ · උපරිම 60% ඉඩම", ta: "91% பொருத்தம் · 60% நில வரம்பு" },
+      confidence: (profile.soilCondition === "unknown" ? "Medium" : "High") as Confidence,
     },
-    harvest: {
-      en: "Feb – Apr",
-      si: "පෙබ – අප්‍රේල්",
-      ta: "பிப் – ஏப்",
+    {
+      name: { en: "Green gram", si: "මුං ඇට", ta: "பச்சைப் பயறு" },
+      image: "https://images.unsplash.com/photo-1719846923269-6fdf75444cb8?auto=format&fit=crop&w=900&q=82",
+      photo: "Hannah Shedrow",
+      profit: `Rs ${Math.round(85 * land)}k – ${Math.round(125 * land)}k`,
+      risk: "balanced" as Risk,
+      score: "0.98",
+      water: 1,
+      plant: { en: "Oct 15 – Nov 05", si: "ඔක් 15 – නොවැ 05", ta: "அக் 15 – நவ 05" },
+      harvest: { en: "Jan – Feb", si: "ජන – පෙබ", ta: "ஜன – பிப்" },
+      fit: { en: "88% Fit · Low Risk Buffer", si: "88% ගැළපේ · අඩු වියදම් ආවරණය", ta: "88% பொருத்தம் · குறைந்த செலவு" },
+      confidence: "High" as Confidence,
     },
-    fit: { en: "Strong option", si: "හොඳ විකල්පයක්", ta: "நல்ல விருப்பம்" },
-    confidence: "Medium" as Confidence,
-  },
-  {
-    name: { en: "Big onion", si: "ලොකු ලූනු", ta: "பெரிய வெங்காயம்" },
-    image:
-      "https://images.unsplash.com/photo-1600807644626-fb3c8c8ba40d?auto=format&fit=crop&w=900&q=82",
-    photo: "Mufid Majnun",
-    profit: "Rs 94k – 181k",
-    risk: "oversupply" as Risk,
-    score: "1.42",
-    water: 3,
-    plant: {
-      en: "Nov 01 – Nov 25",
-      si: "නොවැ 01 – නොවැ 25",
-      ta: "நவ 01 – நவ 25",
-    },
-    harvest: {
-      en: "Mar – Apr",
-      si: "මාර්තු – අප්‍රේල්",
-      ta: "மார் – ஏப்",
-    },
-    fit: { en: "Watch supply", si: "සැපයුම බලන්න", ta: "வழங்கலைக் கவனிக்கவும்" },
-    confidence: "High" as Confidence,
-  },
-]
+  ]
+}
+
+const crops = getPersonalizedCrops(defaultProfile)
 
 function WaterDrops({ count }: { count: number }) {
   return (
@@ -2660,10 +2996,14 @@ function FarmerStateView({
 
 function FarmerHome({
   language,
+  profile,
+  crops: currentCrops,
   onCompare,
   onAlerts,
 }: {
   language: Language
+  profile: FarmerProfile
+  crops: ReturnType<typeof getPersonalizedCrops>
   onCompare: () => void
   onAlerts: () => void
 }) {
@@ -2676,7 +3016,7 @@ function FarmerHome({
           <Leaf size={14} />
           {t.season}
         </span>
-        <p>{extra.greeting}</p>
+        <p>{profile.name} · {profile.district} · {profile.landAcre} {extra.acre}</p>
         <h1>{extra.homeTitle}</h1>
       </div>
       <section className="decision-card">
@@ -2706,11 +3046,11 @@ function FarmerHome({
         <div className="home-risk-row">
           <span>
             <CheckCircle2 size={15} />
-            {crops[0].name[language]} · {t.balanced}
+            {currentCrops[0].name[language]} · {t.balanced}
           </span>
           <span>
             <ArrowUpCircle size={15} />
-            {crops[2].name[language]} · {t.high}
+            {currentCrops[2].name[language]} · {t.high}
           </span>
         </div>
       </section>
@@ -2737,10 +3077,14 @@ function FarmerHome({
 
 function FarmerCompare({
   language,
+  profile,
+  crops: currentCrops,
   onChoose,
   onDetails,
 }: {
   language: Language
+  profile: FarmerProfile
+  crops: ReturnType<typeof getPersonalizedCrops>
   onChoose: (name: string) => void
   onDetails: (index: number) => void
 }) {
@@ -2752,10 +3096,14 @@ function FarmerCompare({
       <div className="mobile-title">
         <span className="season-chip">
           <Leaf size={14} />
-          {t.season}
+          {t.season} · {profile.district} · {profile.landAcre} {extra.acre}
         </span>
         <h1>{t.title}</h1>
-        <p>{t.intro}</p>
+        <p>
+          {profile.waterSource === "rainfed"
+            ? (language === "si" ? "වර්ෂාපෝෂිත ඉඩම් සඳහා විශේෂිත වූ බෝග තේරීම." : language === "ta" ? "மானாவாரி நிலத்திற்கான தனிப்பயன் பரிந்துரை." : "Personalized for rainfed drought-resilient production.")
+            : (language === "si" ? "වාරිමාර්ග ජලය සහිත ඉඩම් සඳහා ඉහළ ආදායම් බෝග." : language === "ta" ? "நீர்ப்பாசன நிலத்திற்கான அதிக வருமான பயிர்கள்." : "Personalized for secure irrigation canal / tank production.")}
+        </p>
       </div>
       <div className="mobile-section-head">
         <div>
@@ -2768,7 +3116,7 @@ function FarmerCompare({
         </div>
       </div>
       <div className="crop-carousel">
-        {crops.map((crop, index) => (
+        {currentCrops.map((crop, index) => (
           <CropCard
             key={crop.name.en}
             crop={crop}
@@ -2811,13 +3159,19 @@ function FarmerCompare({
 function FarmerOnboarding({
   language,
   setLanguage,
+  profile,
   onDone,
 }: {
   language: Language
   setLanguage: (language: Language) => void
-  onDone: () => void
+  profile: FarmerProfile
+  onDone: (newProfile: FarmerProfile) => void
 }) {
-  const [consent, setConsent] = useState(false)
+  const [consent, setConsent] = useState(true)
+  const [district, setDistrict] = useState(profile.district)
+  const [landAcre, setLandAcre] = useState(profile.landAcre)
+  const [waterSource, setWaterSource] = useState<"rainfed" | "minor_tank" | "major_canal">(profile.waterSource)
+  const [soilCondition, setSoilCondition] = useState<"optimal" | "acidic" | "unknown">(profile.soilCondition)
   const extra = farmerExtra[language]
   return (
     <div className="onboarding-screen">
@@ -2855,17 +3209,45 @@ function FarmerOnboarding({
       <div className="onboarding-fields">
         <label>
           <span>{extra.district}</span>
-          <select>
-            <option>Anuradhapura</option>
-            <option>Matale</option>
+          <select value={district} onChange={(e) => setDistrict(e.target.value)}>
+            <option value="Anuradhapura">Anuradhapura (Dry Zone)</option>
+            <option value="Dambulla">Dambulla / Matale</option>
+            <option value="Kurunegala">Kurunegala</option>
           </select>
         </label>
         <label>
           <span>{extra.land}</span>
           <div>
-            <input defaultValue="1.5" inputMode="decimal" />
+            <input
+              value={landAcre}
+              onChange={(e) => setLandAcre(Math.max(0.2, Number(e.target.value) || 0))}
+              inputMode="decimal"
+              type="number"
+              step="0.5"
+              min="0.2"
+              max="20"
+            />
             <small>{extra.acre}</small>
           </div>
+        </label>
+      </div>
+
+      <div className="onboarding-fields onboarding-fields--secondary">
+        <label>
+          <span>WATER SOURCE · ජලය</span>
+          <select value={waterSource} onChange={(e) => setWaterSource(e.target.value as any)}>
+            <option value="rainfed">🌧️ Rainfed (වර්ෂාපෝෂිත)</option>
+            <option value="minor_tank">💧 Minor Tank / Well (කුඩා වැව)</option>
+            <option value="major_canal">🌊 Major Canal (මහා ඇළ)</option>
+          </select>
+        </label>
+        <label>
+          <span>SOIL pH · පස</span>
+          <select value={soilCondition} onChange={(e) => setSoilCondition(e.target.value as any)}>
+            <option value="optimal">Normal (pH 6.5)</option>
+            <option value="acidic">Acidic (pH 5.5)</option>
+            <option value="unknown">Not Tested</option>
+          </select>
         </label>
       </div>
       <label className="consent-check">
@@ -2877,7 +3259,19 @@ function FarmerOnboarding({
         <i>{consent && <Check size={14} />}</i>
         <span>{extra.consent}</span>
       </label>
-      <Button disabled={!consent} onClick={onDone}>
+      <Button
+        disabled={!consent}
+        onClick={() =>
+          onDone({
+            name: "Sunil Perera",
+            farmerId: "ANU-01428",
+            district,
+            landAcre: Number(landAcre) || 1.5,
+            waterSource,
+            soilCondition,
+          })
+        }
+      >
         {extra.continue}
       </Button>
       <small className="onboarding-version">
@@ -2975,10 +3369,41 @@ function ReportPlantingScreen({
 }: {
   language: Language
   chosen: string
-  onSuccess: () => void
+  onSuccess: (report: GroundReport) => void
 }) {
   const [step, setStep] = useState(1)
   const extra = farmerExtra[language]
+  const [selectedCrop, setSelectedCrop] = useState(chosen || "Big onion")
+  const [area, setArea] = useState("1.5")
+  const [date, setDate] = useState("2026-10-24")
+  const [consent, setConsent] = useState(true)
+
+  const availableCrops = [
+    { en: "Big onion", si: "ලොකු ලූනු", ta: "பெரிய வெங்காயம்" },
+    { en: "Chilli", si: "මිරිස්", ta: "மிளகாய்" },
+    { en: "Green gram", si: "මුං ඇට", ta: "பச்சைப்பயறு" },
+    { en: "Maize", si: "බඩ ඉරිඟු", ta: "மக்காச்சோளம்" },
+    { en: "Red onion", si: "රතු ලූනු", ta: "சின்ன வெங்காயம்" },
+    { en: "Potato", si: "අර්තාපල්", ta: "உருளைக்கிழங்கு" },
+    { en: "Tomato", si: "තක්කාලි", ta: "தக்காளி" },
+  ]
+
+  const handleSubmit = () => {
+    const acres = parseFloat(area) || 1.5
+    const report: GroundReport = {
+      id: `REP-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+      crop: selectedCrop,
+      areaAcres: acres,
+      areaHa: Math.round(acres * 0.404686 * 10) / 10,
+      date,
+      district: "Anuradhapura",
+      timestamp: "Just now",
+      pseudonymousId: `LK-NC-${Math.floor(1000 + Math.random() * 9000)}`,
+      status: chosen && selectedCrop !== chosen ? "Independent choice" : "Followed recommendation",
+    }
+    onSuccess(report)
+  }
+
   return (
     <div className="report-screen">
       <div className="mobile-title">
@@ -2997,11 +3422,36 @@ function ReportPlantingScreen({
       <div className="report-form">
         {step === 1 && (
           <>
+            <div className="advisory-notice">
+              <Info size={16} style={{ flexShrink: 0, marginTop: 2 }} />
+              <div>
+                <strong>
+                  {language === "si"
+                    ? "උපදේශාත්මක නිර්දේශ පමණි (Advisory)"
+                    : language === "ta"
+                      ? "ஆலோசனைக் குறிப்பு மட்டும்"
+                      : "Advisory recommendation only"}
+                </strong>
+                <p>
+                  {language === "si"
+                    ? "නිර්දේශ අනිවාර්ය නොවේ. ඔබ සැබවින්ම වගා කරන බෝගය මෙහි තෝරන්න. එය රජයේ සැපයුම් දර්ශකයට එක්වී අස්වනු මිල ආරක්ෂා කරයි."
+                    : language === "ta"
+                      ? "பரிந்துரைகள் கட்டாயமில்லை. நீங்கள் உண்மையில் பயிரிடும் பயிரைத் தேர்ந்தெடுக்கவும்."
+                      : "Suggestions are non-binding. Please report what you actually planted so the Department of Agriculture can track national supply and protect farmgate prices."}
+                </p>
+              </div>
+            </div>
+
             <label>
               <span>{extra.crop}</span>
-              <select defaultValue={chosen || crops[0].name[language]}>
-                {crops.map((crop) => (
-                  <option key={crop.name.en}>{crop.name[language]}</option>
+              <select
+                value={selectedCrop}
+                onChange={(e) => setSelectedCrop(e.target.value)}
+              >
+                {availableCrops.map((c) => (
+                  <option key={c.en} value={c.en}>
+                    {c[language]} ({c.en})
+                  </option>
                 ))}
               </select>
             </label>
@@ -3018,29 +3468,66 @@ function ReportPlantingScreen({
           <label>
             <span>{extra.area}</span>
             <div className="unit-input">
-              <input defaultValue="1.5" inputMode="decimal" />
+              <input
+                value={area}
+                onChange={(e) => setArea(e.target.value)}
+                inputMode="decimal"
+                type="number"
+                step="0.5"
+                min="0.1"
+              />
               <small>{extra.acre}</small>
             </div>
-            <em>Enter the area you expect to plant.</em>
+            <em>
+              {(parseFloat(area) || 0) > 0
+                ? `≈ ${((parseFloat(area) || 0) * 0.4047).toFixed(2)} hectares`
+                : "Enter the land extent you have actually sown."}
+            </em>
           </label>
         )}
         {step === 3 && (
           <>
             <label>
               <span>{extra.date}</span>
-              <input type="date" defaultValue="2026-10-24" />
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
             </label>
             <div className="report-summary">
               <strong>{extra.checkReport}</strong>
               <span>
                 <small>{extra.crop}</small>
-                <b>{chosen || crops[0].name[language]}</b>
+                <b>{selectedCrop}</b>
               </span>
               <span>
                 <small>{extra.area}</small>
-                <b>1.5 {extra.acre}</b>
+                <b>
+                  {area} {extra.acre} ({((parseFloat(area) || 0) * 0.4047).toFixed(2)} ha)
+                </b>
+              </span>
+              <span>
+                <small>{extra.date}</small>
+                <b>{date}</b>
               </span>
             </div>
+
+            <label style={{ display: "flex", gap: "8px", alignItems: "flex-start", marginTop: "12px", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={consent}
+                onChange={(e) => setConsent(e.target.checked)}
+                style={{ marginTop: "3px" }}
+              />
+              <small style={{ color: "var(--ink-muted)", fontSize: "11px", lineHeight: "1.4" }}>
+                {language === "si"
+                  ? "මිල ස්ථායිකරණය සඳහා නිර්නාමික වගා දත්ත කෘෂිකර්ම දෙපාර්තමේන්තුව සමඟ බෙදා ගැනීමට එකඟ වෙමි."
+                  : language === "ta"
+                    ? "அநாமதேய நடவுத் தரவை விவசாயத் துறையுடன் பகிர்ந்து கொள்ள ஒப்புக்கொள்கிறேன்."
+                    : "I consent to share pseudonymous planting extent with the Department of Agriculture for national market price protection."}
+              </small>
+            </label>
           </>
         )}
       </div>
@@ -3052,7 +3539,8 @@ function ReportPlantingScreen({
         )}
         <Button
           icon={step === 3 ? Send : ChevronRight}
-          onClick={() => (step === 3 ? onSuccess() : setStep(step + 1))}
+          disabled={step === 3 && !consent}
+          onClick={() => (step === 3 ? handleSubmit() : setStep(step + 1))}
         >
           {step === 3 ? extra.submit : extra.next}
         </Button>
@@ -3145,10 +3633,14 @@ function AlertsScreen({ language }: { language: Language }) {
 
 function FarmerProfile({
   language,
+  profile,
+  setProfile,
   state,
   setState,
 }: {
   language: Language
+  profile: FarmerProfile
+  setProfile: (p: FarmerProfile) => void
   state: ScreenState
   setState: (state: ScreenState) => void
 }) {
@@ -3162,11 +3654,46 @@ function FarmerProfile({
       <div className="profile-summary">
         <span>SU</span>
         <div>
-          <strong>Sunil Perera</strong>
-          <small>{extra.farmerId} · ANU-01428</small>
+          <strong>{profile.name}</strong>
+          <small>{profile.district} · {profile.landAcre} {extra.acre} · {profile.waterSource === "rainfed" ? "Rainfed" : "Irrigated"}</small>
         </div>
-        <Button variant="secondary">{extra.edit}</Button>
       </div>
+
+      <section className="profile-section">
+        <h2>
+          <SlidersHorizontal size={18} />
+          {language === "si" ? "ගොවිපළ තොරතුරු වෙනස් කරන්න" : language === "ta" ? "பண்ணை விவரங்களை மாற்றுக" : "Update Farm Parameters"}
+        </h2>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "12px" }}>
+          <div>
+            <label style={{ fontSize: "11px", color: "var(--ink-muted)", display: "block", marginBottom: "4px" }}>
+              {extra.land} ({extra.acre})
+            </label>
+            <input
+              type="number"
+              step="0.5"
+              min="0.2"
+              value={profile.landAcre}
+              onChange={(e) => setProfile({ ...profile, landAcre: Math.max(0.2, Number(e.target.value) || 0) })}
+              style={{ width: "100%", padding: "8px", borderRadius: "8px", border: "1px solid var(--neutral-300)", background: "#fff", fontWeight: 700 }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: "11px", color: "var(--ink-muted)", display: "block", marginBottom: "4px" }}>
+              Water Source
+            </label>
+            <select
+              value={profile.waterSource}
+              onChange={(e) => setProfile({ ...profile, waterSource: e.target.value as any })}
+              style={{ width: "100%", padding: "8px", borderRadius: "8px", border: "1px solid var(--neutral-300)", background: "#fff", fontSize: "11px" }}
+            >
+              <option value="rainfed">🌧️ Rainfed</option>
+              <option value="minor_tank">💧 Minor Tank</option>
+              <option value="major_canal">🌊 Major Canal</option>
+            </select>
+          </div>
+        </div>
+      </section>
       <section className="profile-section">
         <h2>
           <ShieldCheck size={18} />
@@ -3202,12 +3729,25 @@ function FarmerProfile({
   )
 }
 
-function FarmerScreen() {
+function FarmerScreen({
+  view,
+  setView,
+  groundReports,
+  onAddReport,
+}: {
+  view: View
+  setView: (view: View) => void
+  groundReports?: GroundReport[]
+  onAddReport?: (report: GroundReport) => void
+}) {
   const [language, setLanguage] = useState<Language>("en")
   const [page, setPage] = useState<FarmerPage>("onboarding")
+  const [profile, setProfile] = useState<FarmerProfile>(defaultProfile)
   const [chosen, setChosen] = useState("")
   const [selectedCrop, setSelectedCrop] = useState(0)
   const [screenState, setScreenState] = useState<ScreenState>("ready")
+
+  const currentCrops = useMemo(() => getPersonalizedCrops(profile), [profile])
   const t = copy[language]
   const extra = farmerExtra[language]
   const navItems = [
@@ -3227,7 +3767,11 @@ function FarmerScreen() {
   }
   return (
     <div className="farmer-stage">
-      <div className="mobile-note">
+      <div className="farmer-stage-switcher">
+        <WorkspaceSwitcher view={view} setView={setView} />
+      </div>
+      <div className="farmer-stage-content">
+        <div className="mobile-note">
         <span>Connected mobile flow</span>
         <strong>390 × 844</strong>
         <p>
@@ -3299,17 +3843,25 @@ function FarmerScreen() {
             <FarmerOnboarding
               language={language}
               setLanguage={setLanguage}
-              onDone={() => setPage("home")}
+              profile={profile}
+              onDone={(newProfile) => {
+                setProfile(newProfile)
+                setPage("home")
+              }}
             />
           ) : page === "home" ? (
             <FarmerHome
               language={language}
+              profile={profile}
+              crops={currentCrops}
               onCompare={() => setPage("compare")}
               onAlerts={() => setPage("alerts")}
             />
           ) : page === "compare" ? (
             <FarmerCompare
               language={language}
+              profile={profile}
+              crops={currentCrops}
               onChoose={chooseCrop}
               onDetails={(index) => {
                 setSelectedCrop(index)
@@ -3319,14 +3871,18 @@ function FarmerScreen() {
           ) : page === "detail" ? (
             <CropDetailScreen
               language={language}
-              crop={crops[selectedCrop]}
-              onChoose={() => chooseCrop(crops[selectedCrop].name[language])}
+              crop={currentCrops[selectedCrop] || currentCrops[0]}
+              onChoose={() => chooseCrop((currentCrops[selectedCrop] || currentCrops[0]).name[language])}
             />
           ) : page === "report" ? (
             <ReportPlantingScreen
               language={language}
               chosen={chosen}
-              onSuccess={() => setPage("success")}
+              onSuccess={(report) => {
+                setLastReport(report)
+                onAddReport?.(report)
+                setPage("success")
+              }}
             />
           ) : page === "success" ? (
             <div className="report-success">
@@ -3335,13 +3891,26 @@ function FarmerScreen() {
               </span>
               <h1>{extra.successTitle}</h1>
               <p>{extra.successBody}</p>
-              <div>
-                <FileText size={19} />
-                <span>
-                  <strong>{chosen || crops[0].name[language]}</strong>
-                  <small>1.5 {extra.acre} · Maha 2026</small>
-                </span>
+              <div style={{ padding: "14px", background: "var(--bg-hover)", borderRadius: "12px", border: "1px solid var(--glass-border)", width: "100%", margin: "14px 0" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+                  <FileText size={18} color="var(--primary)" />
+                  <div>
+                    <strong style={{ display: "block", color: "var(--ink)", fontSize: "14px" }}>
+                      {lastReport?.crop || chosen || crops[0].name[language]}
+                    </strong>
+                    <small style={{ color: "var(--ink-muted)", fontSize: "12px" }}>
+                      {lastReport ? `${lastReport.areaAcres} ${extra.acre} (${lastReport.areaHa} ha) · ${lastReport.date}` : `1.5 ${extra.acre} · Maha 2026`}
+                    </small>
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--primary)", fontSize: "11px", fontWeight: "600" }}>
+                  <ShieldCheck size={14} />
+                  <span>Registered in DoA national supply model ({lastReport?.pseudonymousId || "LK-NC-0842"})</span>
+                </div>
               </div>
+              <p style={{ fontSize: "11px", color: "var(--ink-muted)", lineHeight: "1.4", margin: "0 0 16px" }}>
+                The Government Dashboard has updated its aggregate supply forecast. If excess planting is detected across Anuradhapura, import permits will be restricted to protect your harvest price.
+              </p>
               <Button onClick={() => setPage("home")}>{extra.done}</Button>
             </div>
           ) : page === "alerts" ? (
@@ -3349,6 +3918,8 @@ function FarmerScreen() {
           ) : (
             <FarmerProfile
               language={language}
+              profile={profile}
+              setProfile={setProfile}
               state={screenState}
               setState={setScreenState}
             />
@@ -3372,6 +3943,7 @@ function FarmerScreen() {
             ))}
           </nav>
         )}
+      </div>
       </div>
     </div>
   )
@@ -3733,39 +4305,56 @@ function DesignSystem() {
 }
 
 export default function App() {
-  const [view, setView] = useState<View>("officer")
+  const [view, setView] = useState<View>(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get("view") === "farmer" || window.location.pathname.includes("/farmer")) {
+        return "farmer"
+      }
+    }
+    return "officer"
+  })
+
+  const [groundReports, setGroundReports] = useState<GroundReport[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("govisense_ground_reports")
+        if (saved) return JSON.parse(saved)
+      } catch (e) {}
+    }
+    return INITIAL_GROUND_REPORTS
+  })
+
+  const handleAddReport = (report: GroundReport) => {
+    setGroundReports((prev) => {
+      const next = [report, ...prev]
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("govisense_ground_reports", JSON.stringify(next))
+        } catch (e) {}
+      }
+      return next
+    })
+  }
+
   return (
     <div className="app-shell">
-      <div
-        className="workspace-switcher"
-        role="navigation"
-        aria-label="Workspace views"
-      >
-        <span>
-          <Sprout size={16} />
-          GoviSense
-        </span>
-        <div>
-          <button
-            className={view === "officer" ? "active" : ""}
-            onClick={() => setView("officer")}
-            type="button"
-          >
-            <BarChart3 size={15} />
-            Officer dashboard
-          </button>
-          <button
-            className={view === "farmer" ? "active" : ""}
-            onClick={() => setView("farmer")}
-            type="button"
-          >
-            <Menu size={15} />
-            Farmer app
-          </button>
-        </div>
-      </div>
-      {view === "officer" && <OfficerScreen />}
-      {view === "farmer" && <FarmerScreen />}
+      {view === "officer" && (
+        <OfficerScreen
+          view={view}
+          setView={setView}
+          groundReports={groundReports}
+          onAddReport={handleAddReport}
+        />
+      )}
+      {view === "farmer" && (
+        <FarmerScreen
+          view={view}
+          setView={setView}
+          groundReports={groundReports}
+          onAddReport={handleAddReport}
+        />
+      )}
     </div>
   )
 }

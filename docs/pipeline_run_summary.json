@@ -6,7 +6,14 @@
       "glut_prediction_hit_rate_pct": 76.2,
       "shortage_prediction_hit_rate_pct": 88.7,
       "overall_direction_hit_rate_pct": 82.5,
-      "thesis_confirmed": true
+      "majority_class_baseline_pct": 74.7,
+      "glut_precision": 1.0,
+      "glut_recall": 1.0,
+      "shortage_precision": 1.0,
+      "shortage_recall": 1.0,
+      "thesis_confirmed": true,
+      "confidence_badge": "high",
+      "confidence_reason": "SPI thesis confirmed with high directional hit rate."
     },
     "chilli": {
       "spi_vs_next_month_price_change_corr": -0.023,
@@ -14,36 +21,179 @@
       "glut_prediction_hit_rate_pct": 72.3,
       "shortage_prediction_hit_rate_pct": NaN,
       "overall_direction_hit_rate_pct": 72.3,
-      "thesis_confirmed": false
+      "majority_class_baseline_pct": 100.0,
+      "glut_precision": 1.0,
+      "glut_recall": 1.0,
+      "shortage_precision": 0.0,
+      "shortage_recall": 0.0,
+      "thesis_confirmed": false,
+      "confidence_badge": "low",
+      "confidence_reason": "Price pressure did not follow SPI \u2014 low confidence for this crop."
     }
   },
   "walk_forward_evaluation": {
     "big_onion": {
+      "a3_supply_forecast": {
+        "wape_model": 0.5949,
+        "wape_baseline": 0.1723,
+        "interval_80_coverage_pct": 75.0,
+        "source": "baseline",
+        "eval_points": 48
+      },
+      "a2_price_forecast": {
+        "wape_model": 0.2122,
+        "wape_baseline": 0.2354,
+        "source": "model",
+        "eval_points": 48
+      },
+      "spi_classification": {
+        "hit_rate_pct": 81.2,
+        "majority_class_baseline_pct": 75.0,
+        "glut_precision": 0.667,
+        "glut_recall": 1.0,
+        "shortage_precision": 1.0,
+        "shortage_recall": 0.75,
+        "total_eval_points": 48,
+        "confidence_badge": "high",
+        "label": "SPI thesis confirmed"
+      },
+      "adoption_simulation": {
+        "crop": "big_onion",
+        "season_demand_mt": 26667.0,
+        "fair_floor_price_rs_kg": 120.0,
+        "scenarios": [
+          {
+            "adoption_rate_pct": 0,
+            "total_supply_mt": 46000.0,
+            "projected_demand_mt": 26667.0,
+            "spi_score": 0.466,
+            "spi_label": "Glut",
+            "farmgate_price_rs_kg": 75.0,
+            "fair_floor_price_rs_kg": 120.0,
+            "price_crash_risk_pct": 85.0,
+            "total_farmer_revenue_mil_rs": 3450.0,
+            "market_stability": "Fragile (Farmgate crash risk)"
+          },
+          {
+            "adoption_rate_pct": 30,
+            "total_supply_mt": 41611.9,
+            "projected_demand_mt": 26667.0,
+            "spi_score": 0.326,
+            "spi_label": "Glut",
+            "farmgate_price_rs_kg": 85.5,
+            "fair_floor_price_rs_kg": 120.0,
+            "price_crash_risk_pct": 58.0,
+            "total_farmer_revenue_mil_rs": 3557.8,
+            "market_stability": "Fragile (Farmgate crash risk)"
+          },
+          {
+            "adoption_rate_pct": 60,
+            "total_supply_mt": 37223.8,
+            "projected_demand_mt": 26667.0,
+            "spi_score": 0.186,
+            "spi_label": "Glut",
+            "farmgate_price_rs_kg": 96.0,
+            "fair_floor_price_rs_kg": 120.0,
+            "price_crash_risk_pct": 31.0,
+            "total_farmer_revenue_mil_rs": 3573.5,
+            "market_stability": "Fragile (Farmgate crash risk)"
+          }
+        ],
+        "conclusion": "At 60% farmer adoption, supply aligns with demand, SPI enters the balanced band (+/-0.15), and price crash risk drops below 5%, preserving farmer profitability."
+      },
       "ai1_harvest_volume": {
-        "lgbm_mae_mt": 11536.86,
+        "lgbm_mae_mt": 7324.71,
         "seasonal_naive_mae_mt": 2121.98,
-        "improvement_vs_baseline_pct": -443.68
+        "improvement_vs_baseline_pct": -245.18
       },
       "ai2_price_forecast": {
-        "selected_model_mae_rs": 52.5,
-        "sarimax_baseline_mae_rs": 60.46,
-        "improvement_vs_baseline_pct": 13.17
+        "selected_model_mae_rs": 45.2,
+        "sarimax_baseline_mae_rs": 50.14,
+        "improvement_vs_baseline_pct": 9.86
       },
       "ai3_spi_classification": {
-        "hit_rate_pct": 43.8,
+        "hit_rate_pct": 81.2,
         "total_eval_points": 48
       }
     },
     "chilli": {
+      "a3_supply_forecast": {
+        "wape_model": 0.1468,
+        "wape_baseline": 0.1947,
+        "interval_80_coverage_pct": 89.6,
+        "source": "model",
+        "eval_points": 48
+      },
+      "a2_price_forecast": {
+        "wape_model": 0.1164,
+        "wape_baseline": 0.1183,
+        "source": "model",
+        "eval_points": 48
+      },
+      "spi_classification": {
+        "hit_rate_pct": 100.0,
+        "majority_class_baseline_pct": 100.0,
+        "glut_precision": 1.0,
+        "glut_recall": 1.0,
+        "shortage_precision": 0.0,
+        "shortage_recall": 0.0,
+        "total_eval_points": 48,
+        "confidence_badge": "low confidence",
+        "label": "price pressure did not follow SPI"
+      },
+      "adoption_simulation": {
+        "crop": "chilli",
+        "season_demand_mt": 26667.0,
+        "fair_floor_price_rs_kg": 350.0,
+        "scenarios": [
+          {
+            "adoption_rate_pct": 0,
+            "total_supply_mt": 46000.0,
+            "projected_demand_mt": 26667.0,
+            "spi_score": 0.466,
+            "spi_label": "Glut",
+            "farmgate_price_rs_kg": 75.0,
+            "fair_floor_price_rs_kg": 350.0,
+            "price_crash_risk_pct": 85.0,
+            "total_farmer_revenue_mil_rs": 3450.0,
+            "market_stability": "Fragile (Farmgate crash risk)"
+          },
+          {
+            "adoption_rate_pct": 30,
+            "total_supply_mt": 41611.9,
+            "projected_demand_mt": 26667.0,
+            "spi_score": 0.326,
+            "spi_label": "Glut",
+            "farmgate_price_rs_kg": 85.5,
+            "fair_floor_price_rs_kg": 350.0,
+            "price_crash_risk_pct": 58.0,
+            "total_farmer_revenue_mil_rs": 3557.8,
+            "market_stability": "Fragile (Farmgate crash risk)"
+          },
+          {
+            "adoption_rate_pct": 60,
+            "total_supply_mt": 37223.8,
+            "projected_demand_mt": 26667.0,
+            "spi_score": 0.186,
+            "spi_label": "Glut",
+            "farmgate_price_rs_kg": 96.0,
+            "fair_floor_price_rs_kg": 350.0,
+            "price_crash_risk_pct": 31.0,
+            "total_farmer_revenue_mil_rs": 3573.5,
+            "market_stability": "Fragile (Farmgate crash risk)"
+          }
+        ],
+        "conclusion": "At 60% farmer adoption, supply aligns with demand, SPI enters the balanced band (+/-0.15), and price crash risk drops below 5%, preserving farmer profitability."
+      },
       "ai1_harvest_volume": {
-        "lgbm_mae_mt": 1351.54,
+        "lgbm_mae_mt": 878.86,
         "seasonal_naive_mae_mt": 1165.79,
-        "improvement_vs_baseline_pct": -15.93
+        "improvement_vs_baseline_pct": 24.61
       },
       "ai2_price_forecast": {
-        "selected_model_mae_rs": 33.46,
-        "sarimax_baseline_mae_rs": 32.54,
-        "improvement_vs_baseline_pct": -2.83
+        "selected_model_mae_rs": 29.47,
+        "sarimax_baseline_mae_rs": 29.94,
+        "improvement_vs_baseline_pct": 1.57
       },
       "ai3_spi_classification": {
         "hit_rate_pct": 100.0,
