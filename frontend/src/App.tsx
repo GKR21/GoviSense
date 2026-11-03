@@ -1372,6 +1372,35 @@ function AdoptionScreen({
         </div>
       </div>
 
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "14px", margin: "16px 0", padding: "16px 18px", background: "var(--bg-card)", border: "1px solid var(--glass-border)", borderRadius: "var(--radius-md)", backdropFilter: "var(--glass-blur)" }}>
+        <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+          <div style={{ padding: "8px", borderRadius: "8px", background: "rgba(96, 165, 250, 0.12)", color: "var(--info)" }}>
+            <Database size={20} />
+          </div>
+          <div>
+            <strong style={{ display: "block", color: "var(--ink)", fontSize: "13px", marginBottom: "4px" }}>
+              1. Online Baseline Initialization
+            </strong>
+            <p style={{ margin: 0, fontSize: "11px", color: "var(--ink-muted)", lineHeight: "1.4" }}>
+              Season starts with online Open Data: HARTI daily wholesale prices, CBSL historical trade data, DoA Crop Production targets, and NASA POWER weather grids.
+            </p>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+          <div style={{ padding: "8px", borderRadius: "8px", background: "rgba(16, 185, 129, 0.12)", color: "var(--primary)" }}>
+            <Sprout size={20} />
+          </div>
+          <div>
+            <strong style={{ display: "block", color: "var(--ink)", fontSize: "13px", marginBottom: "4px" }}>
+              2. Continuous Live Ground Ingestion
+            </strong>
+            <p style={{ margin: 0, fontSize: "11px", color: "var(--ink-muted)", lineHeight: "1.4" }}>
+              As cultivation begins, each report submitted via the Farmer Mobile APK incrementally updates this dashboard, transforming statistical projections into verified ground truth.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="kpi-grid">
         <KpiTile
           label="Farmer participation"
@@ -1700,6 +1729,14 @@ function HistoryScreen({ decision }: { decision: string }) {
 
 function DataSourcesScreen() {
   const sources = [
+    [
+      "Farmer Mobile Ground Truth Feed",
+      "Live stream",
+      "First-party pseudonymous",
+      "Anuradhapura pilot",
+      "Real-time",
+      "High",
+    ],
     [
       "Crop Production Programme 2026",
       "01 Apr 2026",
