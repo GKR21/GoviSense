@@ -102,3 +102,43 @@ python scripts/run_pipeline.py
 ```powershell
 python -m pytest tests/
 ```
+
+---
+
+## 5. System Architecture: Web Dashboard & Flutter Mobile APK
+
+```
+┌────────────────────────────────────────────────────────┐
+│                   GoviSense Ecosystem                  │
+├──────────────────────────┬─────────────────────────────┤
+│   Government Web App     │     Farmer Mobile App       │
+│      (Server Hosted)     │   (Standalone Android APK)  │
+│   React 19 + TypeScript  │       Flutter + Dart        │
+│    Directory: frontend/  │    Directory: farmer_app/   │
+└────────────┬─────────────┴──────────────┬──────────────┘
+             │                            │
+             │   REST API & WebSockets    │
+             ▼                            ▼
+┌────────────────────────────────────────────────────────┐
+│             FastAPI Backend Server (Python)            │
+│   - AI 1: LightGBM Harvest Volume Forecaster           │
+│   - AI 2: SARIMAX / LightGBM Price Forecaster          │
+│   - AI 3: Supply Pressure Index (SPI Engine)           │
+│   - AI 4: HiGHS Linear Recommendation Optimizer        │
+│   - Feedback Store: Live Farmer Ground Truth Stream    │
+└────────────────────────────────────────────────────────┘
+```
+
+### Running the Government Web Dashboard (Server)
+```powershell
+npm --prefix frontend install
+npm --prefix frontend run dev
+```
+
+### Building the Farmer Android APK (Flutter)
+```powershell
+cd farmer_app
+flutter pub get
+flutter build apk --release
+# Output APK: farmer_app/build/app/outputs/flutter-apk/app-release.apk
+```

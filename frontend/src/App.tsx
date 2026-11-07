@@ -462,15 +462,15 @@ function WorkspaceSwitcher({
           type="button"
         >
           <BarChart3 size={15} />
-          Officer dashboard
+          Government Web Platform
         </button>
         <button
           className={view === "farmer" ? "active" : ""}
           onClick={() => setView("farmer")}
           type="button"
         >
-          <Menu size={15} />
-          Farmer app
+          <Smartphone size={15} />
+          Flutter APK Telemetry
         </button>
       </div>
     </div>
@@ -5520,12 +5520,11 @@ function FarmerScreen({
       </div>
       <div className="farmer-stage-content">
         <div className="mobile-note">
-        <span>Connected mobile flow</span>
-        <strong>390 × 844</strong>
-        <p>
-          Onboarding → Home → Compare → Detail → Report → Confirmation. Sinhala
-          and Tamil use increased line height and flexible card heights.
-        </p>
+          <span>Dedicated Mobile Client</span>
+          <strong>Flutter Android APK</strong>
+          <p>
+            The production farmer application is built with <strong>Flutter</strong> in <code>farmer_app/</code> and compiles to an installable standalone Android APK (<code>lk.gov.govisense.farmer</code>). Below is the live mobile telemetry preview.
+          </p>
         <div className="mobile-note__states">
           {(["ready", "loading", "empty", "error"] as ScreenState[]).map(
             (item) => (
