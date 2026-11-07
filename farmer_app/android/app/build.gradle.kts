@@ -7,7 +7,6 @@ plugins {
 android {
     namespace = "lk.gov.govisense.govisense_farmer"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
