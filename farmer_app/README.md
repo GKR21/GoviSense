@@ -51,7 +51,32 @@ farmer_app/
 
 ---
 
-## 3. How to Build the Android APK
+## 3. Local Environment & Running in Android Studio
+
+### Configured Local Tools
+- **Android Studio:** `C:\Program Files\Android\Android Studio\bin\studio64.exe`
+- **Android SDK:** `C:\Users\User\AppData\Local\Android\Sdk`
+- **Pre-configured Emulator:** `Medium_Phone_API_37.0`
+- **JDK (JBR):** `C:\Program Files\Android\Android Studio\jbr`
+
+### One-Click Launchers
+From the project root (`D:\GoviSence`):
+1. **Launch Emulator:** Double-click [`launch_mobile_emulator.bat`](file:///d:/GoviSence/launch_mobile_emulator.bat) to spin up `Medium_Phone_API_37.0`.
+2. **Open in Android Studio:** Double-click [`open_farmer_app_studio.bat`](file:///d:/GoviSence/open_farmer_app_studio.bat) to open the project in Android Studio.
+
+### Opening in Android Studio
+1. Start Android Studio: `studio64.exe` or use `open_farmer_app_studio.bat`.
+2. Open either:
+   - Root project: `d:\GoviSence\farmer_app` (if Flutter & Dart plugins are installed).
+   - Native Android module: `d:\GoviSence\farmer_app\android` (to inspect Gradle dependencies, manifests, and build variants).
+3. If the Flutter plugin is not yet installed in Android Studio:
+   - Go to **Plugins** -> search for **Flutter** (by flutter.dev) -> Click **Install** -> Restart IDE.
+4. Select the device dropdown: choose **Medium Phone API 37.0** or your connected Android phone.
+5. Click **Run** (`Shift + F10`) or debug.
+
+---
+
+## 4. How to Build the Standalone Android APK
 
 ### Prerequisites
 1. Install [Flutter SDK](https://docs.flutter.dev/get-started/install/windows) (Version 3.0.0 or higher).
