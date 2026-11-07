@@ -248,7 +248,7 @@ class FarmerRepository extends ChangeNotifier {
     required String seedSource,
   }) {
     final crop = _crops.firstWhere(
-      (c) => c.id === cropId,
+      (c) => c.id == cropId,
       orElse: () => _crops.first,
     );
     final rng = Random();

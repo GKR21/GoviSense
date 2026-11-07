@@ -35,7 +35,7 @@ class DigitalFarmerCardWidget extends StatelessWidget {
         children: [
           // Header
           Row(
-            mainAxisAlignment: MainAxisAlignment.between,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
@@ -95,7 +95,7 @@ class DigitalFarmerCardWidget extends StatelessWidget {
           const SizedBox(height: 20),
           // ID and Name
           Row(
-            mainAxisAlignment: MainAxisAlignment.between,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -151,7 +151,7 @@ class DigitalFarmerCardWidget extends StatelessWidget {
               border: Border(top: BorderSide(color: Colors.white.withOpacity(0.15))),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.between,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

@@ -497,7 +497,7 @@ class _FarmerPageState extends State<FarmerPage> {
                     children: [
                       Expanded(
                         child: Text(
-                          crop.localizedName(language: _language),
+                          crop.localizedName(_language),
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                           overflow: TextOverflow.ellipsis,
                         ),

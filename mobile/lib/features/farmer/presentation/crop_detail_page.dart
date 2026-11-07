@@ -133,7 +133,7 @@ class CropDetailPage extends StatelessWidget {
                           border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
                         ),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.between,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text(
                               'Net Return / Acre',

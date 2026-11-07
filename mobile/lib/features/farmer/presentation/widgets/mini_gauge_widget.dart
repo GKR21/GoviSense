@@ -89,7 +89,7 @@ class MiniGaugeWidget extends StatelessWidget {
         if (showLabels) ...[
           const SizedBox(height: 6),
           Row(
-            mainAxisAlignment: MainAxisAlignment.between,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
                 '< 0.85 Shortage',
