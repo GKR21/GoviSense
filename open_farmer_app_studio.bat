@@ -15,3 +15,4 @@ if not exist "%STUDIO_EXE%" (
 
 start "" "%STUDIO_EXE%" "%PROJECT_DIR%"
 echo Android Studio launched with project: %PROJECT_DIR%
+

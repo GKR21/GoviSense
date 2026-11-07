@@ -15,3 +15,4 @@ if not exist "%EMULATOR_EXE%" (
 
 start "" "%EMULATOR_EXE%" -avd Medium_Phone_API_37.0
 echo Android emulator started in background!
+
