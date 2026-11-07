@@ -1,4 +1,6 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { FarmerScreen as ModernFarmerScreen } from "./screens/farmer/FarmerScreen"
+import { farmerService } from "./services/farmerService"
 import {
   AlertCircle,
   ArrowDownCircle,
@@ -1211,12 +1213,32 @@ function PriceOutlookScreen() {
 }
 
 function AdoptionScreen() {
+  const [reports, setReports] = useState(() => farmerService.getReports())
+
+  useEffect(() => {
+    return farmerService.subscribe(() => {
+      setReports(farmerService.getReports())
+    })
+  }, [])
+
+  const extraOnion = reports
+    .filter((r) => r.cropId.includes("onion") || r.cropName.en.toLowerCase().includes("onion"))
+    .reduce((s, r) => s + r.areaAcres * 0.404686, 0)
+  const extraChilli = reports
+    .filter((r) => r.cropId.includes("chilli") || r.cropName.en.toLowerCase().includes("chilli"))
+    .reduce((s, r) => s + r.areaAcres * 0.404686, 0)
+  const extraGreenGram = reports
+    .filter((r) => r.cropId.includes("green") || r.cropName.en.toLowerCase().includes("green"))
+    .reduce((s, r) => s + r.areaAcres * 0.404686, 0)
+
   const rows = [
-    ["Big onion", 2131, 1880],
-    ["Chilli", 2493, 2210],
-    ["Green gram", 1750, 1960],
+    ["Big onion", 2131, Math.round(1880 + extraOnion)],
+    ["Chilli", 2493, Math.round(2210 + extraChilli)],
+    ["Green gram", 1750, Math.round(1960 + extraGreenGram)],
     ["Maize", 3100, 2870],
   ]
+  const totalReportedHa = Math.round(8920 + extraOnion + extraChilli + extraGreenGram)
+
   return (
     <>
       <PageHeading
@@ -1225,9 +1247,23 @@ function AdoptionScreen() {
         title="Adoption tracker"
         description="Compare recommendations, reported plans and actual outcomes without personal data."
         actions={
-          <Button variant="secondary" icon={Download}>
-            Export aggregate
-          </Button>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <span
+              style={{
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "var(--color-primary-forest, #0A5C36)",
+                background: "#E8F5E9",
+                padding: "4px 8px",
+                borderRadius: "6px",
+              }}
+            >
+              {reports.length} Reports Live
+            </span>
+            <Button variant="secondary" icon={Download}>
+              Export aggregate
+            </Button>
+          </div>
         }
       />
       <div className="privacy-banner">
@@ -1246,8 +1282,8 @@ function AdoptionScreen() {
         />
         <KpiTile
           label="Reported planting"
-          value="8,920 ha"
-          meta="87% of planned area"
+          value={`${totalReportedHa.toLocaleString()} ha`}
+          meta={`${reports.length} farmer declarations`}
           icon={Sprout}
         />
         <KpiTile
@@ -1268,7 +1304,7 @@ function AdoptionScreen() {
           <div className="panel-heading">
             <div>
               <h2>Recommended vs planned area</h2>
-              <p>Hectares by crop</p>
+              <p>Hectares by crop (Live Closed Loop Data)</p>
             </div>
           </div>
           <div className="adoption-bars">
@@ -1322,20 +1358,75 @@ function AdoptionScreen() {
           ))}
         </section>
       </div>
+
+      <section className="panel" style={{ marginTop: "16px" }}>
+        <div className="panel-heading">
+          <div>
+            <h2>Verified Smallholder Declarations (Closed Loop Ingestion)</h2>
+            <p>Decentralized reports from Anuradhapura ASC smallholders</p>
+          </div>
+        </div>
+        <div className="data-table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Receipt ID</th>
+                <th>Crop</th>
+                <th>Area</th>
+                <th>Irrigation</th>
+                <th>Seed Source</th>
+                <th>Timestamp</th>
+                <th>Verification Hash</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reports.map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    <strong>{r.id}</strong>
+                  </td>
+                  <td>{r.cropName.en}</td>
+                  <td>
+                    {r.areaAcres} ac ({(r.areaAcres * 0.404686).toFixed(2)} ha)
+                  </td>
+                  <td>{r.irrigationType}</td>
+                  <td>{r.seedSource}</td>
+                  <td>{r.timestamp}</td>
+                  <td>
+                    <code style={{ fontSize: "11px", color: "var(--color-primary-forest, #0A5C36)" }}>
+                      {r.receiptHash}
+                    </code>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </>
   )
 }
 
 function HistoryScreen({ decision }: { decision: string }) {
+  const [officerDecisions, setOfficerDecisions] = useState(() => farmerService.getOfficerDecisions())
+
+  useEffect(() => {
+    return farmerService.subscribe(() => {
+      setOfficerDecisions(farmerService.getOfficerDecisions())
+    })
+  }, [])
+
+  const liveRows = officerDecisions.map((d) => [
+    d.runId,
+    d.date,
+    "2.4.1",
+    "CPP 3.2 · Real-time",
+    "Closed-loop broadcast",
+    d.decision,
+  ])
+
   const rows = [
-    [
-      "RUN-260404-18",
-      "04 Apr 2026",
-      "2.4.1",
-      "CPP 3.2 · HARTI 04/04",
-      "Loss 12% · Lead 7w",
-      decision || "Import later",
-    ],
+    ...liveRows,
     [
       "RUN-260321-07",
       "21 Mar 2026",
@@ -1739,6 +1830,8 @@ function OfficerScreen() {
 
   const recordDecision = (value: string) => {
     setDecision(value)
+    // Phase 6: Broadcast decision to shared reactive FarmerService
+    farmerService.recordOfficerDecision(value, "Big onion")
     setSaved(true)
     window.setTimeout(() => {
       setSaved(false)
@@ -3733,7 +3826,18 @@ function DesignSystem() {
 }
 
 export default function App() {
-  const [view, setView] = useState<View>("officer")
+  const [view, setView] = useState<View>("farmer")
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  useEffect(() => {
+    const updateCount = async () => {
+      const alerts = await farmerService.getAlerts()
+      setUnreadCount(alerts.filter((a) => !a.isRead).length)
+    }
+    updateCount()
+    return farmerService.subscribe(updateCount)
+  }, [])
+
   return (
     <div className="app-shell">
       <div
@@ -3741,11 +3845,59 @@ export default function App() {
         role="navigation"
         aria-label="Workspace views"
       >
-        <span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
           <Sprout size={16} />
           GoviSense
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              fontSize: "10px",
+              fontWeight: 600,
+              color: "#168B52",
+              background: "#E8F5E9",
+              padding: "2px 6px",
+              borderRadius: "10px",
+              marginLeft: "6px",
+            }}
+          >
+            <span
+              style={{
+                width: "6px",
+                height: "6px",
+                borderRadius: "50%",
+                background: "#168B52",
+              }}
+            />
+            Closed Loop Live
+          </span>
         </span>
         <div>
+          <button
+            className={view === "farmer" ? "active" : ""}
+            onClick={() => setView("farmer")}
+            type="button"
+            style={{ position: "relative" }}
+          >
+            <Menu size={15} />
+            Farmer app
+            {unreadCount > 0 && (
+              <span
+                style={{
+                  background: "#D44333",
+                  color: "#fff",
+                  fontSize: "10px",
+                  fontWeight: "bold",
+                  padding: "1px 5px",
+                  borderRadius: "10px",
+                  marginLeft: "4px",
+                }}
+              >
+                {unreadCount}
+              </span>
+            )}
+          </button>
           <button
             className={view === "officer" ? "active" : ""}
             onClick={() => setView("officer")}
@@ -3754,18 +3906,10 @@ export default function App() {
             <BarChart3 size={15} />
             Officer dashboard
           </button>
-          <button
-            className={view === "farmer" ? "active" : ""}
-            onClick={() => setView("farmer")}
-            type="button"
-          >
-            <Menu size={15} />
-            Farmer app
-          </button>
         </div>
       </div>
+      {view === "farmer" && <ModernFarmerScreen />}
       {view === "officer" && <OfficerScreen />}
-      {view === "farmer" && <FarmerScreen />}
     </div>
   )
 }
