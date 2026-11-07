@@ -190,6 +190,9 @@ export async function submitPlantingReportApi(payload: {
   season: string
   planned_area_ha: number
   actual_area_ha: number
+  harvest_outcome_mt?: number
+  sale_price_rs_kg?: number
+  sale_channel?: string
   consent_given: boolean
   pseudonymous_id: string
   notes?: string
@@ -206,4 +209,25 @@ export async function submitPlantingReportApi(payload: {
     return { status: "ACCEPTED_OFFLINE", ...payload }
   }
 }
+
+export async function simulateScenarioApi(payload: {
+  crop: string
+  custom_planted_extent_ha?: number
+  custom_yield_mt_ha?: number
+  custom_import_volume_mt?: number
+  custom_loss_pct?: number
+}) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/simulate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } catch (err) {
+    return null
+  }
+}
+
 

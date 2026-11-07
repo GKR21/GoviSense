@@ -17,10 +17,21 @@ Demand is provided by the DemandEstimator module (WP1) — not a hardcoded const
 
 import numpy as np
 import pandas as pd
-from typing import Dict, Any, List
-from dataclasses import dataclass
+from typing import Dict, Any, List, Optional
+from dataclasses import dataclass, field
 from govisense.config import settings
 from govisense.models.demand_estimator import DemandEstimator
+
+
+@dataclass
+class SPIScenario:
+    scenario: str           # "low", "mid", "high"
+    supply_mt: float
+    demand_mt: float
+    gap_mt: float
+    spi_ratio: float        # S / D (Bands 0.8 / 1.2)
+    spi_score: float        # (S - D) / D (Bands ±0.15)
+    spi_label: str          # "Glut", "Balanced", "Shortage"
 
 
 @dataclass
@@ -30,12 +41,14 @@ class SPIResult:
     forecast_supply_mt: float
     projected_demand_mt: float
     gap_mt: float
-    spi_score: float
-    spi_label: str          # "Glut", "Balanced", "Shortage"
-    action_summary: str
+    spi_score: float        # Delta formula: (Supply - Demand) / Demand
+    spi_ratio: float = 1.0  # Ratio formula: Supply / Demand (Bands 0.8 / 1.2)
+    spi_label: str = "Balanced"  # "Glut", "Balanced", "Shortage"
+    action_summary: str = ""
     demand_low_mt: float = 0.0
     demand_high_mt: float = 0.0
     confidence_badge: str = "medium"
+    scenarios: Dict[str, SPIScenario] = field(default_factory=dict)
 
 
 class SupplyPressureEngine:
@@ -66,37 +79,104 @@ class SupplyPressureEngine:
         target_date: str = "Upcoming",
         import_volume_mt: float = 0.0,
         confidence_badge: str = "medium",
+        supply_low_mt: Optional[float] = None,
+        supply_high_mt: Optional[float] = None,
+        loss_pct: float = 0.15,
     ) -> SPIResult:
         """
         Compute SPI score using forecast supply vs projected demand.
-        Includes low/high demand range for display.
+        Calculates both the ratio formula (SPI = Supply / Demand, bands 0.8 / 1.2)
+        and deviation formula (SPI = (Supply - Demand) / Demand, bands ±0.15).
+        Generates low, mid, and high uncertainty scenarios.
         """
         demand_est_mid = self._demand_estimator.estimate(crop, month, scenario="mid")
         demand_est_low = self._demand_estimator.estimate(crop, month, scenario="low")
         demand_est_high = self._demand_estimator.estimate(crop, month, scenario="high")
 
         projected_demand = demand_est_mid.demand_mt
+        net_retention = 1.0 - loss_pct
 
-        # Effective available supply (15% post-harvest loss, 40% import absorption)
-        effective_supply = (forecast_supply_mt * 0.85) + (import_volume_mt * 0.40)
+        # Effective available supply
+        effective_supply = (forecast_supply_mt * net_retention) + (import_volume_mt * 0.40)
         gap_mt = effective_supply - projected_demand
 
+        # Delta formula: (S - D) / D
         if projected_demand <= 0:
-            spi = 0.0
+            spi_score = 0.0
+            spi_ratio = 1.0
         else:
-            spi = gap_mt / projected_demand
+            spi_score = gap_mt / projected_demand
+            spi_ratio = effective_supply / projected_demand
 
-        spi = round(float(np.clip(spi, -0.65, 0.75)), 3)
+        spi_score = round(float(np.clip(spi_score, -0.65, 0.75)), 3)
+        spi_ratio = round(float(np.clip(spi_ratio, 0.35, 1.75)), 3)
 
-        if spi > self.glut_threshold:
+        # Classification based on 0.8 / 1.2 ratio bands (equivalent to ±0.15/0.20 delta)
+        if spi_ratio > 1.20 or spi_score > self.glut_threshold:
             label = "Glut"
             action = "Oversupply detected: Farm-gate crash risk. Activate storage buffers / defer imports."
-        elif spi < self.shortage_threshold:
+        elif spi_ratio < 0.80 or spi_score < self.shortage_threshold:
             label = "Shortage"
             action = "Deficit detected: Consumer price spike risk. Nudge planting expansion or plan targeted imports."
         else:
             label = "Balanced"
             action = "Supply & demand in equilibrium. Stable market conditions expected."
+
+        # Compute three scenarios (low, mid, high)
+        s_low = supply_low_mt if supply_low_mt is not None else forecast_supply_mt * 0.85
+        s_high = supply_high_mt if supply_high_mt is not None else forecast_supply_mt * 1.15
+
+        eff_low = (s_low * net_retention) + (import_volume_mt * 0.40)
+        eff_high = (s_high * net_retention) + (import_volume_mt * 0.40)
+
+        # Low scenario (pessimistic: lowest supply vs highest demand)
+        d_high = demand_est_high.demand_mt
+        gap_low = eff_low - d_high
+        ratio_low = eff_low / max(d_high, 1.0)
+        score_low = gap_low / max(d_high, 1.0)
+        label_low = "Glut" if ratio_low > 1.20 else ("Shortage" if ratio_low < 0.80 else "Balanced")
+
+        # Mid scenario
+        ratio_mid = spi_ratio
+        score_mid = spi_score
+        label_mid = label
+
+        # High scenario (optimistic: highest supply vs lowest demand)
+        d_low = demand_est_low.demand_mt
+        gap_high = eff_high - d_low
+        ratio_high = eff_high / max(d_low, 1.0)
+        score_high = gap_high / max(d_low, 1.0)
+        label_high = "Glut" if ratio_high > 1.20 else ("Shortage" if ratio_high < 0.80 else "Balanced")
+
+        scenarios_dict = {
+            "low": SPIScenario(
+                scenario="low",
+                supply_mt=round(s_low, 1),
+                demand_mt=round(d_high, 1),
+                gap_mt=round(gap_low, 1),
+                spi_ratio=round(ratio_low, 3),
+                spi_score=round(score_low, 3),
+                spi_label=label_low,
+            ),
+            "mid": SPIScenario(
+                scenario="mid",
+                supply_mt=round(forecast_supply_mt, 1),
+                demand_mt=round(projected_demand, 1),
+                gap_mt=round(gap_mt, 1),
+                spi_ratio=round(ratio_mid, 3),
+                spi_score=round(score_mid, 3),
+                spi_label=label_mid,
+            ),
+            "high": SPIScenario(
+                scenario="high",
+                supply_mt=round(s_high, 1),
+                demand_mt=round(d_low, 1),
+                gap_mt=round(gap_high, 1),
+                spi_ratio=round(ratio_high, 3),
+                spi_score=round(score_high, 3),
+                spi_label=label_high,
+            ),
+        }
 
         return SPIResult(
             crop=crop,
@@ -106,10 +186,12 @@ class SupplyPressureEngine:
             demand_low_mt=demand_est_low.demand_mt,
             demand_high_mt=demand_est_high.demand_mt,
             gap_mt=round(gap_mt, 1),
-            spi_score=spi,
+            spi_score=spi_score,
+            spi_ratio=spi_ratio,
             spi_label=label,
             action_summary=action,
             confidence_badge=confidence_badge,
+            scenarios=scenarios_dict,
         )
 
     def validate_historical_alignment(self, df: pd.DataFrame) -> Dict[str, Any]:

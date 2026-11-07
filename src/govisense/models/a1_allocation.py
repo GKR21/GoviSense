@@ -33,6 +33,61 @@ class ForecastResult:
     upper_bound_90: float
     forecast_source: str = "model"   # "model" or "baseline"
     actual_volume: Optional[float] = None
+    accounting_supply_mt: float = 0.0
+    accounting_breakdown: Dict[str, Any] = field(default_factory=dict)
+
+
+def compute_transparent_accounting_supply(
+    crop: str,
+    month: int,
+    planted_area_ha: float,
+    yield_mt_ha: float = 15.0,
+    loss_pct: float = 0.15,
+    crop_duration_months: int = 3,
+) -> Dict[str, Any]:
+    """
+    Transparent Agronomic Accounting Model:
+      Harvest Supply = Planted Area (from planting month = current_month - duration)
+                       x Base Yield (MT/ha)
+                       x (1 - Post_Harvest_Loss)
+                       x Harvest Window Spread Factor
+
+    Harvest Windows:
+      - Big Onion: Yala peak in Aug (40%), Sep (45%), Oct (15%).
+      - Chilli: Maha peak in Jan (35%), Feb (45%), Mar (20%); Yala peak in Jul (35%), Aug (45%), Sep (20%).
+    """
+    if crop == "big_onion":
+        # Harvest window spread factors
+        window_weights = {8: 0.40, 9: 0.45, 10: 0.15}
+        spread_factor = window_weights.get(month, 0.08)  # default low off-season
+        harvest_window_desc = "Yala Peak (Aug-Oct)" if month in [8, 9, 10] else "Off-season lean"
+        planting_month = ((month - crop_duration_months - 1) % 12) + 1
+    elif crop == "chilli":
+        window_weights = {1: 0.35, 2: 0.45, 3: 0.20, 7: 0.35, 8: 0.45, 9: 0.20}
+        spread_factor = window_weights.get(month, 0.10)
+        harvest_window_desc = "Maha Peak (Jan-Mar)" if month in [1, 2, 3] else ("Yala Peak (Jul-Sep)" if month in [7, 8, 9] else "Inter-monsoon")
+        planting_month = ((month - crop_duration_months - 1) % 12) + 1
+    else:
+        spread_factor = 0.25
+        harvest_window_desc = "General Harvest Window"
+        planting_month = ((month - crop_duration_months - 1) % 12) + 1
+
+    net_yield = max(yield_mt_ha, 0.1)
+    net_loss = np.clip(loss_pct, 0.0, 0.50)
+    raw_production = planted_area_ha * net_yield
+    effective_supply = raw_production * (1.0 - net_loss) * (spread_factor / max(sum(window_weights.values()) if 'window_weights' in locals() else 1.0, 0.5))
+
+    return {
+        "accounting_supply_mt": round(float(effective_supply), 1),
+        "planted_area_ha": round(float(planted_area_ha), 1),
+        "yield_mt_ha": round(float(net_yield), 2),
+        "loss_pct": round(float(net_loss), 2),
+        "planting_month": planting_month,
+        "crop_duration_months": crop_duration_months,
+        "spread_factor": round(float(spread_factor), 3),
+        "harvest_window": harvest_window_desc,
+        "formula": "Supply = Planted Area (at month - duration) x Yield x (1 - Loss) x Harvest Window Weight",
+    }
 
 
 def safe_forecast(
@@ -99,8 +154,11 @@ class HarvestVolumeForecaster:
     # Training
     # ------------------------------------------------------------------
     def train(self, train_df: pd.DataFrame) -> None:
-        """Train three LightGBM models (point, lower, upper quantiles)."""
-        crop_train = train_df[train_df["crop"] == self.crop].dropna(
+        """Train three LightGBM models (point, lower, upper quantiles) strictly on empirical real rows."""
+        crop_train = train_df[train_df["crop"] == self.crop]
+        if "source" in crop_train.columns:
+            crop_train = crop_train[crop_train["source"] == "real"]
+        crop_train = crop_train.dropna(
             subset=self.features + ["harvest_volume_mt"]
         )
 
@@ -190,6 +248,19 @@ class HarvestVolumeForecaster:
             else None
         )
 
+        # Transparent agronomic accounting calculation
+        month_val = int(row.get("month", 1))
+        plant_area = float(row.get("planted_extent_lag3") or row.get("planted_extent_ha", 1000.0))
+        y_val = float(row.get("yield_rolling_6m") or row.get("yield_mt_per_ha", 15.0 if self.crop == "big_onion" else 5.2))
+        acct_res = compute_transparent_accounting_supply(
+            crop=self.crop,
+            month=month_val,
+            planted_area_ha=plant_area,
+            yield_mt_ha=y_val,
+            loss_pct=self._LOSS_PCT,
+            crop_duration_months=3,
+        )
+
         return ForecastResult(
             crop=self.crop,
             target_date=str(row.get("year_month", row.get("date", "Unknown"))),
@@ -199,6 +270,8 @@ class HarvestVolumeForecaster:
             upper_bound_90=round(upper_pred, 1),
             forecast_source=source,
             actual_volume=round(actual, 1) if actual is not None else None,
+            accounting_supply_mt=acct_res["accounting_supply_mt"],
+            accounting_breakdown=acct_res,
         )
 
     # ------------------------------------------------------------------

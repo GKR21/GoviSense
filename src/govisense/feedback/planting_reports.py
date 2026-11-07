@@ -38,6 +38,9 @@ class PlantingReport:
     actual_area_ha: float
     consent_given: bool
     pseudonymous_id: str
+    harvest_outcome_mt: Optional[float] = None
+    sale_price_rs_kg: Optional[float] = None
+    sale_channel: Optional[str] = None
     notes: Optional[str] = None
     report_id: str = ""
     timestamp: str = ""

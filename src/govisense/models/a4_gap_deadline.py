@@ -38,12 +38,19 @@ except (ImportError, Exception):
 class RecommendationAction:
     crop: str
     season: str
-    action_type: str  # "PLANT_EXPANSION", "HOLD_STORAGE_BUFFER", "TARGETED_IMPORT", "MAINTAIN_CURRENT_EXTENT"
+    action_type: str  # "IMPORT_NOW", "IMPORT_LATER", "DELAY", "STORE", "PLANT_EXPANSION", "HOLD_STORAGE_BUFFER"
     quantity: float
     unit: str
     target_timeline: str
     rationale: str
     fair_farmgate_floor_rs_kg: float
+    best_case_gap_mt: float = 0.0
+    mid_case_gap_mt: float = 0.0
+    worst_case_gap_mt: float = 0.0
+    decision_deadline: str = "T-45 days"
+    days_until_deadline: int = 45
+    import_lead_time_weeks: int = 7
+    policy_option: str = "DELAY"  # "IMPORT_NOW" | "IMPORT_LATER" | "DELAY" | "STORE"
 
 
 class GapFillingOptimizer:
@@ -159,6 +166,29 @@ class GapFillingOptimizer:
             else:
                 d_area, h_buf, i_q = 0.0, 0.0, 0.0
 
+            # Scenario gap calculation (best case, mid case, worst case)
+            mid_gap = gap
+            if spi_res and hasattr(spi_res, "scenarios") and spi_res.scenarios:
+                worst_gap = spi_res.scenarios["low"].gap_mt
+                best_gap = spi_res.scenarios["high"].gap_mt
+            else:
+                worst_gap = mid_gap - 1200.0 if mid_gap < 0 else mid_gap - 800.0
+                best_gap = mid_gap + 1500.0 if mid_gap > 0 else mid_gap + 1000.0
+
+            # Import lead time: 6 to 8 weeks (45 to 56 days)
+            import_lead_weeks = 7
+            lead_days = import_lead_weeks * 7  # 49 days
+            decision_deadline_desc = f"{lead_days} days before projected shortage (T-{lead_days}d)"
+            days_remaining = max(14, lead_days - 20)
+
+            # Determine policy option: IMPORT_NOW, IMPORT_LATER, DELAY, STORE
+            if spi_res and spi_res.spi_label == "Glut":
+                policy_opt = "STORE"
+            elif spi_res and spi_res.spi_label == "Shortage":
+                policy_opt = "IMPORT_NOW" if days_remaining <= 30 else "IMPORT_LATER"
+            else:
+                policy_opt = "DELAY"
+
             if spi_res and spi_res.spi_label == "Shortage":
                 if d_area > 5.0:
                     actions.append(RecommendationAction(
@@ -169,7 +199,14 @@ class GapFillingOptimizer:
                         unit="hectares",
                         target_timeline="Nudge farmers within DoA planting window (next 30 days)",
                         rationale=f"Fills {round(d_area * cfg.base_yield_mt_per_ha, 1)} MT deficit via local cultivation. Protects farm-gate price above fair floor (Rs {cfg.min_fair_farmgate_price}/kg).",
-                        fair_farmgate_floor_rs_kg=cfg.min_fair_farmgate_price
+                        fair_farmgate_floor_rs_kg=cfg.min_fair_farmgate_price,
+                        best_case_gap_mt=round(float(best_gap), 1),
+                        mid_case_gap_mt=round(float(mid_gap), 1),
+                        worst_case_gap_mt=round(float(worst_gap), 1),
+                        decision_deadline=decision_deadline_desc,
+                        days_until_deadline=days_remaining,
+                        import_lead_time_weeks=import_lead_weeks,
+                        policy_option=policy_opt,
                     ))
                 if i_q > 5.0:
                     actions.append(RecommendationAction(
@@ -178,9 +215,16 @@ class GapFillingOptimizer:
                         action_type="TARGETED_IMPORT",
                         quantity=round(float(i_q), 1),
                         unit="MT",
-                        target_timeline="Staggered customs clearance over 45 days",
-                        rationale=f"Emergency buffer import to cap retail spike without depressing farmer harvest incentives.",
-                        fair_farmgate_floor_rs_kg=cfg.min_fair_farmgate_price
+                        target_timeline=f"Execute import procurement {import_lead_weeks} weeks ahead of deficit",
+                        rationale=f"Emergency buffer import to cap retail spike without depressing farmer harvest incentives. Best-case gap: {best_gap:.1f} MT, Worst-case gap: {worst_gap:.1f} MT.",
+                        fair_farmgate_floor_rs_kg=cfg.min_fair_farmgate_price,
+                        best_case_gap_mt=round(float(best_gap), 1),
+                        mid_case_gap_mt=round(float(mid_gap), 1),
+                        worst_case_gap_mt=round(float(worst_gap), 1),
+                        decision_deadline=decision_deadline_desc,
+                        days_until_deadline=days_remaining,
+                        import_lead_time_weeks=import_lead_weeks,
+                        policy_option=policy_opt,
                     ))
             elif spi_res and spi_res.spi_label == "Glut":
                 if h_buf > 5.0:
@@ -191,8 +235,15 @@ class GapFillingOptimizer:
                         quantity=round(float(h_buf), 1),
                         unit="MT",
                         target_timeline="Activate Dambulla/Anuradhapura dedicated warehouse storage",
-                        rationale=f"Hold back bumper surplus off spot market to safeguard minimum fair farmgate floor (Rs {cfg.min_fair_farmgate_price}/kg).",
-                        fair_farmgate_floor_rs_kg=cfg.min_fair_farmgate_price
+                        rationale=f"Hold back bumper surplus off spot market to safeguard minimum fair farmgate floor (Rs {cfg.min_fair_farmgate_price}/kg). Best-case surplus: {best_gap:.1f} MT, Worst-case surplus: {worst_gap:.1f} MT.",
+                        fair_farmgate_floor_rs_kg=cfg.min_fair_farmgate_price,
+                        best_case_gap_mt=round(float(best_gap), 1),
+                        mid_case_gap_mt=round(float(mid_gap), 1),
+                        worst_case_gap_mt=round(float(worst_gap), 1),
+                        decision_deadline="Immediate - within peak harvest window",
+                        days_until_deadline=7,
+                        import_lead_time_weeks=import_lead_weeks,
+                        policy_option="STORE",
                     ))
             else:
                 actions.append(RecommendationAction(
@@ -202,8 +253,15 @@ class GapFillingOptimizer:
                     quantity=0.0,
                     unit="status_quo",
                     target_timeline="Current season",
-                    rationale="Market balanced within +-15% target band. No intervention required.",
-                    fair_farmgate_floor_rs_kg=cfg.min_fair_farmgate_price
+                    rationale=f"Market balanced within target band (Gap: {mid_gap:.1f} MT). Option: DELAY trade intervention.",
+                    fair_farmgate_floor_rs_kg=cfg.min_fair_farmgate_price,
+                    best_case_gap_mt=round(float(best_gap), 1),
+                    mid_case_gap_mt=round(float(mid_gap), 1),
+                    worst_case_gap_mt=round(float(worst_gap), 1),
+                    decision_deadline="Continuous monitoring",
+                    days_until_deadline=60,
+                    import_lead_time_weeks=import_lead_weeks,
+                    policy_option="DELAY",
                 ))
 
         return {

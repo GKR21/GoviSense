@@ -55,11 +55,11 @@ class ApiService {
       if (response.statusCode == 200) {
         return true;
       }
+      return false;
     } catch (e) {
       print('Ground report submission network error: $e');
+      return false;
     }
-    // Return true for local simulation even if offline
-    return true;
   }
 
   /// Fallback calibrated crop recommendations for Anuradhapura

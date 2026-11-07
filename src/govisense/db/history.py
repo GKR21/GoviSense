@@ -208,5 +208,6 @@ class DecisionHistoryStore:
             records = [r for r in records if r.season == season]
         # Return sorted descending by timestamp
         records = sorted(records, key=lambda r: r.timestamp, reverse=True)
-        return records[:limit]
+        lim = int(limit) if isinstance(limit, int) else 50
+        return records[:lim]
 

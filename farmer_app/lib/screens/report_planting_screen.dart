@@ -14,10 +14,14 @@ class ReportPlantingScreen extends StatefulWidget {
 
 class _ReportPlantingScreenState extends State<ReportPlantingScreen> {
   String _selectedCrop = 'big_onion';
+  final TextEditingController _plannedAcresController = TextEditingController(text: '2.0');
   final TextEditingController _acresController = TextEditingController(text: '2.0');
+  final TextEditingController _harvestController = TextEditingController(text: '');
+  final TextEditingController _salePriceController = TextEditingController(text: '');
   bool _consentGiven = true;
   bool _isSubmitting = false;
   String? _successMessage;
+  String? _errorMessage;
 
   final List<Map<String, String>> _crops = [
     {'id': 'big_onion', 'name': 'Big Onion (ලොකු ළූණු)'},
@@ -29,26 +33,38 @@ class _ReportPlantingScreenState extends State<ReportPlantingScreen> {
 
   @override
   void dispose() {
+    _plannedAcresController.dispose();
     _acresController.dispose();
+    _harvestController.dispose();
+    _salePriceController.dispose();
     super.dispose();
   }
 
   Future<void> _handleSubmit() async {
     final state = context.read<AppState>();
-    final acres = double.tryParse(_acresController.text) ?? 1.0;
+    final plannedAcres = double.tryParse(_plannedAcresController.text) ?? 2.0;
+    final actualAcres = double.tryParse(_acresController.text) ?? 2.0;
+    final harvestMt = double.tryParse(_harvestController.text);
+    final salePrice = double.tryParse(_salePriceController.text);
     final cropName = _crops.firstWhere((c) => c['id'] == _selectedCrop)['name']!.split(' (')[0];
 
     setState(() {
       _isSubmitting = true;
       _successMessage = null;
+      _errorMessage = null;
     });
 
     final newReport = PlantingReport(
       id: 'REP-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
       cropId: _selectedCrop,
       cropName: cropName,
-      actualAreaAcres: acres,
-      actualAreaHa: acres * 0.404686,
+      plannedAreaAcres: plannedAcres,
+      plannedAreaHa: plannedAcres * 0.404686,
+      actualAreaAcres: actualAcres,
+      actualAreaHa: actualAcres * 0.404686,
+      harvestOutcomeMt: harvestMt,
+      salePriceRsKg: salePrice,
+      saleChannel: 'Dambulla DEC',
       date: DateTime.now().toIso8601String().substring(0, 10),
       consentGiven: _consentGiven,
       pseudonymousId: state.profile.id,
@@ -56,11 +72,17 @@ class _ReportPlantingScreenState extends State<ReportPlantingScreen> {
       notes: 'Mobile ground planting declaration',
     );
 
-    await state.addPlantingReport(newReport);
+    final success = await state.addPlantingReport(newReport);
 
     setState(() {
       _isSubmitting = false;
-      _successMessage = AppStrings.get('reportSubmitted', state.language);
+      if (success) {
+        _successMessage = AppStrings.get('reportSubmitted', state.language);
+        _errorMessage = null;
+      } else {
+        _errorMessage = 'Network connection failed. Report cached locally for pending sync.';
+        _successMessage = null;
+      }
     });
   }
 
@@ -106,7 +128,7 @@ class _ReportPlantingScreenState extends State<ReportPlantingScreen> {
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
             if (_successMessage != null) ...[
               Container(
@@ -129,7 +151,31 @@ class _ReportPlantingScreenState extends State<ReportPlantingScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+            ],
+
+            if (_errorMessage != null) ...[
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.danger.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.danger),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.error_outline, color: AppColors.danger, size: 22),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: AppColors.danger, fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
             ],
 
             // Crop Dropdown
@@ -163,34 +209,149 @@ class _ReportPlantingScreenState extends State<ReportPlantingScreen> {
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
-            // Planted Acres Input
-            Text(
-              AppStrings.get('plantedAcres', lang),
-              style: const TextStyle(color: AppColors.textLight, fontSize: 13, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.cardBackground,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.cardBorder),
-              ),
-              child: TextField(
-                controller: _acresController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                style: const TextStyle(color: AppColors.textLight, fontSize: 16, fontWeight: FontWeight.bold),
-                decoration: const InputDecoration(
-                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  border: InputBorder.none,
-                  suffixText: 'Acres',
-                  suffixStyle: TextStyle(color: AppColors.textMuted),
+            // Planned vs Actual Acres (Grid)
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Planned Extent',
+                        style: TextStyle(color: AppColors.textLight, fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.cardBackground,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.cardBorder),
+                        ),
+                        child: TextField(
+                          controller: _plannedAcresController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          style: const TextStyle(color: AppColors.textLight, fontSize: 15, fontWeight: FontWeight.bold),
+                          decoration: const InputDecoration(
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            border: InputBorder.none,
+                            suffixText: 'Ac',
+                            suffixStyle: TextStyle(color: AppColors.textMuted),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        AppStrings.get('plantedAcres', lang),
+                        style: const TextStyle(color: AppColors.textLight, fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.cardBackground,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.cardBorder),
+                        ),
+                        child: TextField(
+                          controller: _acresController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          style: const TextStyle(color: AppColors.textLight, fontSize: 15, fontWeight: FontWeight.bold),
+                          decoration: const InputDecoration(
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            border: InputBorder.none,
+                            suffixText: 'Ac',
+                            suffixStyle: TextStyle(color: AppColors.textMuted),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+
+            // Harvest Outcome & Sale Outcome
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Harvest Outcome',
+                        style: TextStyle(color: AppColors.textLight, fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.cardBackground,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.cardBorder),
+                        ),
+                        child: TextField(
+                          controller: _harvestController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          style: const TextStyle(color: AppColors.textLight, fontSize: 15, fontWeight: FontWeight.bold),
+                          decoration: const InputDecoration(
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            border: InputBorder.none,
+                            hintText: 'e.g. 12.5',
+                            hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                            suffixText: 'MT',
+                            suffixStyle: TextStyle(color: AppColors.textMuted),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Sale Outcome',
+                        style: TextStyle(color: AppColors.textLight, fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.cardBackground,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.cardBorder),
+                        ),
+                        child: TextField(
+                          controller: _salePriceController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          style: const TextStyle(color: AppColors.textLight, fontSize: 15, fontWeight: FontWeight.bold),
+                          decoration: const InputDecoration(
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            border: InputBorder.none,
+                            hintText: 'e.g. 145',
+                            hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                            suffixText: 'Rs/kg',
+                            suffixStyle: TextStyle(color: AppColors.textMuted),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
 
             // Consent Checkbox
             Row(
@@ -241,4 +402,3 @@ class _ReportPlantingScreenState extends State<ReportPlantingScreen> {
     );
   }
 }
-

@@ -11,8 +11,12 @@ from typing import Tuple, List, Optional
 from govisense.config import PROCESSED_DATA_DIR, DEMO_DATA_DIR, settings
 
 
-def load_monthly_dataset(filepath: Optional[Path] = None) -> pd.DataFrame:
-    """Load the monthly master dataset."""
+def load_monthly_dataset(filepath: Optional[Path] = None, training_only: bool = False) -> pd.DataFrame:
+    """
+    Load the monthly master dataset.
+    If training_only is True, filters strictly to empirical rows with source == 'real',
+    excluding interpolated freeze months and synthetic/demo data.
+    """
     if filepath is None:
         filepath = PROCESSED_DATA_DIR / "monthly_master.csv"
         if not filepath.exists():
@@ -20,6 +24,8 @@ def load_monthly_dataset(filepath: Optional[Path] = None) -> pd.DataFrame:
             
     df = pd.read_csv(filepath)
     df["date"] = pd.to_datetime(df["date"])
+    if training_only and "source" in df.columns:
+        df = df[df["source"] == "real"].copy()
     df = df.sort_values(by=["crop", "date"]).reset_index(drop=True)
     return df
 

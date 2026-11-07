@@ -124,14 +124,29 @@ def get_latest_forecasts():
                 "point_forecast_mt": a1_res.point_forecast,
                 "lower_bound_10_mt": a1_res.lower_bound_10,
                 "upper_bound_90_mt": a1_res.upper_bound_90,
-                "baseline_mt": a1_res.baseline_pred
+                "baseline_mt": a1_res.baseline_pred,
+                "accounting_supply_mt": a1_res.accounting_supply_mt,
+                "accounting_breakdown": a1_res.accounting_breakdown,
             },
             "ai3_supply_pressure_index": {
                 "spi_score": spi_res.spi_score,
+                "spi_ratio": spi_res.spi_ratio,
                 "spi_label": spi_res.spi_label,
                 "projected_demand_mt": spi_res.projected_demand_mt,
                 "gap_mt": spi_res.gap_mt,
-                "action_summary": spi_res.action_summary
+                "action_summary": spi_res.action_summary,
+                "scenarios": {
+                    k: {
+                        "scenario": v.scenario,
+                        "supply_mt": v.supply_mt,
+                        "demand_mt": v.demand_mt,
+                        "gap_mt": v.gap_mt,
+                        "spi_ratio": v.spi_ratio,
+                        "spi_score": v.spi_score,
+                        "spi_label": v.spi_label,
+                    }
+                    for k, v in spi_res.scenarios.items()
+                },
             },
             "ai2_price_forecast": {
                 "wholesale_price_rs_kg": a2_res.best_forecast,
@@ -159,7 +174,14 @@ def get_latest_forecasts():
                     "unit": a.unit,
                     "timeline": a.target_timeline,
                     "rationale": a.rationale,
-                    "fair_farmgate_floor_rs_kg": a.fair_farmgate_floor_rs_kg
+                    "fair_farmgate_floor_rs_kg": a.fair_farmgate_floor_rs_kg,
+                    "best_case_gap_mt": a.best_case_gap_mt,
+                    "mid_case_gap_mt": a.mid_case_gap_mt,
+                    "worst_case_gap_mt": a.worst_case_gap_mt,
+                    "decision_deadline": a.decision_deadline,
+                    "days_until_deadline": a.days_until_deadline,
+                    "import_lead_time_weeks": a.import_lead_time_weeks,
+                    "policy_option": a.policy_option,
                 }
                 for a in opt_output["actions"]
             ]
@@ -170,36 +192,75 @@ def get_latest_forecasts():
 class SimulationRequest(BaseModel):
     crop: str
     custom_planted_extent_ha: Optional[float] = None
+    custom_yield_mt_ha: Optional[float] = None
     custom_import_volume_mt: Optional[float] = None
+    custom_loss_pct: Optional[float] = None
 
 
 @app.post("/api/simulate")
 def simulate_scenario(req: SimulationRequest):
-    """Allows authorities to simulate custom acreage or import scenarios."""
+    """Allows authorities to simulate custom acreage, yield, loss, and import scenarios."""
     crop = req.crop
     if crop not in settings.crops:
         return {"error": f"Invalid crop: {crop}"}
 
     latest_row = cached_df[cached_df["crop"] == crop].sort_values("date").iloc[-1].copy()
+
+    # Apply what-if area slider
     if req.custom_planted_extent_ha is not None:
         latest_row["planted_extent_lag3"] = req.custom_planted_extent_ha
+        latest_row["planted_extent_ha"] = req.custom_planted_extent_ha
+
+    # Apply what-if yield slider
+    if req.custom_yield_mt_ha is not None:
+        latest_row["yield_rolling_6m"] = req.custom_yield_mt_ha
+        latest_row["yield_mt_per_ha"] = req.custom_yield_mt_ha
 
     a1_res = a1_models[crop].predict_row(latest_row)
     import_vol = req.custom_import_volume_mt if req.custom_import_volume_mt is not None else float(latest_row.get("import_volume_mt", 0.0))
+    loss_val = req.custom_loss_pct if req.custom_loss_pct is not None else 0.15
+
+    # If both area and yield were explicitly customized in sandbox, adjust point forecast proportionally
+    base_area = float(latest_row.get("planted_extent_lag3") or 1.0)
+    base_yield = float(latest_row.get("yield_rolling_6m") or 1.0)
+    if req.custom_planted_extent_ha is not None and req.custom_yield_mt_ha is not None:
+        sim_supply = req.custom_planted_extent_ha * req.custom_yield_mt_ha * 0.85
+    else:
+        sim_supply = a1_res.point_forecast
 
     spi_res = spi_engine.compute_spi(
         crop=crop,
-        forecast_supply_mt=a1_res.point_forecast,
+        forecast_supply_mt=sim_supply,
         month=int(latest_row["month"]),
-        import_volume_mt=import_vol
+        import_volume_mt=import_vol,
+        loss_pct=loss_val,
     )
+
+    scenarios_data = {
+        k: {
+            "scenario": v.scenario,
+            "supply_mt": v.supply_mt,
+            "demand_mt": v.demand_mt,
+            "gap_mt": v.gap_mt,
+            "spi_ratio": v.spi_ratio,
+            "spi_score": v.spi_score,
+            "spi_label": v.spi_label,
+        }
+        for k, v in spi_res.scenarios.items()
+    }
 
     return {
         "crop": crop,
-        "simulated_supply_mt": a1_res.point_forecast,
+        "simulated_supply_mt": round(sim_supply, 1),
         "simulated_spi": spi_res.spi_score,
+        "simulated_spi_ratio": spi_res.spi_ratio,
         "simulated_label": spi_res.spi_label,
-        "action_summary": spi_res.action_summary
+        "simulated_gap_mt": spi_res.gap_mt,
+        "area_ha": req.custom_planted_extent_ha or float(latest_row.get("planted_extent_lag3", 0.0)),
+        "yield_mt_ha": req.custom_yield_mt_ha or float(latest_row.get("yield_rolling_6m", 0.0)),
+        "loss_pct": loss_val,
+        "action_summary": spi_res.action_summary,
+        "scenarios": scenarios_data,
     }
 
 
@@ -379,6 +440,9 @@ class PlantingReportPayload(BaseModel):
     actual_area_ha: float
     consent_given: bool
     pseudonymous_id: str
+    harvest_outcome_mt: Optional[float] = None
+    sale_price_rs_kg: Optional[float] = None
+    sale_channel: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -397,6 +461,9 @@ class DecisionLogPayload(BaseModel):
     quantity: float
     unit: str
     rationale: str
+    model_version: Optional[str] = "LightGBM-v2.1+HiGHS-LP"
+    data_version: Optional[str] = "CBSL-HARTI-DOA-2024.12"
+    assumptions: Optional[Dict[str, Any]] = None
     notes: Optional[str] = None
 
 
@@ -404,7 +471,7 @@ class DecisionLogPayload(BaseModel):
 def submit_planting_report(payload: PlantingReportPayload):
     """
     Item 7: Ingest actual planting report with consent and pseudonymous ID.
-    Replaces planned area with reported area in the store.
+    Replaces planned area with reported area, and captures harvest & sale outcomes.
     """
     try:
         report = PlantingReport(
@@ -414,6 +481,9 @@ def submit_planting_report(payload: PlantingReportPayload):
             actual_area_ha=payload.actual_area_ha,
             consent_given=payload.consent_given,
             pseudonymous_id=payload.pseudonymous_id,
+            harvest_outcome_mt=payload.harvest_outcome_mt,
+            sale_price_rs_kg=payload.sale_price_rs_kg,
+            sale_channel=payload.sale_channel,
             notes=payload.notes,
         )
         return report_store.submit_report(report)
@@ -471,6 +541,13 @@ def log_officer_action(payload: DecisionLogPayload):
     """
     Item 8: Save officer action with model version, data version, and assumptions snapshot.
     """
+    assump = payload.assumptions or {
+        "loss_pct": 0.15,
+        "import_lead_time_weeks": 7,
+        "spi_bands": [0.8, 1.2],
+        "pilot_district_share": 0.50 if payload.crop_id == "big_onion" else 0.40,
+        "notes": payload.notes,
+    }
     record = DecisionRecord(
         crop_id=payload.crop_id,
         season=payload.season,
@@ -479,6 +556,9 @@ def log_officer_action(payload: DecisionLogPayload):
         quantity=payload.quantity,
         unit=payload.unit,
         rationale=payload.rationale,
+        model_version=payload.model_version or "LightGBM-v2.1+HiGHS-LP",
+        data_version=payload.data_version or "CBSL-HARTI-DOA-2024.12",
+        assumptions=assump,
     )
     return history_store.log_decision(record)
 
@@ -490,9 +570,13 @@ def get_decision_history(
     limit: int = Query(50),
 ):
     """
-    Item 8: Retrieve audit decision log records.
+    Item 8: Retrieve audit decision log records with model, data, and assumption snapshots.
     """
-    records = history_store.list_decisions(crop_id=crop_id, season=season, limit=limit)
+    eff_crop = str(crop_id) if crop_id is not None and not hasattr(crop_id, "default") else None
+    eff_season = str(season) if season is not None and not hasattr(season, "default") else None
+    eff_limit = int(limit) if isinstance(limit, int) else 50
+
+    records = history_store.list_decisions(crop_id=eff_crop, season=eff_season, limit=eff_limit)
     from dataclasses import asdict
     return [asdict(r) for r in records]
 

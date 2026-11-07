@@ -109,8 +109,11 @@ class PriceForecaster:
         Train SARIMAX, ETS, and LightGBM, evaluate on the held-out validation window
         using WAPE vs Seasonal Naive, and select the winner.
         """
+        crop_train_raw = train_df[train_df["crop"] == self.crop]
+        if "source" in crop_train_raw.columns:
+            crop_train_raw = crop_train_raw[crop_train_raw["source"] == "real"]
         crop_train = (
-            train_df[train_df["crop"] == self.crop]
+            crop_train_raw
             .dropna(subset=self.features + [self.target_col])
             .copy()
         )
