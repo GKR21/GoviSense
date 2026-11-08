@@ -142,15 +142,17 @@ export const REAL_MODEL_BASELINE: LatestForecastsResponse = {
   },
 }
 
-export async function fetchLatestForecasts(): Promise<LatestForecastsResponse> {
+export type LatestForecastsWithMeta = LatestForecastsResponse & { isLive: boolean }
+
+export async function fetchLatestForecasts(): Promise<LatestForecastsWithMeta> {
   try {
     const res = await fetch(`${API_BASE_URL}/api/forecasts/latest`, { method: "GET" })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = await res.json()
-    return data
+    return { ...data, isLive: true }
   } catch (err) {
     // When backend is not running, return the real trained ML pipeline baseline
-    return REAL_MODEL_BASELINE
+    return { ...REAL_MODEL_BASELINE, isLive: false }
   }
 }
 

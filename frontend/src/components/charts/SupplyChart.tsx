@@ -3,6 +3,7 @@ import { ArrowDownCircle, ArrowUpCircle, CheckCircle2 } from "lucide-react"
 import { cx, type Risk } from "../../types"
 import { CROP_DATA_CATALOG, MONTHS } from "../../mocks/officerData"
 import { RiskBadge } from "../common/Badges"
+import type { CropForecastData } from "../../api"
 
 export function SupplyChart({
   crop = "Big onion",
@@ -10,15 +11,24 @@ export function SupplyChart({
   yieldValue,
   selectedMonth,
   onSelectMonth,
+  apiCropData,
 }: {
   crop?: string
   area: number
   yieldValue: number
   selectedMonth: number
   onSelectMonth: (month: number) => void
+  apiCropData?: CropForecastData
 }) {
   const profile = CROP_DATA_CATALOG[crop] || CROP_DATA_CATALOG["Big onion"]
   const series = useMemo(() => {
+    const lowRatio = apiCropData?.ai1_harvest_forecast && apiCropData.ai1_harvest_forecast.point_forecast_mt > 0
+      ? apiCropData.ai1_harvest_forecast.lower_bound_10_mt / apiCropData.ai1_harvest_forecast.point_forecast_mt
+      : 0.84
+    const highRatio = apiCropData?.ai1_harvest_forecast && apiCropData.ai1_harvest_forecast.point_forecast_mt > 0
+      ? apiCropData.ai1_harvest_forecast.upper_bound_90_mt / apiCropData.ai1_harvest_forecast.point_forecast_mt
+      : 1.16
+
     const factor = (area / profile.baselineArea) * (yieldValue / profile.baselineYield)
     return profile.supplyMonthly.map((value, index) => {
       const middle = value * factor
@@ -26,13 +36,13 @@ export function SupplyChart({
       const spi = curDemand > 0 ? (middle - curDemand) / curDemand : 0
       return {
         middle,
-        low: middle * 0.84,
-        high: middle * 1.16,
+        low: middle * lowRatio,
+        high: middle * highRatio,
         demand: curDemand,
         spi,
       }
     })
-  }, [area, yieldValue, profile])
+  }, [area, yieldValue, profile, apiCropData])
 
   const maxY = Math.max(...series.map((s) => s.high), ...series.map((s) => s.demand), 100) * 1.1
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import {
   ArrowDownCircle,
   ArrowUpCircle,
@@ -50,6 +50,7 @@ import {
   ScreenStateView,
 } from "../../components/common"
 import { SupplyChart } from "../../components/charts"
+import { fetchLatestForecasts, type LatestForecastsWithMeta, type CropForecastData } from "../../api"
 
 import { OverviewScreen } from "./OverviewScreen"
 import { GapTimelineScreen } from "./GapTimelineScreen"
@@ -102,6 +103,35 @@ export function OfficerScreen({
   const [lastReport, setLastReport] = useState<GroundReport | null>(null)
   const [decision, setDecision] = useState("")
   const [decisionHistory, setDecisionHistory] = useState<PolicyDecision[]>(INITIAL_DECISION_HISTORY)
+  const [forecastData, setForecastData] = useState<LatestForecastsWithMeta | null>(null)
+  const [isLiveApi, setIsLiveApi] = useState(false)
+  const [forecastLoading, setForecastLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    setForecastLoading(true)
+    fetchLatestForecasts()
+      .then((res) => {
+        if (!active) return
+        setForecastData(res)
+        setIsLiveApi(res.isLive)
+        setForecastLoading(false)
+      })
+      .catch(() => {
+        if (!active) return
+        setForecastLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const cropApiKey = selectedCrop.toLowerCase().includes("onion")
+    ? "big_onion"
+    : selectedCrop.toLowerCase().includes("chilli")
+      ? "chilli"
+      : selectedCrop.toLowerCase().replace(/\s+/g, "_")
+  const currentApiCropData: CropForecastData | undefined = forecastData?.crops[cropApiKey]
   const changed = area !== currentProfile.baselineArea || yieldValue !== currentProfile.baselineYield
 
   const reset = () => {
@@ -328,6 +358,8 @@ export function OfficerScreen({
               scenario={scenario}
               onOpenSupply={() => setPage("Supply pressure")}
               onOpenGap={() => setPage("Gap & import timeline")}
+              apiCropData={currentApiCropData}
+              isLiveApi={isLiveApi}
             />
           ) : page === "Gap & import timeline" ? (
             <GapTimelineScreen
@@ -385,7 +417,12 @@ export function OfficerScreen({
                     Key insight · middle scenario
                   </span>
                   <strong>
-                    {selectedCrop} harvest in {selectedSeason} ({selectedDistrict}): {CROP_DATA_CATALOG[selectedCrop]?.spiLabel || "Monitored"} (SPI: {CROP_DATA_CATALOG[selectedCrop]?.spiAnnualScore || -0.63}). {CROP_DATA_CATALOG[selectedCrop]?.ai4Action || ""}
+                    {selectedCrop} harvest in {selectedSeason} ({selectedDistrict}):{" "}
+                    {currentApiCropData?.ai3_supply_pressure_index.spi_label || currentProfile.spiLabel}{" "}
+                    (SPI: {currentApiCropData?.ai3_supply_pressure_index.spi_score !== undefined
+                      ? (currentApiCropData.ai3_supply_pressure_index.spi_score > 0 ? "+" : "") + currentApiCropData.ai3_supply_pressure_index.spi_score.toFixed(2)
+                      : currentProfile.spiAnnualScore}).{" "}
+                    {currentApiCropData?.ai3_supply_pressure_index.action_summary || currentProfile.ai4Action}
                   </strong>
                   <p>
                     High oversupply risk. Consider shifting part of planned area
@@ -428,6 +465,7 @@ export function OfficerScreen({
                     yieldValue={yieldValue}
                     selectedMonth={selectedMonth}
                     onSelectMonth={setSelectedMonth}
+                    apiCropData={currentApiCropData}
                   />
                   <div className="chart-footer">
                     <div>
