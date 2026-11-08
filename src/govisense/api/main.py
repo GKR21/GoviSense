@@ -23,6 +23,7 @@ from govisense.models.target_area import TargetAreaCalculator
 from govisense.feedback.planting_reports import PlantingReportStore, PlantingReport
 from govisense.db.history import DecisionHistoryStore, DecisionRecord, evaluate_confidence_badge
 from govisense.simulation.agent_sim import MarketAdoptionSimulator, calculate_interval_coverage
+from govisense.api.routes.auth import router as auth_router
 
 app = FastAPI(
     title="GoviSense API",
@@ -38,6 +39,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth_router)
 
 # Global in-memory cache for models and data
 cached_df: Optional[pd.DataFrame] = None
