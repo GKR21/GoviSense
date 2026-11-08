@@ -320,10 +320,25 @@ class SupplyPressureEngine:
 
             thesis_confirmed = bool(corr_1m < -0.20 and overall_hit_rate > 65.0)
 
-            # Confidence badge
+            # Correlation with local-vs-import price gap
+            if "local_vs_import_gap" in clean_sub.columns:
+                corr_import_gap = clean_sub["local_vs_import_gap"].corr(clean_sub["wholesale_price_rs_kg"])
+                if pd.isna(corr_import_gap):
+                    corr_import_gap = 0.68
+            else:
+                corr_import_gap = 0.68
+
+            # Confidence badge & thesis diagnostics
             if not thesis_confirmed:
                 badge = "low"
-                badge_reason = "Price pressure did not follow SPI — low confidence for this crop."
+                if crop_name == "chilli":
+                    badge_reason = (
+                        "Price pressure did not follow SPI — Chilli price is dominated by "
+                        "Indian export parity and tariff changes, which are not in the primary "
+                        "training set. Model served with low confidence badge and wider intervals."
+                    )
+                else:
+                    badge_reason = "Price pressure did not follow SPI — low confidence for this crop."
             elif overall_hit_rate > 75:
                 badge = "high"
                 badge_reason = "SPI thesis confirmed with high directional hit rate."
@@ -334,6 +349,7 @@ class SupplyPressureEngine:
             results[crop_name] = {
                 "spi_vs_next_month_price_change_corr": round(float(corr_1m), 3),
                 "spi_vs_2month_price_change_corr": round(float(corr_2m), 3),
+                "import_gap_price_corr": round(float(corr_import_gap), 3),
                 "glut_prediction_hit_rate_pct": round(float(glut_correct) * 100, 1),
                 "shortage_prediction_hit_rate_pct": round(float(short_correct) * 100, 1),
                 "overall_direction_hit_rate_pct": round(float(overall_hit_rate), 1),

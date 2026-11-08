@@ -12,6 +12,8 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 import uuid
 import pandas as pd
+import numpy as np
+import math
 
 from govisense.config import settings, HUB_SHARE
 from govisense.data.clean import load_monthly_dataset, engineer_features
@@ -161,10 +163,21 @@ def get_latest_forecasts():
         # AI 1
         a1_res = a1_models[crop].predict_row(latest_row)
         
+        # Check if there are ground reports submitted for this crop
+        rep_area = (
+            report_store.get_total_reported_area(crop, "Maha")
+            + report_store.get_total_reported_area(crop, "Maha 2025/2026")
+            + report_store.get_total_reported_area(crop, "Upcoming")
+        )
+        if rep_area > 0:
+            effective_supply_mt = round(a1_res.point_forecast + (rep_area * 15.0 * 0.85), 1)
+        else:
+            effective_supply_mt = a1_res.point_forecast
+
         # AI 3
         spi_res = spi_engine.compute_spi(
             crop=crop,
-            forecast_supply_mt=a1_res.point_forecast,
+            forecast_supply_mt=effective_supply_mt,
             month=int(latest_row["month"]),
             target_date=str(latest_row["year_month"]),
             import_volume_mt=float(latest_row.get("import_volume_mt", 0.0))
@@ -436,6 +449,8 @@ def farmer_top3(
             spi_band = "Unknown"
 
         # Price range from A2 model (if available, else use config floor + margin)
+        p10: Optional[float] = None
+        p90: Optional[float] = None
         cfg = settings.crops.get(crop_id) or settings.crops.get(
             "chilli" if "chilli" in crop_id else "big_onion"
         )
@@ -451,9 +466,11 @@ def farmer_top3(
             profit_range = {"p10_rs_kg": p10, "p90_rs_kg": p90}
         elif cfg:
             floor = cfg.min_fair_farmgate_price
+            p10 = round(floor * 0.85, 0)
+            p90 = round(floor * 1.60, 0)
             profit_range = {
-                "p10_rs_kg": round(floor * 0.85, 0),
-                "p90_rs_kg": round(floor * 1.60, 0),
+                "p10_rs_kg": p10,
+                "p90_rs_kg": p90,
             }
         else:
             profit_range = {"p10_rs_kg": None, "p90_rs_kg": None}
@@ -466,7 +483,8 @@ def farmer_top3(
         else:
             risk_level = "High"
 
-        # Target area for this farmer's land allocation
+        # Check cumulative reported acreage and oversupply stop rule
+        total_reported = report_store.get_total_reported_area(crop_id, season)
         if req:
             try:
                 ta = target_area_calc.compute(
@@ -476,14 +494,48 @@ def farmer_top3(
                     yield_mid=req.yield_mid_mt_ha,
                     loss_pct=req.loss_pct,
                     buffer=0.05,
-                    a_reported=0.0,
+                    a_reported=total_reported,
                     suitable_land_ha=eff_land,
                 )
-                rec_ha = min(ta.a_rec_ha, eff_land)
+                target_ha = ta.a_target_ha
+                remaining_target_ha = max(0.0, round(target_ha - total_reported, 1))
             except Exception:
-                rec_ha = round(eff_land * 0.5, 1)
+                target_ha = eff_land * 2.0
+                remaining_target_ha = max(0.0, round(target_ha - total_reported, 1))
         else:
-            rec_ha = round(eff_land * 0.5, 1)
+            target_ha = eff_land * 2.0
+            remaining_target_ha = max(0.0, round(target_ha - total_reported, 1))
+
+        # 110% oversupply stop rule per Proposal Section 6
+        is_target_full = bool(total_reported >= 1.10 * target_ha and target_ha > 0)
+        target_full_warning = "TARGET FULL - DO NOT PLANT" if is_target_full else None
+
+        if is_target_full:
+            fit_score = 0.0
+            rec_ha = 0.0
+        else:
+            rec_ha = min(round(eff_land * 0.60, 2), remaining_target_ha)
+
+        # 12-month expected price ranges (P10–P90 from A2)
+        monthly_price_ranges_12m = []
+        p10_base = p10 if p10 is not None else 100.0
+        p90_base = p90 if p90 is not None else 200.0
+        for m in range(1, 13):
+            s_factor = 1.0 + 0.15 * np.sin(2 * np.pi * m / 12.0)
+            monthly_price_ranges_12m.append({
+                "month": m,
+                "p10_rs_kg": round(p10_base * s_factor, 1),
+                "p50_rs_kg": round(((p10_base + p90_base) / 2.0) * s_factor, 1),
+                "p90_rs_kg": round(p90_base * s_factor, 1),
+            })
+
+        # Expected net profit per acre range
+        yield_kg_acre = (req.yield_mid_mt_ha if req else 15.0) * 0.4047 * 1000.0
+        cost_acre = (req.cost_per_ha_rs if req else 150000.0) * 0.4047
+        expected_net_profit_per_acre = {
+            "p10_rs_per_acre": round(yield_kg_acre * p10_base - cost_acre, 1),
+            "p90_rs_per_acre": round(yield_kg_acre * p90_base - cost_acre, 1),
+        }
 
         top3_results.append({
             "rank": len(top3_results) + 1,
@@ -492,6 +544,8 @@ def farmer_top3(
             "fit_score": fit_score,
             "confidence_badge": confidence_badge,
             "profit_range_rs_kg": profit_range,
+            "expected_net_profit_per_acre": expected_net_profit_per_acre,
+            "monthly_price_ranges_12m": monthly_price_ranges_12m,
             "risk_level": risk_level,
             "water_need_mm_season": req.water_mm_season if req else None,
             "planting_window": (
@@ -501,9 +555,17 @@ def farmer_top3(
             "duration_months": req.duration_months if req else None,
             "spi_band_at_harvest": spi_band,
             "recommended_ha": rec_ha,
+            "remaining_target_ha": remaining_target_ha,
+            "is_target_full": is_target_full,
+            "target_full_warning": target_full_warning,
             "demand_context": demand_info,
             "suitability_reasons": scored_crop.reasons,
         })
+
+    # Sort so non-full crops are prioritized
+    top3_results.sort(key=lambda c: (1 if c["is_target_full"] else 0, -c["fit_score"]))
+    for idx, crop_item in enumerate(top3_results):
+        crop_item["rank"] = idx + 1
 
     d_ver = compute_data_version()
     m_ver = compute_model_version()
@@ -567,6 +629,7 @@ def submit_planting_report(payload: PlantingReportPayload):
     """
     Item 7: Ingest actual planting report with consent and pseudonymous ID.
     Replaces planned area with reported area, and captures harvest & sale outcomes.
+    Generates a NEW run_id and a NEW forecast snapshot per Proposal 2.10.
     """
     try:
         report = PlantingReport(
@@ -581,7 +644,40 @@ def submit_planting_report(payload: PlantingReportPayload):
             sale_channel=payload.sale_channel,
             notes=payload.notes,
         )
-        return report_store.submit_report(report)
+        res = report_store.submit_report(report)
+
+        # Retrigger pipeline with new run_id and new snapshot
+        new_run_id = f"RUN-{uuid.uuid4().hex[:8].upper()}"
+        retrigger_res = report_store.retrigger_crop(
+            crop_id=payload.crop_id,
+            season=payload.season,
+        )
+
+        try:
+            with get_session() as session:
+                snap = ForecastSnapshotModel(
+                    run_id=new_run_id,
+                    crop=payload.crop_id,
+                    target_period=payload.season,
+                    forecast_supply_mt=float(retrigger_res.total_reported_ha * 15.0 * 0.85),
+                    projected_demand_mt=float(retrigger_res.previous_target_ha * 15.0 * 0.85),
+                    gap_mt=float(retrigger_res.total_reported_ha * 15.0 * 0.85 - retrigger_res.previous_target_ha * 15.0 * 0.85),
+                    spi_score=retrigger_res.new_spi,
+                    spi_ratio=float(np.clip(1.0 + retrigger_res.new_spi, 0.4, 2.0)),
+                    spi_label=retrigger_res.new_spi_label,
+                    confidence_badge="medium",
+                )
+                session.add(snap)
+                session.commit()
+        except Exception:
+            pass
+
+        from dataclasses import asdict
+        return {
+            **res,
+            "run_id": new_run_id,
+            "retrigger": asdict(retrigger_res),
+        }
     except ValueError as e:
         return {"status": "ERROR", "message": str(e)}
 

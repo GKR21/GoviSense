@@ -46,66 +46,123 @@ class ConfidenceBadgeEvaluation:
     spi_validation_passed: bool
     soil_data_present: bool
     reasons: List[str]
+    rule_breakdown: Dict[str, Any] = field(default_factory=dict)
+    fallback_capped: bool = False
 
 
 def evaluate_confidence_badge(
     crop_id: str,
     data_age_days: int = 15,
     area_reported_share: float = 0.35,  # 35% of district target reported
-    model_wape: float = 0.15,
-    baseline_wape: float = 0.20,
+    model_wape: Optional[float] = 0.15,
+    baseline_wape: Optional[float] = 0.20,
     spi_validated: bool = True,
     soil_ph_available: bool = True,
+    ground_reports_count: int = 8,
+    rainfall_anomaly_sigma: float = 0.8,
+    served_model: str = "model",
 ) -> ConfidenceBadgeEvaluation:
     """
-    Evaluates confidence badge based on 5 rigorous operational rules:
-      1. Data age: <= 45 days fresh.
-      2. Area reported share: >= 20% of district land confirmed by farmers.
-      3. Model beats baseline: model WAPE < baseline WAPE.
-      4. SPI validation pass: economic price inverse correlation confirmed.
-      5. Soil test data present: lab/agronomic soil pH data available.
+    Evaluates confidence badge based on 5 Proposal rules with transparent breakdown:
+      1. Data freshness: days since last update (< 30 days = pass).
+      2. Model holdout WAPE: <= 0.20 = pass (safely handles inf/nan/zero-denominator).
+      3. Ground-report coverage: >= 5 reports in target district.
+      4. Weather anomaly: current rainfall anomaly < 2 sigma.
+      5. Fallback flag: if served_model is baseline, cap badge at "medium".
     """
     reasons = []
 
-    # Rule 1: Data age
-    data_fresh = data_age_days <= 45
+    # Rule 1: Data freshness (< 30 days)
+    data_fresh = data_age_days < 30
     if data_fresh:
-        reasons.append(f"Data is fresh ({data_age_days} days old, limit 45 days).")
+        reasons.append(f"Data is fresh ({data_age_days} days old, limit 30 days).")
     else:
-        reasons.append(f"Data is aging ({data_age_days} days old, exceeds 45 days limit).")
+        reasons.append(f"Data is aging ({data_age_days} days old, exceeds 30 days threshold).")
 
-    # Rule 2: Area reported share
-    area_ok = area_reported_share >= 0.20
+    # Rule 2: Model holdout WAPE <= 0.20 (Fix inf WAPE bug: handle None/inf/NaN)
+    import numpy as np
+    if model_wape is None or np.isnan(model_wape) or np.isinf(model_wape):
+        clean_wape = None
+        wape_pass = False
+        reasons.append("Holdout WAPE invalid or infinite due to zero denominator (handled gracefully).")
+    else:
+        clean_wape = round(float(model_wape), 4)
+        wape_pass = clean_wape <= 0.20
+        if wape_pass:
+            reasons.append(f"Holdout WAPE ({clean_wape:.3f}) satisfies <= 0.20 quality benchmark.")
+        else:
+            reasons.append(f"Holdout WAPE ({clean_wape:.3f}) exceeds 0.20 threshold.")
+
+    # Rule 3: Ground-report coverage (>= 5 reports or >= 20% area reported)
+    area_ok = bool(ground_reports_count >= 5 or area_reported_share >= 0.20)
     if area_ok:
-        reasons.append(f"Ground acreage coverage adequate ({area_reported_share*100:.1f}% reported, min 20%).")
+        reasons.append(f"Ground reports adequate ({ground_reports_count} reports, {area_reported_share*100:.1f}% area, min 5).")
     else:
-        reasons.append(f"Low ground coverage ({area_reported_share*100:.1f}% reported, below 20% threshold).")
+        reasons.append(f"Low ground coverage ({ground_reports_count} reports, threshold 5).")
 
-    # Rule 3: Model beats baseline
-    model_ok = model_wape < baseline_wape
-    if model_ok:
-        reasons.append(f"Production model beats baseline (WAPE {model_wape:.3f} vs baseline {baseline_wape:.3f}).")
+    # Rule 4: Weather anomaly (< 2 sigma)
+    weather_ok = abs(rainfall_anomaly_sigma) < 2.0
+    if weather_ok:
+        reasons.append(f"Weather anomaly within normal variance ({abs(rainfall_anomaly_sigma):.1f} sigma < 2.0 sigma).")
     else:
-        reasons.append(f"Serving statistical baseline (Model WAPE {model_wape:.3f} >= baseline {baseline_wape:.3f}).")
+        reasons.append(f"Severe weather anomaly detected ({abs(rainfall_anomaly_sigma):.1f} sigma >= 2.0 sigma).")
 
-    # Rule 4: SPI validation
+    # Rule 5: Non-fallback model
+    is_baseline = served_model in ["baseline", "seasonal_naive"] or (
+        baseline_wape is not None and clean_wape is not None and clean_wape >= baseline_wape
+    )
+    model_beats_baseline = not is_baseline
+    if model_beats_baseline:
+        reasons.append("Production ML model served (beats statistical baseline).")
+    else:
+        reasons.append("Serving statistical baseline fallback.")
+
     spi_ok = bool(spi_validated)
     if spi_ok:
         reasons.append("SPI thesis verified against historical price changes.")
     else:
         reasons.append("SPI thesis unverified or price pressure did not follow SPI.")
 
-    # Rule 5: Soil data
     soil_ok = bool(soil_ph_available)
-    if soil_ok:
-        reasons.append("Site soil pH agronomic data verified.")
-    else:
-        reasons.append("Soil pH missing — soil suitability component estimated.")
 
-    passed_rules = sum([data_fresh, area_ok, model_ok, spi_ok, soil_ok])
+    # Rule Breakdown Dict
+    rule_breakdown = {
+        "rule_1_data_freshness": {
+            "passed": data_fresh,
+            "value": f"{data_age_days} days",
+            "threshold": "< 30 days",
+            "status": "PASS" if data_fresh else "FAIL",
+        },
+        "rule_2_holdout_wape": {
+            "passed": wape_pass,
+            "value": clean_wape,
+            "threshold": "<= 0.20",
+            "status": "PASS" if wape_pass else "FAIL",
+        },
+        "rule_3_ground_reports": {
+            "passed": area_ok,
+            "value": ground_reports_count,
+            "threshold": ">= 5 reports",
+            "status": "PASS" if area_ok else "FAIL",
+        },
+        "rule_4_weather_anomaly": {
+            "passed": weather_ok,
+            "value": f"{abs(rainfall_anomaly_sigma):.2f} sigma",
+            "threshold": "< 2.0 sigma",
+            "status": "PASS" if weather_ok else "FAIL",
+        },
+        "rule_5_served_model": {
+            "passed": model_beats_baseline,
+            "value": served_model,
+            "threshold": "model",
+            "status": "PASS" if model_beats_baseline else "FAIL (Capped at Medium)",
+        },
+    }
+
+    passed_rules = sum([data_fresh, wape_pass, area_ok, weather_ok, model_beats_baseline])
     score_pct = round((passed_rules / 5.0) * 100.0, 1)
 
-    # Decouple chilli if SPI unverified
+    fallback_capped = False
     if crop_id == "chilli" and not spi_ok:
         badge = "low"
     elif passed_rules >= 4 and data_fresh:
@@ -115,16 +172,24 @@ def evaluate_confidence_badge(
     else:
         badge = "low"
 
+    # Proposal Rule 5 capping: if served_model is baseline, cap badge at "medium"
+    if is_baseline and badge == "high":
+        badge = "medium"
+        fallback_capped = True
+        reasons.append("Confidence badge capped at 'medium' because statistical baseline is served.")
+
     return ConfidenceBadgeEvaluation(
         crop_id=crop_id,
         badge=badge,
         score_pct=score_pct,
         data_fresh=data_fresh,
         area_reported_share_adequate=area_ok,
-        model_beats_baseline=model_ok,
+        model_beats_baseline=model_beats_baseline,
         spi_validation_passed=spi_ok,
         soil_data_present=soil_ok,
         reasons=reasons,
+        rule_breakdown=rule_breakdown,
+        fallback_capped=fallback_capped,
     )
 
 
