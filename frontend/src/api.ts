@@ -29,6 +29,8 @@ export interface CropForecastData {
     upper_bound_rs_kg: number
     direction: "up" | "down" | "flat"
     confidence: number
+    selected_model?: string
+    forecast_source?: string
   }
 }
 
@@ -84,6 +86,8 @@ export const REAL_MODEL_BASELINE: LatestForecastsResponse = {
         upper_bound_rs_kg: 404.6,
         direction: "up",
         confidence: 0.6,
+        selected_model: "sarimax",
+        forecast_source: "model",
       },
     },
     chilli: {
@@ -111,6 +115,8 @@ export const REAL_MODEL_BASELINE: LatestForecastsResponse = {
         upper_bound_rs_kg: 306.3,
         direction: "down",
         confidence: 0.9,
+        selected_model: "seasonal_naive",
+        forecast_source: "baseline",
       },
     },
   },
