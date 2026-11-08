@@ -94,13 +94,13 @@ def test_planting_report_oversupply_stop_rule_trigger():
         store_path = Path(tmpdir) / "reports.json"
         store = PlantingReportStore(storage_path=store_path)
 
-        # Massive bumper acreage reported (e.g. 5,000 ha > 110% of target)
+        # Massive bumper acreage reported (e.g. 6,000 ha > 110% of target)
         store.submit_report(
             PlantingReport(
                 crop_id="big_onion",
                 season="Maha 2025/2026",
-                planned_area_ha=5000.0,
-                actual_area_ha=5000.0,
+                planned_area_ha=6000.0,
+                actual_area_ha=6000.0,
                 consent_given=True,
                 pseudonymous_id="COOP-ANURADHAPURA",
             )

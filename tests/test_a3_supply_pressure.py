@@ -11,7 +11,7 @@ def test_spi_calculation_glut():
     # High supply vs demand should trigger Glut
     res = engine.compute_spi(
         crop="big_onion",
-        forecast_supply_mt=15000.0,
+        forecast_supply_mt=25000.0,
         month=8,
         import_volume_mt=500.0
     )
