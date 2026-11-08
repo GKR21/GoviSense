@@ -3,7 +3,6 @@ import type { View, GroundReport } from "./types"
 import { fetchPlantingReports, mapPlantingReportToGroundReport } from "./api"
 import { OfficerScreen } from "./screens/officer/OfficerScreen"
 import { FarmerScreen } from "./screens/farmer/FarmerScreen"
-import { DesignSystem } from "./screens/system/DesignSystem"
 
 export default function App() {
   const [view, setView] = useState<View>(() => {
@@ -12,7 +11,6 @@ export default function App() {
       const v = params.get("view")
       if (v === "farmer" || window.location.pathname.includes("/farmer")) return "farmer"
       if (v === "admin" || window.location.pathname.includes("/admin")) return "admin"
-      if (v === "system" || window.location.pathname.includes("/system")) return "system"
       if (v === "officer" || window.location.pathname.includes("/officer")) return "officer"
     }
     return "officer"
@@ -89,12 +87,6 @@ export default function App() {
       )}
       {view === "farmer" && (
         <FarmerScreen
-          view={view}
-          setView={handleSetView}
-        />
-      )}
-      {view === "system" && (
-        <DesignSystem
           view={view}
           setView={handleSetView}
         />
