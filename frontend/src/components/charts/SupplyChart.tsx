@@ -19,6 +19,7 @@ export function SupplyChart({
   selectedMonth: number
   onSelectMonth: (month: number) => void
   apiCropData?: CropForecastData
+  isLive?: boolean
 }) {
   const profile = CROP_DATA_CATALOG[crop] || CROP_DATA_CATALOG["Big onion"]
   const series = useMemo(() => {
@@ -215,7 +216,22 @@ export function SupplyChart({
       </div>
 
       <div className="spi-strip-header">
-        <span className="spi-strip-title">Supply Pressure Index (SPI) by Month</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span className="spi-strip-title">Supply Pressure Index (SPI) by Month</span>
+          <span
+            style={{
+              fontSize: "10px",
+              fontWeight: "800",
+              padding: "2px 8px",
+              borderRadius: "999px",
+              background: isLive ? "rgba(16, 185, 129, 0.15)" : "rgba(59, 130, 246, 0.15)",
+              color: isLive ? "var(--primary)" : "#60a5fa",
+              border: `1px solid ${isLive ? "var(--balanced-border)" : "rgba(59, 130, 246, 0.35)"}`,
+            }}
+          >
+            {isLive ? "● LIVE FEED" : "🔵 DEMO BASELINE"}
+          </span>
+        </div>
         <div className="spi-strip-legend">
           <span className="spi-strip-legend-item">
             <i className="spi-strip-dot spi-strip-dot--oversupply" /> Glut (&gt; +0.15)
