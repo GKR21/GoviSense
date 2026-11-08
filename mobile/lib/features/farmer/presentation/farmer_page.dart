@@ -137,7 +137,7 @@ class _FarmerPageState extends State<FarmerPage> {
           ),
           // Trilingual language toggle
           Container(
-            margin: const EdgeInsets.only(right: 12),
+            margin: const EdgeInsets.only(right: 4),
             decoration: BoxDecoration(
               color: AppTheme.neutral100,
               borderRadius: BorderRadius.circular(10),
@@ -176,6 +176,13 @@ class _FarmerPageState extends State<FarmerPage> {
               }).toList(),
             ),
           ),
+          // Visible Log Out Button in Mobile AppBar
+          IconButton(
+            tooltip: 'Log Out',
+            icon: const Icon(Icons.logout_rounded, size: 19, color: AppTheme.neutral600),
+            onPressed: () => _confirmLogout(context),
+          ),
+          const SizedBox(width: 4),
         ],
       ),
       body: IndexedStack(
@@ -1277,7 +1284,7 @@ class _FarmerPageState extends State<FarmerPage> {
     final profile = _repo.profile;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
       children: [
         const Text(
           'Farmer Profile & Govijana Pass',
@@ -1367,7 +1374,118 @@ class _FarmerPageState extends State<FarmerPage> {
             ],
           ),
         ),
+        const SizedBox(height: 18),
+
+        // 4. ACCOUNT & SESSION (Matches Mobile Design Specification)
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: AppTheme.cardBorder),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'ACCOUNT & SESSION',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                  color: AppTheme.ink,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Signed in as ${profile.name} (${profile.farmerId})',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AppTheme.neutral600,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Material(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(16),
+                child: InkWell(
+                  onTap: () => _confirmLogout(context),
+                  borderRadius: BorderRadius.circular(16),
+                  splashColor: const Color(0xFFFCA5A5).withOpacity(0.3),
+                  highlightColor: const Color(0xFFFEE2E2),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFFECACA), width: 1.2),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.logout_rounded,
+                          size: 18,
+                          color: Color(0xFFB91C1C),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _language == AppLanguage.si
+                              ? 'පද්ධතියෙන් ඉවත් වන්න (Log Out)'
+                              : _language == AppLanguage.ta
+                                  ? 'வெளியேறு (Log Out)'
+                                  : 'Log Out of GoviSense',
+                          style: const TextStyle(
+                            color: Color(0xFFB91C1C),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
+    );
+  }
+
+  void _confirmLogout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Confirm Log Out'),
+        content: const Text('Are you sure you want to log out of your GoviSense profile?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.shortage,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.go('/login');
+            },
+            child: const Text('Log Out'),
+          ),
+        ],
+      ),
     );
   }
 }

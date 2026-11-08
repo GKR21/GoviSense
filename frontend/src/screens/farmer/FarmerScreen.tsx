@@ -132,6 +132,7 @@ export function FarmerScreen() {
               language={language}
               onBack={handleBack}
               onLanguageChange={setLanguage}
+              onLogout={() => setCurrentPage("onboarding")}
             />
             <OfflineBanner
               isOffline={isOffline}
@@ -221,6 +222,7 @@ export function FarmerScreen() {
               onLanguageChange={setLanguage}
               onScreenStateChange={setScreenState}
               onManualSync={() => {}}
+              onLogout={() => setCurrentPage("onboarding")}
             />
           ) : null}
         </main>

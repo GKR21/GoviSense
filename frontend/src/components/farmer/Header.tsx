@@ -1,4 +1,4 @@
-import { ArrowLeft, Sprout, Globe } from "lucide-react"
+import { ArrowLeft, Sprout, Globe, LogOut } from "lucide-react"
 import type { Language, FarmerPage } from "../../types/farmer"
 
 interface HeaderProps {
@@ -6,6 +6,7 @@ interface HeaderProps {
   language: Language
   onBack: () => void
   onLanguageChange: (lang: Language) => void
+  onLogout?: () => void
 }
 
 export function Header({
@@ -13,6 +14,7 @@ export function Header({
   language,
   onBack,
   onLanguageChange,
+  onLogout,
 }: HeaderProps) {
   const showBack =
     currentPage === "detail" ||
@@ -54,25 +56,39 @@ export function Header({
         </div>
       </div>
 
-      {/* Language Switcher Pill */}
-      <div className="flex items-center rounded-xl bg-stone-100 p-0.5 border border-stone-200/60">
-        <div className="pl-1.5 pr-0.5 text-stone-400">
-          <Globe size={13} />
+      {/* Header Actions: Language Switcher Pill + Log Out */}
+      <div className="flex items-center gap-1.5">
+        <div className="flex items-center rounded-xl bg-stone-100 p-0.5 border border-stone-200/60">
+          <div className="pl-1.5 pr-0.5 text-stone-400">
+            <Globe size={13} />
+          </div>
+          {(["en", "si", "ta"] as Language[]).map((lang) => (
+            <button
+              key={lang}
+              onClick={() => onLanguageChange(lang)}
+              type="button"
+              className={`min-w-7 rounded-lg py-1 px-1.5 text-xs font-semibold transition-all ${
+                language === lang
+                  ? "bg-white text-emerald-800 shadow-sm"
+                  : "text-stone-500 hover:text-stone-800"
+              }`}
+            >
+              {lang === "en" ? "EN" : lang === "si" ? "සිං" : "த"}
+            </button>
+          ))}
         </div>
-        {(["en", "si", "ta"] as Language[]).map((lang) => (
+
+        {onLogout && (
           <button
-            key={lang}
-            onClick={() => onLanguageChange(lang)}
+            onClick={onLogout}
             type="button"
-            className={`min-w-7 rounded-lg py-1 px-1.5 text-xs font-semibold transition-all ${
-              language === lang
-                ? "bg-white text-emerald-800 shadow-sm"
-                : "text-stone-500 hover:text-stone-800"
-            }`}
+            title="Log Out"
+            className="flex h-8 w-8 items-center justify-center rounded-xl bg-stone-100 hover:bg-rose-50 text-stone-500 hover:text-rose-600 transition active:scale-95 cursor-pointer border border-stone-200/60"
+            aria-label="Log Out"
           >
-            {lang === "en" ? "EN" : lang === "si" ? "සිං" : "த"}
+            <LogOut size={14} />
           </button>
-        ))}
+        )}
       </div>
     </header>
   )

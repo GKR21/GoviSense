@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ShieldCheck, RefreshCw, Globe, SlidersHorizontal, User, Check, Smartphone } from "lucide-react"
+import { ShieldCheck, RefreshCw, Globe, SlidersHorizontal, User, Check, Smartphone, LogOut } from "lucide-react"
 import type { Language, FarmerProfileData, ScreenState } from "../../types/farmer"
 import { DigitalFarmerCard } from "../../components/farmer/DigitalFarmerCard"
 import { getTranslations } from "../../i18n"
@@ -11,6 +11,7 @@ interface FarmerProfileProps {
   onLanguageChange: (lang: Language) => void
   onScreenStateChange: (state: ScreenState) => void
   onManualSync: () => void
+  onLogout?: () => void
 }
 
 export function FarmerProfile({
@@ -20,6 +21,7 @@ export function FarmerProfile({
   onLanguageChange,
   onScreenStateChange,
   onManualSync,
+  onLogout,
 }: FarmerProfileProps) {
   const t = getTranslations(language)
   const [syncing, setSyncing] = useState(false)
@@ -36,7 +38,7 @@ export function FarmerProfile({
   }
 
   return (
-    <div className="space-y-5 p-4 pb-16">
+    <div className="space-y-5 p-4 pb-32">
       {/* Title */}
       <div>
         <h2 className="text-2xl font-extrabold text-stone-900 tracking-tight leading-tight">
@@ -152,6 +154,30 @@ export function FarmerProfile({
             ),
           )}
         </div>
+      </div>
+
+      {/* 6. Session & Logout */}
+      <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm space-y-3">
+        <h3 className="text-xs font-extrabold uppercase tracking-wider text-stone-800">
+          ACCOUNT & SESSION
+        </h3>
+        <p className="text-xs text-stone-500 font-medium">
+          Signed in as {profile.name} ({profile.farmerId})
+        </p>
+        <button
+          onClick={onLogout}
+          type="button"
+          className="w-full flex items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 hover:bg-red-100 p-3.5 text-xs font-bold text-red-700 transition active:scale-[0.99] cursor-pointer"
+        >
+          <LogOut size={16} />
+          <span>
+            {language === "si"
+              ? "පද්ධතියෙන් ඉවත් වන්න (Log Out)"
+              : language === "ta"
+                ? "வெளியேறு (Log Out)"
+                : "Log Out of GoviSense"}
+          </span>
+        </button>
       </div>
     </div>
   )

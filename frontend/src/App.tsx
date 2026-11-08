@@ -35,6 +35,7 @@ import {
   LogIn,
   MapPin,
   Menu,
+  Moon,
   MoreHorizontal,
   PackageOpen,
   PencilLine,
@@ -49,6 +50,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Sprout,
+  Sun,
   TrendingUp,
   TriangleAlert,
   UploadCloud,
@@ -74,6 +76,7 @@ function Button({
   icon: Icon,
   className,
   disabled,
+  loading,
   onClick,
   type = "button",
 }: {
@@ -82,17 +85,27 @@ function Button({
   icon?: LucideIcon
   className?: string
   disabled?: boolean
+  loading?: boolean
   onClick?: () => void
   type?: "button" | "submit"
 }) {
   return (
     <button
       type={type}
-      className={cx("button", `button--${variant}`, className)}
-      disabled={disabled}
+      className={cx(
+        "button",
+        `button--${variant}`,
+        loading && "button--loading",
+        className,
+      )}
+      disabled={disabled || loading}
       onClick={onClick}
     >
-      {Icon && <Icon size={17} aria-hidden="true" />}
+      {loading ? (
+        <span className="spinner" aria-hidden="true" />
+      ) : (
+        Icon && <Icon size={17} aria-hidden="true" />
+      )}
       <span>{children}</span>
     </button>
   )
@@ -3828,6 +3841,28 @@ function DesignSystem() {
 export default function App() {
   const [view, setView] = useState<View>("farmer")
   const [unreadCount, setUnreadCount] = useState(0)
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("govisense_theme") as "light" | "dark" | null
+      if (saved) return saved
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+    }
+    return "light"
+  })
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme)
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark")
+    } else {
+      document.documentElement.classList.remove("dark")
+    }
+    localStorage.setItem("govisense_theme", theme)
+  }, [theme])
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === "light" ? "dark" : "light"))
+  }
 
   useEffect(() => {
     const updateCount = async () => {
@@ -3905,6 +3940,15 @@ export default function App() {
           >
             <BarChart3 size={15} />
             Officer dashboard
+          </button>
+          <button
+            className="theme-toggle"
+            type="button"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+            title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+          >
+            {theme === "light" ? <Moon size={15} /> : <Sun size={15} />}
           </button>
         </div>
       </div>

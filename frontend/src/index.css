@@ -2,38 +2,147 @@
 @import 'tailwindcss';
 
 :root {
-  --primary: #1b7f4b;
-  --primary-hover: #14663c;
-  --primary-dark: #0f4d2e;
-  --primary-tint: #e8f5ee;
-  --ink: #14211b;
-  --neutral-700: #34453d;
-  --neutral-600: #4a5a52;
-  --neutral-500: #6f7e76;
-  --neutral-400: #9eaaa4;
-  --neutral-300: #cbd5cf;
-  --neutral-200: #dfe6e2;
-  --neutral-100: #edf1ef;
-  --background: #f6f8f7;
+  /* 1. Primary Brand Identity (Deep Botanical Forest) */
+  --primary: #0a5c36;
+  --primary-hover: #08492b;
+  --primary-dark: #073b23;
+  --primary-tint: #eaf5ef;
+  --primary-border: #bde3ce;
+  --primary-glow: rgba(10, 92, 54, 0.2);
+
+  /* 2. Accent Identity (High-Visibility Fresh Lime) */
+  --accent: #e2f163;
+  --accent-contrast: #1c2600;
+  --accent-tint: #f5fbe0;
+
+  /* 3. Neutral Inks & Typographic Contrast */
+  --ink: #0e1c15;
+  --ink-secondary: #3b4e43;
+  --ink-muted: #6b7f73;
+  --neutral-700: #2c3e34;
+  --neutral-600: #42554a;
+  --neutral-500: #5c7064;
+  --neutral-400: #8ba093;
+  --neutral-300: #c2d1c8;
+  --neutral-200: #dfe7e2;
+  --neutral-100: #eff4f0;
+
+  /* 4. Surfaces & Anti-Glare Paper System */
+  --background: #f7f9f6;
   --surface: #ffffff;
-  --shortage: #d64545;
-  --shortage-tint: #fcecec;
-  --balanced: #2e9e5b;
-  --balanced-tint: #e8f6ed;
-  --oversupply: #9a6500;
+  --surface-subtle: #f0f4ee;
+  --surface-card: #ffffff;
+  --surface-card-hover: #fafcf9;
+  --surface-glass: rgba(255, 255, 255, 0.92);
+  --border-subtle: rgba(20, 38, 28, 0.08);
+  --border-strong: rgba(20, 38, 28, 0.16);
+
+  /* 5. Perspective-Aware Semantic Risk Signals */
+  --shortage: #d44333;
+  --shortage-text: #8a1c10;
+  --shortage-tint: #fdf0ed;
+  --shortage-border: #f7c3bd;
+
+  --balanced: #168b52;
+  --balanced-text: #0a502e;
+  --balanced-tint: #e8f7ee;
+  --balanced-border: #a6e3bf;
+
+  --oversupply: #b87300;
   --oversupply-bright: #e8a317;
-  --oversupply-tint: #fff6df;
-  --info: #2f6fde;
-  --info-tint: #edf3ff;
-  --focus: #2f6fde;
+  --oversupply-text: #6b4300;
+  --oversupply-tint: #fff7e6;
+  --oversupply-border: #fce0a6;
+
+  --info: #1e65d6;
+  --info-text: #0d3c8a;
+  --info-tint: #eff5ff;
+  --info-border: #bbd5fc;
+
+  /* 6. Focus Ring & Elevation */
+  --focus: #0a5c36;
+  --focus-ring: rgba(10, 92, 54, 0.35);
   --chart-low: #9db8a8;
-  --shadow-sm: 0 1px 2px rgba(20, 33, 27, 0.06);
-  --shadow-md: 0 8px 24px rgba(20, 33, 27, 0.08);
-  --shadow-lg: 0 20px 60px rgba(20, 33, 27, 0.14);
+
+  --shadow-sm: 0 1px 3px rgba(14, 28, 21, 0.04), 0 1px 2px rgba(14, 28, 21, 0.02);
+  --shadow-md: 0 4px 16px -2px rgba(14, 28, 21, 0.07), 0 2px 6px -1px rgba(14, 28, 21, 0.04);
+  --shadow-lg: 0 12px 32px -4px rgba(14, 28, 21, 0.1), 0 4px 12px -2px rgba(14, 28, 21, 0.05);
+
+  --radius-xs: 6px;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 22px;
+  --radius-full: 9999px;
+}
+
+[data-theme="dark"],
+.dark {
+  /* 1. Primary Brand Identity (Luminous Botanical Emerald for Dark Mode) */
+  --primary: #1eb96c;
+  --primary-hover: #27d47e;
+  --primary-dark: #14854c;
+  --primary-tint: rgba(30, 185, 108, 0.14);
+  --primary-border: rgba(30, 185, 108, 0.3);
+  --primary-glow: rgba(30, 185, 108, 0.3);
+
+  /* 2. Accent Identity */
+  --accent: #e2f163;
+  --accent-contrast: #101900;
+  --accent-tint: rgba(226, 241, 99, 0.15);
+
+  /* 3. Neutral Inks & Dark Typographic Contrast */
+  --ink: #f1f7f4;
+  --ink-secondary: #a3b8ad;
+  --ink-muted: #6e8477;
+  --neutral-700: #d6e2db;
+  --neutral-600: #a8bcaf;
+  --neutral-500: #7d9486;
+  --neutral-400: #546a5d;
+  --neutral-300: #33443a;
+  --neutral-200: #233229;
+  --neutral-100: #17231c;
+
+  /* 4. Surfaces (Deep Rich Obsidian Forest) */
+  --background: #0b130e;
+  --surface: #121c16;
+  --surface-subtle: #17241c;
+  --surface-card: #15221b;
+  --surface-card-hover: #192720;
+  --surface-glass: rgba(18, 28, 22, 0.92);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  /* 5. Perspective-Aware Semantic Signals (Vibrant on Dark) */
+  --shortage: #ff6b6b;
+  --shortage-text: #ffb8b8;
+  --shortage-tint: rgba(255, 107, 107, 0.15);
+  --shortage-border: rgba(255, 107, 107, 0.35);
+
+  --balanced: #2bd482;
+  --balanced-text: #96f0c2;
+  --balanced-tint: rgba(43, 212, 130, 0.15);
+  --balanced-border: rgba(43, 212, 130, 0.35);
+
+  --oversupply: #f5a623;
+  --oversupply-bright: #ffbe4a;
+  --oversupply-text: #ffdeb0;
+  --oversupply-tint: rgba(245, 166, 35, 0.15);
+  --oversupply-border: rgba(245, 166, 35, 0.35);
+
+  --info: #5995ff;
+  --info-text: #bdd6ff;
+  --info-tint: rgba(89, 149, 255, 0.15);
+  --info-border: rgba(89, 149, 255, 0.35);
+
+  /* 6. Focus Ring & Elevation */
+  --focus: #1eb96c;
+  --focus-ring: rgba(30, 185, 108, 0.45);
+  --chart-low: #3a5c48;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 16px -2px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 14px 36px -4px rgba(0, 0, 0, 0.7);
 }
 
 @layer base {
@@ -93,12 +202,14 @@
   align-items: center;
   gap: 8px;
   transform: translateX(-50%);
-  padding: 5px;
-  border: 1px solid rgba(203, 213, 207, 0.8);
-  border-radius: 13px;
-  background: rgba(255, 255, 255, 0.96);
+  padding: 5px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-glass);
   box-shadow: var(--shadow-lg);
   backdrop-filter: blur(12px);
+  color: var(--ink);
+  transition: all 180ms ease;
 }
 
 .workspace-switcher > span {
@@ -106,14 +217,15 @@
   align-items: center;
   gap: 6px;
   padding: 0 10px;
-  color: var(--primary-dark);
+  color: var(--primary);
   font-size: 12px;
   font-weight: 700;
 }
 
 .workspace-switcher > div {
   display: flex;
-  gap: 2px;
+  align-items: center;
+  gap: 4px;
 }
 
 .workspace-switcher button {
@@ -123,17 +235,49 @@
   gap: 6px;
   padding: 0 11px;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--neutral-600);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+  transition: all 180ms ease;
+}
+
+.workspace-switcher button:hover:not(.active) {
+  background: var(--surface-subtle);
+  color: var(--ink);
 }
 
 .workspace-switcher button.active {
-  background: var(--primary-dark);
-  color: white;
+  background: var(--primary);
+  color: #ffffff;
+  box-shadow: 0 2px 6px var(--primary-glow);
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-subtle);
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 180ms ease;
+  padding: 0 !important;
+}
+
+.theme-toggle:hover {
+  background: var(--surface);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.theme-toggle:active {
+  transform: scale(0.92);
 }
 
 .button {
@@ -146,39 +290,50 @@
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   font-size: 14px;
-  font-weight: 650;
-  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+  font-weight: 600;
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
   cursor: pointer;
+  user-select: none;
 }
 
 .button:hover:not(:disabled) {
   transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.button:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .button--primary {
   background: var(--primary);
   color: white;
-  box-shadow: 0 2px 5px rgba(27, 127, 75, 0.2);
+  box-shadow: 0 2px 8px var(--primary-glow);
 }
 
-.button--primary:hover {
+.button--primary:hover:not(:disabled) {
   background: var(--primary-hover);
 }
 
 .button--secondary {
-  border-color: var(--neutral-300);
+  border-color: var(--border-strong);
   background: var(--surface);
-  color: var(--neutral-700);
+  color: var(--ink);
 }
 
-.button--secondary:hover {
+.button--secondary:hover:not(:disabled) {
   border-color: var(--primary);
-  color: var(--primary-dark);
+  color: var(--primary);
+  background: var(--surface-subtle);
 }
 
 .button--ghost {
   background: transparent;
-  color: var(--primary-dark);
+  color: var(--primary);
+}
+
+.button--ghost:hover:not(:disabled) {
+  background: var(--primary-tint);
 }
 
 .button--danger {
@@ -190,6 +345,27 @@
   background: var(--neutral-100);
   color: var(--neutral-400);
   cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.button--loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.88;
+}
+
+.spinner {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 600ms linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .icon-button {
@@ -198,17 +374,22 @@
   height: 40px;
   flex: 0 0 auto;
   place-items: center;
-  border: 1px solid var(--neutral-200);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--neutral-600);
   cursor: pointer;
+  transition: all 180ms ease;
 }
 
 .icon-button:hover {
-  border-color: var(--neutral-300);
-  background: var(--background);
+  border-color: var(--border-strong);
+  background: var(--surface-subtle);
   color: var(--ink);
+}
+
+.icon-button:active {
+  transform: scale(0.94);
 }
 
 .demo-ribbon {
