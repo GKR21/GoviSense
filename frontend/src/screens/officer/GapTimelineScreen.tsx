@@ -3,16 +3,19 @@ import {
   AlertCircle,
   ArrowDownCircle,
   ArrowUpCircle,
+  BarChart3,
   BookOpen,
   CalendarDays,
   Check,
   CheckCircle2,
   ChevronRight,
   CircleDollarSign,
+  ClipboardCheck,
   Clock3,
   Cpu,
   Database,
   Download,
+  Eye,
   FileCheck,
   FileClock,
   Layers,
@@ -23,6 +26,7 @@ import {
   ShieldCheck,
   Ship,
   Sparkles,
+  Sprout,
   TrendingDown,
   TrendingUp,
   TriangleAlert,
@@ -34,19 +38,24 @@ import {
 import type { PolicyDecision } from "../../types"
 import { CROP_DATA_CATALOG, MONTHS as months } from "../../mocks/officerData"
 import { Button, PageHeading, RiskBadge, SelectControl } from "../../components/common"
+import type { LatestForecastsResponse, RecommendationItem } from "../../api"
 
 export function GapTimelineScreen({
   crop = "Big onion",
   district = "Anuradhapura",
   onRecord,
+  forecastData,
+  isLiveApi = false,
 }: {
   crop?: string
   district?: string
   onRecord: (decision: string, details?: Partial<PolicyDecision>) => void
+  forecastData?: LatestForecastsResponse | null
+  isLiveApi?: boolean
 }) {
   const profile = CROP_DATA_CATALOG[crop] || CROP_DATA_CATALOG["Big onion"]
   const [leadTime, setLeadTime] = useState(7)
-  const [selectedStrategy, setSelectedStrategy] = useState("Dynamic Just-In-Time")
+  const [selectedStrategy, setSelectedStrategy] = useState("PLANT_EXPANSION")
   const [selectedMonthIdx, setSelectedMonthIdx] = useState(6) // July
   const [metricMode, setMetricMode] = useState<"gap" | "coverage" | "price">("gap")
   const [assumptionsOpen, setAssumptionsOpen] = useState(false)
@@ -57,6 +66,22 @@ export function GapTimelineScreen({
     "Authorize dynamic JIT procurement window. Hold release until Week 21 farmer planting report verification to prevent domestic market suppression."
   )
   const [exportNotice, setExportNotice] = useState(false)
+
+  // Extract AI 4 recommendations
+  const apiRecs: RecommendationItem[] = useMemo(() => {
+    return forecastData?.ai4_optimization?.recommendations || []
+  }, [forecastData])
+
+  const plantRec = apiRecs.find(
+    (r) => r.action_type === "PLANT_EXPANSION" && (r.crop.toLowerCase().includes(crop.toLowerCase()) || crop.toLowerCase().includes(r.crop.toLowerCase())),
+  ) || apiRecs.find((r) => r.action_type === "PLANT_EXPANSION")
+
+  const bufferRec = apiRecs.find(
+    (r) => r.action_type === "HOLD_STORAGE_BUFFER" && (r.crop.toLowerCase().includes(crop.toLowerCase()) || crop.toLowerCase().includes(r.crop.toLowerCase())),
+  ) || apiRecs.find((r) => r.action_type === "HOLD_STORAGE_BUFFER")
+
+  const importRec = apiRecs.find((r) => r.action_type === "TARGETED_IMPORT")
+  const maintainRec = apiRecs.find((r) => r.action_type === "MAINTAIN_CURRENT_EXTENT")
 
   // Dynamic calculations based on lead time
   const deadlineDate = leadTime === 6 ? "25 May 2026" : leadTime === 8 ? "11 May 2026" : "18 May 2026"
@@ -84,59 +109,71 @@ export function GapTimelineScreen({
 
   const selectedMonthData = monthlyData[selectedMonthIdx]
 
-  // Strategies
+  // Four Official AI 4 Strategic Response Directives
   const strategies = [
     {
-      id: "Early Import Buffer",
-      title: "Early Import Buffer (Import now)",
-      tag: "Conservative Safety Buffer",
-      tagClass: "strategy-tag--warn",
-      icon: UploadCloud,
-      security: "98%",
-      estPrice: `Rs. ${(profile.spotPrice * 0.88).toFixed(0)} - ${(profile.spotPrice * 0.94).toFixed(0)}/kg`,
-      carryingCost: "Rs. 18.5M",
-      category: "Import quota" as const,
-      pro: "Completely eliminates stockout and retail spike risks in major urban centres.",
-      con: "High warehouse holding cost; risks depressing farmgate prices for local growers at harvest.",
-    },
-    {
-      id: "Dynamic Just-In-Time",
-      title: "Dynamic Just-In-Time (Import later)",
-      tag: "AI Recommended · Optimal Welfare",
+      id: "PLANT_EXPANSION",
+      action_type: "PLANT_EXPANSION",
+      title: "1. Plant Expansion (Nudge Cultivation)",
+      tag: "AI 4 · Local Cultivation",
       tagClass: "strategy-tag--rec",
-      icon: Clock3,
-      security: "93%",
-      estPrice: `Rs. ${(profile.spotPrice * 0.96).toFixed(0)} - ${(profile.spotPrice * 1.02).toFixed(0)}/kg`,
-      carryingCost: "Rs. 4.2M",
-      category: "Import quota" as const,
-      pro: "Synchronizes with live farmer planting telemetry to size import quotas with zero surplus wastage.",
-      con: "Requires 7-day alert trigger window; tight margin if port customs encounters congestion.",
+      icon: Sprout,
+      security: "95%",
+      quantity: plantRec ? `${plantRec.quantity.toLocaleString()} ${plantRec.unit}` : "336.8 hectares",
+      timeline: plantRec?.timeline || "Nudge farmers within DoA planting window (next 30 days)",
+      rationale: plantRec?.rationale || "Fills deficit via local cultivation. Protects farm-gate price above fair floor (Rs 120.0/kg).",
+      floorPrice: plantRec ? `Rs. ${plantRec.fair_farmgate_floor_rs_kg}/kg` : `Rs. ${profile.fairFloorPrice}/kg`,
+      category: "Planting advisory" as const,
+      pro: "Directly bridges domestic deficit without foreign currency drain; expands farmer household income.",
+      con: "Must be triggered within the 30-day biological sowing window before rainfed moisture recedes.",
     },
     {
-      id: "Tariff Shield",
-      title: "Tariff Shield (Delay imports)",
-      tag: "Farmer Margin Protection",
-      tagClass: "strategy-tag--warn",
-      icon: CalendarDays,
-      security: "74%",
-      estPrice: `Rs. ${(profile.spotPrice * 1.12).toFixed(0)} - ${(profile.spotPrice * 1.24).toFixed(0)}/kg`,
-      carryingCost: "Rs. 0.0M",
-      category: "Tariff adjustment" as const,
-      pro: "Guarantees premium farmgate returns (>Rs. 280/kg) for local farming communities.",
-      con: "Shortage may deepen by up to 28% if late Yala rainfall slips below 90mm.",
-    },
-    {
-      id: "Domestic Buffer Stock",
-      title: "Domestic Buffer Stock (Store locally)",
-      tag: "Zero Forex Outflow",
+      id: "HOLD_STORAGE_BUFFER",
+      action_type: "HOLD_STORAGE_BUFFER",
+      title: "2. Hold Storage Buffer (Reserve Stock)",
+      tag: "AI 4 · Floor Protection",
       tagClass: "strategy-tag--rec",
       icon: Warehouse,
-      security: "86%",
-      estPrice: `Rs. ${(profile.spotPrice * 0.92).toFixed(0)} - ${(profile.spotPrice * 0.98).toFixed(0)}/kg`,
-      carryingCost: "Rs. 9.1M",
+      security: "90%",
+      quantity: bufferRec ? `${bufferRec.quantity.toLocaleString()} ${bufferRec.unit}` : "3,948.6 MT",
+      timeline: bufferRec?.timeline || "Activate Dambulla/Anuradhapura dedicated warehouse storage",
+      rationale: bufferRec?.rationale || "Hold back bumper surplus off spot market to safeguard minimum fair farmgate floor.",
+      floorPrice: bufferRec ? `Rs. ${bufferRec.fair_farmgate_floor_rs_kg}/kg` : `Rs. ${profile.fairFloorPrice}/kg`,
       category: "Storage buffer" as const,
-      pro: "Absorbs local surplus into temperature-controlled facilities without foreign exchange outflow.",
-      con: "Constrained by certified national cold storage capacity (1,200 MT ceiling).",
+      pro: "Absorbs bumper surplus into temperature-controlled storage; prevents farmgate price crash.",
+      con: "Monthly storage shrinkage and ventilation costs require certified warehouse management.",
+    },
+    {
+      id: "TARGETED_IMPORT",
+      action_type: "TARGETED_IMPORT",
+      title: "3. Targeted Import Quota (Dynamic JIT)",
+      tag: "AI 4 · Consumer Price Cap",
+      tagClass: "strategy-tag--warn",
+      icon: Ship,
+      security: "92%",
+      quantity: importRec ? `${importRec.quantity.toLocaleString()} ${importRec.unit}` : "1,200.0 MT",
+      timeline: importRec?.timeline || `Execute import procurement ${leadTime} weeks ahead of deficit`,
+      rationale: importRec?.rationale || "Emergency buffer import to cap retail spike without depressing farmer harvest incentives.",
+      floorPrice: importRec ? `Rs. ${importRec.fair_farmgate_floor_rs_kg}/kg` : `Rs. ${profile.fairFloorPrice}/kg`,
+      category: "Import quota" as const,
+      pro: "Guarantees consumer price stability during urban peak demand festival spikes.",
+      con: "Requires strict customs release coordination so arrivals do not coincide with local harvest flushes.",
+    },
+    {
+      id: "MAINTAIN_CURRENT_EXTENT",
+      action_type: "MAINTAIN_CURRENT_EXTENT",
+      title: "4. Maintain Current Extent (Status Quo)",
+      tag: "AI 4 · Zero Intervention",
+      tagClass: "strategy-tag--neutral",
+      icon: Clock3,
+      security: "84%",
+      quantity: maintainRec ? `${maintainRec.quantity} ${maintainRec.unit}` : "Status Quo Extent",
+      timeline: maintainRec?.timeline || "Current season planting cycle",
+      rationale: maintainRec?.rationale || "Market in equilibrium balance; defer market intervention until planting telemetry verifies.",
+      floorPrice: maintainRec ? `Rs. ${maintainRec.fair_farmgate_floor_rs_kg}/kg` : `Rs. ${profile.fairFloorPrice}/kg`,
+      category: "Tariff adjustment" as const,
+      pro: "Zero treasury expenditure and zero market distortion when seasonal supply meets expected demand.",
+      con: "Leaves supply vulnerable if sudden pest incidence or rainfall deficits reduce harvest yields.",
     },
   ]
 
@@ -163,9 +200,9 @@ export function GapTimelineScreen({
       category: currentStrategy.category,
       officer: officerName,
       designation: officerDesignation,
-      notes: officerNotes,
-      assumptions: `Lead time ${leadTime}w · Post-harvest loss 12% · Decision cutoff ${deadlineDate}`,
-      impactEstimate: `${currentStrategy.title} deployed: Security score ${currentStrategy.security}, Est Price ${currentStrategy.estPrice}.`,
+      notes: `${officerNotes} | Action: ${currentStrategy.action_type} (${currentStrategy.quantity}) | Timeline: ${currentStrategy.timeline}`,
+      assumptions: `Lead time ${leadTime}w · Recommended ${currentStrategy.quantity} · Farmgate floor ${currentStrategy.floorPrice} · Timeline ${currentStrategy.timeline}`,
+      impactEstimate: `${currentStrategy.title}: ${currentStrategy.rationale}`,
     })
     setSignoffModalOpen(false)
   }
@@ -173,12 +210,25 @@ export function GapTimelineScreen({
   return (
     <>
       <PageHeading
-        eyebrow="Decision Planning & Logistics"
+        eyebrow="Decision Planning & Logistics · AI 4 Linear Optimizer"
         icon={FileClock}
         title={`Gap & Import Timeline: ${crop}`}
         description={`Synchronize international shipping lead-time with domestic ${crop} harvest in ${district}.`}
         actions={
-          <>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <span
+              style={{
+                padding: "3px 10px",
+                borderRadius: "999px",
+                fontSize: "11px",
+                fontWeight: "800",
+                background: isLiveApi ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)",
+                color: isLiveApi ? "var(--primary)" : "var(--oversupply)",
+                border: `1px solid ${isLiveApi ? "var(--balanced-border)" : "var(--oversupply-border)"}`,
+              }}
+            >
+              {isLiveApi ? "● LIVE AI 4 OPTIMIZER" : "DEMO / BASELINE"}
+            </span>
             <Button
               variant="secondary"
               icon={BookOpen}
@@ -189,7 +239,7 @@ export function GapTimelineScreen({
             <Button icon={Download} onClick={handleExportCSV}>
               Export Timeline
             </Button>
-          </>
+          </div>
         }
       />
 
@@ -523,17 +573,24 @@ export function GapTimelineScreen({
 
                 <div className="strategy-metrics-row">
                   <div className="strategy-metric-item">
-                    <small>Supply Security</small>
-                    <strong style={{ color: "var(--primary)" }}>{strat.security}</strong>
+                    <small>Target Quantity</small>
+                    <strong style={{ color: "var(--primary)" }}>{strat.quantity}</strong>
                   </div>
                   <div className="strategy-metric-item">
-                    <small>Est. Price Band</small>
-                    <strong style={{ color: "var(--ink)" }}>{strat.estPrice}</strong>
+                    <small>Floor Price Protection</small>
+                    <strong style={{ color: "#38bdf8" }}>{strat.floorPrice}</strong>
                   </div>
                   <div className="strategy-metric-item">
-                    <small>Carrying Cost</small>
-                    <strong style={{ color: "#38bdf8" }}>{strat.carryingCost}</strong>
+                    <small>Supply Confidence</small>
+                    <strong style={{ color: "var(--ink)" }}>{strat.security}</strong>
                   </div>
+                </div>
+
+                <div style={{ margin: "10px 0 4px", fontSize: "12px", color: "var(--ink)", lineHeight: 1.4 }}>
+                  <strong style={{ color: "var(--primary)" }}>Timeline:</strong> {strat.timeline}
+                </div>
+                <div style={{ margin: "0 0 10px", fontSize: "11px", color: "var(--ink-muted)", lineHeight: 1.4 }}>
+                  <strong>Rationale:</strong> {strat.rationale}
                 </div>
 
                 <div className="strategy-pros-cons">
@@ -560,7 +617,7 @@ export function GapTimelineScreen({
             <div>
               <strong>Selected Directive: {currentStrategy.title}</strong>
               <p>
-                Lead-Time: {leadTime} Weeks · Decision Cutoff: {deadlineDate} ({daysLeft} days remaining)
+                Directive: {currentStrategy.action_type} · Allocation: {currentStrategy.quantity} · Timeline: {currentStrategy.timeline}
               </p>
             </div>
           </div>
@@ -605,8 +662,11 @@ export function GapTimelineScreen({
                 <strong style={{ color: "#6ee7b7", fontSize: "14px", display: "block" }}>
                   {currentStrategy.title}
                 </strong>
-                <span style={{ fontSize: "12px", color: "var(--ink-muted)", display: "block", marginTop: "2px" }}>
-                  Target Crop: {crop} · District: {district} · Lead Time: {leadTime} Weeks · Cutoff: {deadlineDate}
+                <span style={{ fontSize: "12px", color: "var(--ink-muted)", display: "block", marginTop: "4px" }}>
+                  Target Crop: <strong>{crop}</strong> · Allocation: <strong>{currentStrategy.quantity}</strong> · Floor: <strong>{currentStrategy.floorPrice}</strong>
+                </span>
+                <span style={{ fontSize: "11px", color: "var(--primary)", display: "block", marginTop: "2px" }}>
+                  Directive Timeline: {currentStrategy.timeline}
                 </span>
               </div>
 
