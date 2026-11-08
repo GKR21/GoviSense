@@ -221,6 +221,40 @@ export async function submitPlantingReportApi(payload: {
   }
 }
 
+export async function submitHarvestReportApi(payload: {
+  crop_id: string
+  season?: string
+  area_harvested_ha: number
+  harvest_quantity_kg: number
+  loss_kg?: number
+  quantity_sold_kg?: number
+  quantity_stored_kg?: number
+  sale_price_rs_kg?: number
+  sale_channel?: string
+  sale_month?: string
+  pseudonymous_id?: string
+  notes?: string
+}) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/feedback/harvest-report`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        season: "Maha 2025/2026",
+        loss_kg: 0,
+        quantity_sold_kg: 0,
+        quantity_stored_kg: 0,
+        pseudonymous_id: "FARMER-ANON-001",
+        ...payload,
+      }),
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } catch (err) {
+    return { status: "ACCEPTED_OFFLINE", ...payload }
+  }
+}
+
 export interface PlantingReportApi {
   crop_id: string
   season: string

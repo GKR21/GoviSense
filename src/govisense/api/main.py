@@ -1335,6 +1335,7 @@ from govisense.api.routes.alerts import (
     get_alerts as list_alerts,
     acknowledge_alert,
     ask_officer_inquiry as ask_officer_on_alert,
+    add_officer_note,
 )
 from govisense.api.routes.officer import (
     list_runs as list_pipeline_runs,

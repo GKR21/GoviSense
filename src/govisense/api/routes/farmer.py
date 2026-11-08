@@ -209,6 +209,9 @@ def farmer_top3_recommendations(
         except Exception:
             spi_band = "Balanced"
 
+        exp_yield = round(rec_ha * yield_mid, 2)
+        floor_price = settings.crops[crop_id].min_fair_farmgate_price if crop_id in settings.crops else 120.0
+
         top3_results.append({
             "rank": len(top3_results) + 1,
             "crop_id": crop_id,
@@ -216,6 +219,8 @@ def farmer_top3_recommendations(
             "fit_score": fit_score,
             "confidence_badge": confidence_badge,
             "profit_range_rs_kg": {"p10_rs_kg": p10, "p90_rs_kg": p90},
+            "price_forecast": {"p10_rs_kg": p10, "p50_rs_kg": round((p10 + p90) / 2.0, 1), "p90_rs_kg": p90},
+            "fair_floor_price_rs_kg": floor_price,
             "expected_net_profit_per_acre": expected_net_profit_per_acre,
             "monthly_price_ranges_12m": monthly_price_ranges_12m,
             "risk_level": "Low" if fit_score >= 70 else "Medium",
@@ -227,11 +232,16 @@ def farmer_top3_recommendations(
             "growing_duration_days": (req.duration_months * 30) if req else 90,
             "primary_fertilizer": "NPK + Compost",
             "allocated_ha": rec_ha,
+            "allocated_area_ha": rec_ha,
             "recommended_ha": rec_ha,
+            "expected_yield_mt": exp_yield,
+            "expected_yield_mt_ha": yield_mid,
             "target_area_ha": target_ha,
             "cumulative_reported_ha": total_reported,
             "remaining_target_ha": remaining_target_ha,
             "is_target_full": is_target_full,
+            "stop_rule_triggered": is_target_full,
+            "status": "PAUSED" if is_target_full else "APPROVED",
             "target_full_warning": target_full_warning,
         })
 
