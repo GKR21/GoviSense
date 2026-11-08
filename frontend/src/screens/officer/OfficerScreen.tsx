@@ -220,7 +220,7 @@ export function OfficerScreen({
 
   return (
     <div className="officer-app">
-      <DemoRibbon />
+      <DemoRibbon isLive={isLiveApi} />
       <aside className="sidebar">
         <div className="brand">
           <div className="brand__mark">
@@ -526,6 +526,7 @@ export function OfficerScreen({
                     selectedMonth={selectedMonth}
                     onSelectMonth={setSelectedMonth}
                     apiCropData={currentApiCropData}
+                    isLive={isLiveApi}
                   />
                   <div className="chart-footer">
                     <div>
