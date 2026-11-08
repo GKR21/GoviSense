@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react"
+import type { View } from "../../types"
+import { WorkspaceSwitcher } from "../../components/common/WorkspaceSwitcher"
 import type {
   Language,
   FarmerPage,
@@ -25,7 +27,13 @@ import { FarmerProfile } from "./FarmerProfile"
 
 import { farmerService } from "../../services/farmerService"
 
-export function FarmerScreen() {
+export function FarmerScreen({
+  view = "farmer",
+  setView,
+}: {
+  view?: View
+  setView?: (view: View) => void
+} = {}) {
   const [language, setLanguage] = useState<Language>("si") // Default to Sinhala for national farmer relevance
   const [currentPage, setCurrentPage] = useState<FarmerPage>("onboarding")
   const [crops, setCrops] = useState<CropItem[]>([])
@@ -104,6 +112,11 @@ export function FarmerScreen() {
 
   return (
     <div className="min-h-screen bg-stone-100/90 py-6 px-3 flex flex-col items-center justify-start font-sans antialiased text-stone-900">
+      {setView && (
+        <div style={{ marginBottom: 20 }}>
+          <WorkspaceSwitcher view={view} setView={setView} />
+        </div>
+      )}
       {/* Visual Frame Wrapper (Responsive: mobile width container on desktop, full-width on mobile) */}
       <div className="relative w-full max-w-[420px] min-h-[844px] flex flex-col overflow-hidden rounded-[38px] border-[6px] border-stone-800/90 bg-stone-50 shadow-2xl shadow-emerald-950/20">
         {/* Mobile Device Status Bar */}
