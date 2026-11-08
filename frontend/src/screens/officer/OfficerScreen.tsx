@@ -377,7 +377,12 @@ export function OfficerScreen({
               isLiveApi={isLiveApi}
             />
           ) : page === "Adoption tracker" ? (
-            <AdoptionScreen groundReports={groundReports} />
+            <AdoptionScreen
+              groundReports={groundReports}
+              crop={selectedCrop}
+              forecastData={forecastData}
+              isLiveApi={isLiveApi}
+            />
           ) : page === "Decision history" ? (
             <HistoryScreen
               decision={decision}
