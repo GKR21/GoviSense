@@ -368,7 +368,12 @@ export function OfficerScreen({
               onRecord={recordDecision}
             />
           ) : page === "Price outlook" ? (
-            <PriceOutlookScreen crop={selectedCrop} district={selectedDistrict} />
+            <PriceOutlookScreen
+              crop={selectedCrop}
+              district={selectedDistrict}
+              forecastData={forecastData}
+              isLiveApi={isLiveApi}
+            />
           ) : page === "Adoption tracker" ? (
             <AdoptionScreen groundReports={groundReports} />
           ) : page === "Decision history" ? (
