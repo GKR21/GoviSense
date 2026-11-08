@@ -1,4 +1,4 @@
-export type View = "officer" | "admin" | "farmer" | "system"
+export type View = "officer" | "admin" | "farmer"
 export type Language = "en" | "si" | "ta"
 export type Risk = "shortage" | "balanced" | "oversupply"
 export type Confidence = "High" | "Medium" | "Low" | "Outdated"
