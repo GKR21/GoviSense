@@ -65,10 +65,10 @@ export function OverviewScreen({
     : profile.spiMonthly[6] < 0 ? "Shortage" : "Glut"
   const spiScore = apiCropData?.ai3_supply_pressure_index
     ? apiCropData.ai3_supply_pressure_index.spi_score
-    : profile.spiAnnualScore
+    : (profile.spiAnnualScore ?? (profile.spiMonthly[6] || 0.05))
   const spiAction = apiCropData?.ai3_supply_pressure_index
     ? apiCropData.ai3_supply_pressure_index.action_summary
-    : profile.ai4Action
+    : (profile.ai4Action || "Maintain cultivation extent")
 
   const allCrops = ["Big onion", "Chilli", "Green gram", "Maize", "Red onion", "Potato"]
   const orderedCrops = [crop, ...allCrops.filter((c) => c !== crop)]

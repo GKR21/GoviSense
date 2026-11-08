@@ -19,8 +19,10 @@ import {
   Layers,
   Leaf,
   MoreHorizontal,
+  PencilLine,
   Plus,
   RefreshCw,
+  RotateCcw,
   Save,
   Search,
   Settings,
@@ -503,11 +505,11 @@ export function OfficerScreen({
                   </span>
                   <strong>
                     {selectedCrop} harvest in {selectedSeason} ({selectedDistrict}):{" "}
-                    {currentApiCropData?.ai3_supply_pressure_index.spi_label || currentProfile.spiLabel}{" "}
+                    {currentApiCropData?.ai3_supply_pressure_index.spi_label || currentProfile.spiLabel || "Balanced"}{" "}
                     (SPI: {currentApiCropData?.ai3_supply_pressure_index.spi_score !== undefined
                       ? (currentApiCropData.ai3_supply_pressure_index.spi_score > 0 ? "+" : "") + currentApiCropData.ai3_supply_pressure_index.spi_score.toFixed(2)
-                      : currentProfile.spiAnnualScore}).{" "}
-                    {currentApiCropData?.ai3_supply_pressure_index.action_summary || currentProfile.ai4Action}
+                      : (currentProfile.spiAnnualScore !== undefined ? currentProfile.spiAnnualScore : "+0.08")}).{" "}
+                    {currentApiCropData?.ai3_supply_pressure_index.action_summary || currentProfile.ai4Action || "Maintain planting extent."}
                   </strong>
                   <p>
                     High oversupply risk. Consider shifting part of planned area

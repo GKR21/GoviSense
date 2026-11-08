@@ -7,6 +7,7 @@ import {
   BookOpen,
   CalendarDays,
   Check,
+  CheckCheck,
   CheckCircle2,
   ChevronRight,
   CircleDollarSign,
@@ -36,8 +37,9 @@ import {
   Zap,
 } from "lucide-react"
 import type { PolicyDecision } from "../../types"
+import { cx } from "../../types"
 import { CROP_DATA_CATALOG, MONTHS as months } from "../../mocks/officerData"
-import { Button, PageHeading, RiskBadge, SelectControl } from "../../components/common"
+import { Button, PageHeading, RiskBadge, SelectControl, ConfidenceBadge } from "../../components/common"
 import type { LatestForecastsResponse, RecommendationItem } from "../../api"
 
 export function GapTimelineScreen({

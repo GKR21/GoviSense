@@ -12,6 +12,7 @@ export function SupplyChart({
   selectedMonth,
   onSelectMonth,
   apiCropData,
+  isLive = false,
 }: {
   crop?: string
   area: number

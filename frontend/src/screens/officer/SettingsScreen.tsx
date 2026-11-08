@@ -7,7 +7,7 @@ import {
   Settings,
   Sun,
 } from "lucide-react"
-import { Button, PageHeading, SliderField } from "../../components/common"
+import { Button, PageHeading, SliderField, RiskBadge, SelectControl } from "../../components/common"
 
 export function SettingsScreen() {
   const [lang, setLang] = useState("English")
