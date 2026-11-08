@@ -735,10 +735,64 @@
 /* ================================================================
    SPI STRIP
    ================================================================ */
+.spi-strip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+  margin-bottom: 6px;
+  padding: 0 4px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.spi-strip-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-muted);
+}
+
+.spi-strip-legend {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+.spi-strip-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.spi-strip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.spi-strip-dot--shortage {
+  background: var(--shortage-bright, #ef4444);
+  box-shadow: 0 0 6px var(--shortage-glow);
+}
+
+.spi-strip-dot--balanced {
+  background: var(--balanced-bright, #10b981);
+  box-shadow: 0 0 6px var(--balanced-glow);
+}
+
+.spi-strip-dot--oversupply {
+  background: var(--oversupply-bright, #f59e0b);
+  box-shadow: 0 0 6px var(--oversupply-glow);
+}
+
 .spi-strip {
   display: grid;
   grid-template-columns: repeat(12, 1fr);
-  gap: 4px;
+  gap: 5px;
 }
 
 .spi-month {
@@ -746,41 +800,73 @@
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  padding: 8px 4px;
+  padding: 8px 3px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  background: transparent;
   cursor: pointer;
   transition: all 0.15s ease;
+  position: relative;
+  text-align: center;
 }
 
-.spi-month span { color: var(--ink-muted); font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
-.spi-month strong { color: var(--ink); font-size: 11px; font-weight: 700; }
+.spi-month span {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
 
-.spi-month--shortage { color: #fca5a5; }
-.spi-month--shortage span { color: #fca5a5; }
-.spi-month--shortage:hover, .spi-month--shortage.spi-month--active {
+.spi-month strong {
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.spi-month--shortage {
   background: var(--shortage-tint);
   border-color: var(--shortage-border);
+  color: var(--shortage-bright, #f87171);
+}
+.spi-month--shortage span { color: var(--shortage-bright, #fca5a5); }
+.spi-month--shortage strong { color: var(--shortage-bright, #ef4444); }
+.spi-month--shortage:hover {
+  border-color: var(--shortage-bright, #ef4444);
   box-shadow: 0 0 10px var(--shortage-glow);
+  transform: translateY(-2px);
 }
 
-.spi-month--balanced { color: var(--primary); }
-.spi-month--balanced span { color: #6ee7b7; }
-.spi-month--balanced:hover, .spi-month--balanced.spi-month--active {
+.spi-month--balanced {
   background: var(--balanced-tint);
   border-color: var(--balanced-border);
+  color: var(--balanced-bright, #34d399);
+}
+.spi-month--balanced span { color: var(--balanced-bright, #6ee7b7); }
+.spi-month--balanced strong { color: var(--balanced-bright, #10b981); }
+.spi-month--balanced:hover {
+  border-color: var(--balanced-bright, #10b981);
   box-shadow: 0 0 10px var(--balanced-glow);
+  transform: translateY(-2px);
 }
 
-.spi-month--oversupply { color: var(--oversupply); }
-.spi-month--oversupply span { color: #fcd34d; }
-.spi-month--oversupply:hover, .spi-month--oversupply.spi-month--active {
+.spi-month--oversupply {
   background: var(--oversupply-tint);
   border-color: var(--oversupply-border);
+  color: var(--oversupply-bright, #fbbf24);
+}
+.spi-month--oversupply span { color: var(--oversupply-bright, #fcd34d); }
+.spi-month--oversupply strong { color: var(--oversupply-bright, #f59e0b); }
+.spi-month--oversupply:hover {
+  border-color: var(--oversupply-bright, #f59e0b);
   box-shadow: 0 0 10px var(--oversupply-glow);
+  transform: translateY(-2px);
 }
 
+.spi-month.spi-month--active {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+  box-shadow: 0 0 14px rgba(43, 212, 130, 0.4);
+  transform: translateY(-2px);
+}
 /* ================================================================
    SUPPLY PRESSURE SCREEN
    ================================================================ */
@@ -2678,4 +2764,4 @@
   color: var(--primary);
   box-shadow: 0 0 8px var(--primary-glow);
 }
-
+

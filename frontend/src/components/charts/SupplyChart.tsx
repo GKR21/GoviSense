@@ -23,12 +23,13 @@ export function SupplyChart({
     return profile.supplyMonthly.map((value, index) => {
       const middle = value * factor
       const curDemand = profile.demandMonthly[index] || 1000
+      const spi = curDemand > 0 ? (middle - curDemand) / curDemand : 0
       return {
         middle,
         low: middle * 0.84,
         high: middle * 1.16,
         demand: curDemand,
-        spi: middle / curDemand,
+        spi,
       }
     })
   }, [area, yieldValue, profile])
@@ -171,9 +172,9 @@ export function SupplyChart({
             <RiskBadge
               compact
               risk={
-                selected.spi > 1.2
+                selected.spi > 0.15
                   ? "oversupply"
-                  : selected.spi < 0.8
+                  : selected.spi < -0.15
                     ? "shortage"
                     : "balanced"
               }
@@ -197,17 +198,33 @@ export function SupplyChart({
             </div>
             <div>
               <dt>SPI</dt>
-              <dd>{selected.spi.toFixed(2)}×</dd>
+              <dd>{selected.spi > 0 ? `+${selected.spi.toFixed(2)}` : selected.spi.toFixed(2)}</dd>
             </div>
           </dl>
         </div>
       </div>
+
+      <div className="spi-strip-header">
+        <span className="spi-strip-title">Supply Pressure Index (SPI) by Month</span>
+        <div className="spi-strip-legend">
+          <span className="spi-strip-legend-item">
+            <i className="spi-strip-dot spi-strip-dot--oversupply" /> Glut (&gt; +0.15)
+          </span>
+          <span className="spi-strip-legend-item">
+            <i className="spi-strip-dot spi-strip-dot--balanced" /> Balanced (&plusmn;0.15)
+          </span>
+          <span className="spi-strip-legend-item">
+            <i className="spi-strip-dot spi-strip-dot--shortage" /> Shortage (&lt; -0.15)
+          </span>
+        </div>
+      </div>
+
       <div className="spi-strip" aria-label="Monthly supply pressure risk">
         {series.map((item, index) => {
           const risk: Risk =
-            item.spi > 1.2
+            item.spi > 0.15
               ? "oversupply"
-              : item.spi < 0.8
+              : item.spi < -0.15
                 ? "shortage"
                 : "balanced"
           const Icon =
@@ -216,6 +233,7 @@ export function SupplyChart({
               : risk === "shortage"
                 ? ArrowDownCircle
                 : CheckCircle2
+          const formattedSpi = item.spi > 0 ? `+${item.spi.toFixed(2)}` : item.spi.toFixed(2)
           return (
             <button
               key={MONTHS[index]}
@@ -226,11 +244,11 @@ export function SupplyChart({
               )}
               onClick={() => onSelectMonth(index)}
               type="button"
-              aria-label={`${MONTHS[index]} ${risk}, SPI ${item.spi.toFixed(2)}`}
+              aria-label={`${MONTHS[index]} ${risk}, SPI ${formattedSpi}`}
             >
               <Icon size={14} />
               <span>{MONTHS[index]}</span>
-              <strong>{item.spi.toFixed(2)}</strong>
+              <strong>{formattedSpi}</strong>
             </button>
           )
         })}
