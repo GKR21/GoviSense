@@ -366,6 +366,8 @@ export function OfficerScreen({
               crop={selectedCrop}
               district={selectedDistrict}
               onRecord={recordDecision}
+              forecastData={forecastData}
+              isLiveApi={isLiveApi}
             />
           ) : page === "Price outlook" ? (
             <PriceOutlookScreen
