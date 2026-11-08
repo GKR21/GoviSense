@@ -151,12 +151,12 @@ export function PriceOutlookScreen({
                 borderRadius: "999px",
                 fontSize: "11px",
                 fontWeight: "800",
-                background: isLiveApi ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)",
-                color: isLiveApi ? "var(--primary)" : "var(--oversupply)",
-                border: `1px solid ${isLiveApi ? "var(--balanced-border)" : "var(--oversupply-border)"}`,
+                background: isLiveApi ? "rgba(16, 185, 129, 0.15)" : "rgba(59, 130, 246, 0.15)",
+                color: isLiveApi ? "var(--primary)" : "#60a5fa",
+                border: `1px solid ${isLiveApi ? "var(--balanced-border)" : "rgba(59, 130, 246, 0.35)"}`,
               }}
             >
-              {isLiveApi ? "● LIVE API CONNECTED" : "DEMO / BASELINE"}
+              {isLiveApi ? "● LIVE API CONNECTED" : "🔵 DEMO · TRAINED BASELINE"}
             </span>
             <Button variant="secondary" icon={Download}>
               Export forecast
