@@ -73,3 +73,4 @@ def test_pipeline_run_model_records_provenance():
         assert saved is not None
         assert saved.data_version == run.data_version
         assert saved.model_version == run.model_version
+

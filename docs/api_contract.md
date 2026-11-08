@@ -211,3 +211,4 @@ The contract tests in `tests/test_api_contract.py` assert that:
 1. All endpoints defined in this specification exist and respond with HTTP 200/201.
 2. Response payloads validate against Pydantic models in `src/govisense/api/schemas.py`.
 3. Model-bearing outputs include required provenance fields: `run_id`, `data_version`, `model_version`, `data_quality`, `is_demo`, `assumptions_ref`.
+

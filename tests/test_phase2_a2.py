@@ -85,3 +85,4 @@ def test_fallback_when_ml_fails_to_beat_baseline(prepared_df):
     f = forecaster.forecast_step(sample_row, horizon=1)
     assert f.served_model == "seasonal_naive"
     assert f.beat_baseline is False
+

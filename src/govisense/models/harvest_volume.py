@@ -359,3 +359,4 @@ class HarvestVolumeForecaster:
             "conformal_scale": self.conformal_scale,
             "empirical_coverage": self.empirical_coverage,
         }
+

@@ -158,3 +158,4 @@ def test_a1_allocation_10000_farmers_deterministic_fairness():
         assert a1.allocated_ha == a2.allocated_ha
         # Max single crop fraction <= 60%
         assert a1.allocated_ha <= 2.5 * 0.60 + 1e-4
+

@@ -37,3 +37,4 @@ Per Proposal Section 5.2 and Item 1.5, a 5% random sample of extracted values fr
   4. Enter `PASS` or `FAIL` in the `verdict` column.
   5. The CI test in `tests/test_extract.py` computes the exact error rate:
      $$\text{Error Rate} = \frac{\sum |\text{extracted} - \text{verified}|}{\sum \text{verified}} \times 100\%$$
+

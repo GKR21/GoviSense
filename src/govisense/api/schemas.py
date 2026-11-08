@@ -438,3 +438,4 @@ class AlertAckRequest(BaseModel):
 class AskOfficerRequest(BaseModel):
     farmer_id: str
     question: str
+

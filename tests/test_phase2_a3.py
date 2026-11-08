@@ -76,3 +76,4 @@ def test_spi_threshold_adjustability():
         glut_ratio_threshold=1.10,
     )
     assert res_tight.spi_label == "Glut"
+

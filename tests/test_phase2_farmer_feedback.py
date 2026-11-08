@@ -110,3 +110,4 @@ def test_feedback_loop_end_to_end_updates_forecast_and_top3():
     # The effective supply includes ground-reported planting
     after_onion_supply = after_forecasts["crops"]["big_onion"]["ai1_harvest_forecast"]["point_forecast_mt"]
     assert after_forecasts["crops"]["big_onion"]["ai3_supply_pressure_index"]["spi_score"] is not None
+

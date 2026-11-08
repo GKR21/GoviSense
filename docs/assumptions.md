@@ -71,3 +71,4 @@ All parameters used in backend calculations, optimization models, demand estimat
 |---|---|---|---|---|---|
 | `transport_markup_rs_kg` | 12.0 | LKR / kg | CBSL Weekly Economic Indicators / DEC transport differentials | Yes | Fuel and truck haulage markup wholesale-to-retail |
 | `retail_margin_ratio` | 0.18 | Ratio (18%) | CBSL / HARTI retail vs Pettah/Dambulla wholesale series | Yes | Calibrated retail overhead and retailer margin (NOT static 1.35x) |
+
