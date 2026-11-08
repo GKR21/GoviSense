@@ -435,7 +435,10 @@ export function OfficerScreen({
               isLiveApi={isLiveApi}
             />
           ) : page === "Data sources" ? (
-            <DataSourcesScreen />
+            <DataSourcesScreen
+              crop={selectedCrop}
+              isLiveApi={isLiveApi}
+            />
           ) : page === "Settings" ? (
             <SettingsScreen />
           ) : (
