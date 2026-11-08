@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import type { View, GroundReport } from "./types"
-import { INITIAL_GROUND_REPORTS } from "./mocks/officerData"
+import { fetchPlantingReports, mapPlantingReportToGroundReport } from "./api"
 import { OfficerScreen } from "./screens/officer/OfficerScreen"
 import { FarmerScreen } from "./screens/farmer/FarmerScreen"
 import { DesignSystem } from "./screens/system/DesignSystem"
@@ -34,8 +34,24 @@ export default function App() {
         if (saved) return JSON.parse(saved)
       } catch (e) {}
     }
-    return INITIAL_GROUND_REPORTS
+    return []
   })
+
+  useEffect(() => {
+    let active = true
+    fetchPlantingReports()
+      .then((res) => {
+        if (!active) return
+        if (res.isLive && res.reports.length > 0) {
+          const liveReports = res.reports.map(mapPlantingReportToGroundReport)
+          setGroundReports(liveReports)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [])
 
   const handleAddReport = (report: GroundReport) => {
     setGroundReports((prev) => {
