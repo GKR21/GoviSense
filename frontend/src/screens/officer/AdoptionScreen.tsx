@@ -433,40 +433,61 @@ export function AdoptionScreen({
           <span className="count-badge">{groundReports.length}</span>
         </div>
         <div className="reports-feed-list">
-          {groundReports.slice(0, 5).map((r) => (
-            <div className="report-feed-item" key={r.id}>
-              <div className="report-feed-item__left">
-                <code>{r.pseudonymousId}</code>
-                <div>
-                  <strong style={{ display: "block", color: "var(--ink)" }}>
-                    {r.crop} · {r.areaAcres} Acres ({r.areaHa} ha)
-                  </strong>
-                  <small style={{ color: "var(--ink-muted)" }}>
-                    {r.district} · Planted {r.date}
+          {groundReports.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "28px 16px", color: "var(--ink-muted)" }}>
+              <p style={{ margin: "0 0 6px", fontWeight: "600", fontSize: "13px" }}>
+                No farmer ground planting reports registered yet.
+              </p>
+              <small>
+                Submissions from the Farmer Mobile APK will appear here live once filed with consent.
+              </small>
+            </div>
+          ) : (
+            groundReports.slice(0, 5).map((r) => (
+              <div className="report-feed-item" key={r.id}>
+                <div className="report-feed-item__left">
+                  <code>{(r as any).pseudonymousId || r.farmer || r.id}</code>
+                  <div>
+                    <strong style={{ display: "block", color: "var(--ink)" }}>
+                      {r.crop} · {r.areaAcres} Acres ({r.areaHa} ha)
+                    </strong>
+                    <small style={{ color: "var(--ink-muted)" }}>
+                      {r.district} · Planted {r.date}
+                    </small>
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      padding: "3px 8px",
+                      borderRadius: "999px",
+                      fontSize: "11px",
+                      fontWeight: "600",
+                      background:
+                        r.status === "Independent choice"
+                          ? "var(--oversupply-tint)"
+                          : "var(--primary-tint)",
+                      color:
+                        r.status === "Independent choice"
+                          ? "var(--oversupply-bright)"
+                          : "var(--primary)",
+                      border: `1px solid ${
+                        r.status === "Independent choice"
+                          ? "var(--oversupply-border)"
+                          : "var(--balanced-border)"
+                      }`,
+                    }}
+                  >
+                    {r.status || "Verified"}
+                  </span>
+                  <small style={{ display: "block", color: "var(--ink-muted)", marginTop: "2px" }}>
+                    {r.timestamp}
                   </small>
                 </div>
               </div>
-              <div style={{ textAlign: "right" }}>
-                <span
-                  style={{
-                    display: "inline-block",
-                    padding: "3px 8px",
-                    borderRadius: "999px",
-                    fontSize: "11px",
-                    fontWeight: "600",
-                    background: r.status === "Independent choice" ? "var(--oversupply-tint)" : "var(--primary-tint)",
-                    color: r.status === "Independent choice" ? "var(--oversupply-bright)" : "var(--primary)",
-                    border: `1px solid ${r.status === "Independent choice" ? "var(--oversupply-border)" : "var(--balanced-border)"}`,
-                  }}
-                >
-                  {r.status || "Verified"}
-                </span>
-                <small style={{ display: "block", color: "var(--ink-muted)", marginTop: "2px" }}>
-                  {r.timestamp}
-                </small>
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </section>
     </>
