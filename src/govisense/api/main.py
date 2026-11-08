@@ -153,7 +153,9 @@ def get_latest_forecasts():
                 "lower_bound_rs_kg": a2_res.lower_bound,
                 "upper_bound_rs_kg": a2_res.upper_bound,
                 "direction": a2_res.direction,
-                "confidence": a2_res.direction_confidence
+                "confidence": a2_res.direction_confidence,
+                "selected_model": getattr(a2_res, "selected_model", "lightgbm"),
+                "forecast_source": getattr(a2_res, "source", "model"),
             }
         }
 
