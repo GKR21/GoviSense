@@ -493,6 +493,21 @@ def submit_planting_report(payload: PlantingReportPayload):
         return {"status": "ERROR", "message": str(e)}
 
 
+@app.get("/api/feedback/planting-reports")
+def get_planting_reports(
+    crop_id: Optional[str] = Query(None),
+    season: Optional[str] = Query(None),
+):
+    """
+    Item 7: Retrieve actual planting reports submitted by farmers / extension officers.
+    """
+    eff_crop = str(crop_id) if crop_id is not None and not hasattr(crop_id, "default") else None
+    eff_season = str(season) if season is not None and not hasattr(season, "default") else None
+    reports = report_store.get_reports(crop_id=eff_crop, season=eff_season)
+    from dataclasses import asdict
+    return [asdict(r) for r in reports]
+
+
 @app.post("/api/feedback/retrigger")
 def retrigger_pipeline(payload: ReTriggerPayload):
     """
