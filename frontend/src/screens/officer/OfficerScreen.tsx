@@ -50,7 +50,14 @@ import {
   ScreenStateView,
 } from "../../components/common"
 import { SupplyChart } from "../../components/charts"
-import { fetchLatestForecasts, type LatestForecastsWithMeta, type CropForecastData } from "../../api"
+import {
+  fetchLatestForecasts,
+  fetchDecisionHistory,
+  logDecisionActionApi,
+  mapApiRecordToPolicyDecision,
+  type LatestForecastsWithMeta,
+  type CropForecastData,
+} from "../../api"
 
 import { OverviewScreen } from "./OverviewScreen"
 import { GapTimelineScreen } from "./GapTimelineScreen"
@@ -121,6 +128,18 @@ export function OfficerScreen({
         if (!active) return
         setForecastLoading(false)
       })
+
+    fetchDecisionHistory()
+      .then((res) => {
+        if (!active) return
+        if (res.isLive && res.records.length > 0) {
+          setDecisionHistory(res.records.map(mapApiRecordToPolicyDecision))
+        }
+      })
+      .catch(() => {
+        // fallback to INITIAL_DECISION_HISTORY
+      })
+
     return () => {
       active = false
     }
@@ -144,24 +163,49 @@ export function OfficerScreen({
     window.setTimeout(() => setSaved(false), 2600)
   }
 
-  const recordDecision = (value: string, details?: Partial<PolicyDecision>) => {
+  const recordDecision = async (value: string, details?: Partial<PolicyDecision>) => {
     setDecision(value)
+
+    const normCrop = selectedCrop.toLowerCase().includes("chilli") ? "chilli" : "big_onion"
+    try {
+      await logDecisionActionApi({
+        crop_id: normCrop,
+        season: "Maha 2025/2026",
+        officer_id: details?.officer || "Officer OFF-7710",
+        action_type: value.toUpperCase().replace(/\s+/g, "_"),
+        quantity: 1200,
+        unit: "MT",
+        rationale: details?.impactEstimate || details?.notes || `Policy directive: ${value}`,
+        model_version: "LightGBM-v2.1+HiGHS-LP",
+        data_version: "CBSL-HARTI-DOA-2024.12",
+        assumptions: {
+          lead_time_weeks: details?.leadTime || 7,
+          loss_pct: 0.15,
+          district: selectedDistrict,
+          notes: details?.notes,
+        },
+        notes: details?.notes,
+      })
+    } catch {
+      // offline fallback handled by logDecisionActionApi
+    }
+
     const newEntry: PolicyDecision = {
       id: `RUN-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}-${Math.floor(10 + Math.random() * 90)}`,
       date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
       timestamp: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) + " UTC",
       crop: selectedCrop,
       district: selectedDistrict,
-      modelVersion: "v2.4.1",
-      dataVersion: "CPP 3.2 · HARTI Live · 2,418 Ground Reports",
-      assumptions: details?.assumptions || `Loss 12% · Lead ${details?.leadTime || 7}w`,
+      modelVersion: "LightGBM-v2.1+HiGHS-LP",
+      dataVersion: "CBSL-HARTI-DOA-2024.12",
+      assumptions: details?.assumptions || `Loss 15% · Lead ${details?.leadTime || 7}w`,
       leadTime: details?.leadTime || 7,
       action: value,
       category: details?.category || "Import quota",
-      officer: details?.officer || "Dr. N. Ranasinghe",
-      designation: details?.designation || "Chief Agricultural Economist, Dept of Agriculture",
+      officer: details?.officer || "Officer OFF-7710",
+      designation: details?.designation || "Authorized Agricultural Decision Maker",
       status: "Active",
-      notes: details?.notes || `Executive directive recorded from Gap & Import Timeline simulator for ${selectedCrop} in ${selectedDistrict}.`,
+      notes: details?.notes || `Executive directive recorded from Gap & Import Timeline for ${selectedCrop} in ${selectedDistrict}.`,
       confidence: "High (94%)",
       sha256Hash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(""),
       impactEstimate: details?.impactEstimate || "Dynamic buffer adjustment deployed to prevent retail price divergence.",
@@ -388,6 +432,7 @@ export function OfficerScreen({
               decision={decision}
               decisionHistory={decisionHistory}
               crop={selectedCrop}
+              isLiveApi={isLiveApi}
             />
           ) : page === "Data sources" ? (
             <DataSourcesScreen />
