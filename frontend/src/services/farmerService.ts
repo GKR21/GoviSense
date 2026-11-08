@@ -102,11 +102,10 @@ class FarmerService {
     seedSource: "Certified DOA Seed" | "Farmer Saved Seed" | "Registered Private"
   }): Promise<{ success: boolean; report: PlantingReportData }> {
     const crop = mockCrops.find((c) => c.id === reportData.cropId) || mockCrops[0]
-    const randomHex = Math.random().toString(16).substring(2, 8).toUpperCase()
-    const recordNum = Math.floor(1000 + Math.random() * 9000)
+    const ts = Date.now()
 
     const newReport: PlantingReportData = {
-      id: `REP-2026-M-${recordNum}`,
+      id: `REP-${ts}`,
       cropId: reportData.cropId,
       cropName: crop.name,
       district: this.profile.district,
@@ -115,7 +114,7 @@ class FarmerService {
       irrigationType: reportData.irrigationType,
       seedSource: reportData.seedSource,
       timestamp: new Date().toISOString().replace("T", " ").substring(0, 16),
-      receiptHash: `0x${randomHex}...${Math.random().toString(16).substring(2, 6).toUpperCase()}`,
+      receiptHash: `REC-${ts}`,
       status: "verified",
     }
 
@@ -150,7 +149,7 @@ class FarmerService {
    * Dispatches an advisory directly into the farmer's inbox.
    */
   recordOfficerDecision(decision: string, crop = "Big onion"): void {
-    const runId = `RUN-260404-${Math.floor(10 + Math.random() * 90)}`
+    const runId = `RUN-${Date.now()}`
     this.officerDecisions.unshift({
       id: `DEC-${Date.now()}`,
       decision,

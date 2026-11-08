@@ -16,6 +16,7 @@ Provides:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import uuid
 from datetime import datetime, timezone
@@ -329,6 +330,19 @@ class DecisionHistoryStore:
         self._records.append(record)
         self._save()
 
+        hash_payload = {
+            "crop_id": record.crop_id,
+            "season": record.season,
+            "officer_id": record.officer_id,
+            "action_type": record.action_type,
+            "quantity": record.quantity,
+            "model_version": record.model_version,
+            "data_version": record.data_version,
+            "assumptions": record.assumptions,
+            "timestamp": record.timestamp,
+        }
+        record_hash = hashlib.sha256(json.dumps(hash_payload, sort_keys=True).encode("utf-8")).hexdigest()
+
         # Persist to PostgreSQL database
         if self.sync_db:
             try:
@@ -343,6 +357,7 @@ class DecisionHistoryStore:
                         ts = datetime.now(timezone.utc)
                     db_model = DecisionRecordModel(
                         decision_id=record.decision_id,
+                        record_hash=record_hash,
                         crop_id=record.crop_id,
                         season=record.season,
                         officer_id=record.officer_id,
@@ -366,6 +381,7 @@ class DecisionHistoryStore:
             "crop_id": record.crop_id,
             "action_type": record.action_type,
             "timestamp": record.timestamp,
+            "record_hash": record_hash,
         }
 
     def list_decisions(

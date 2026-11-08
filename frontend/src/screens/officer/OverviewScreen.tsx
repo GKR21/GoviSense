@@ -12,7 +12,7 @@ import {
   Sprout,
   Warehouse,
 } from "lucide-react"
-import { CROP_DATA_CATALOG, DISTRICT_PROFILES, MONTHS } from "../../mocks/officerData"
+import { CROP_DATA_CATALOG, DISTRICT_PROFILES, MONTHS } from "../../types"
 import { Button, ConfidenceBadge, KpiTile, PageHeading } from "../../components/common"
 import type { CropForecastData } from "../../api"
 

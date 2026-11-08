@@ -176,6 +176,8 @@ def login_user(payload: LoginPayload):
         "status": "SUCCESS",
         "token": token,
         "access_token": token,
+        "role": role,
+        "user_id": payload.username,
         "user": {
             "username": payload.username,
             "role": role,

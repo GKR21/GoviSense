@@ -23,7 +23,13 @@ import {
 } from "lucide-react"
 import { Button, ConfidenceBadge, PageHeading } from "../../components/common"
 import { cx } from "../../types"
-import { fetchConfidenceBadge, type ConfidenceBadgeEvaluation } from "../../api"
+import {
+  fetchConfidenceBadge,
+  useSourcesSummary,
+  useEvaluationScoreboard,
+  useDataCatalogue,
+  type ConfidenceBadgeEvaluation,
+} from "../../api"
 
 export interface DataSourcesScreenProps {
   crop?: string
@@ -40,6 +46,10 @@ export function DataSourcesScreen({
   const [confidenceData, setConfidenceData] = useState<ConfidenceBadgeEvaluation | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [hasLiveEvaluator, setHasLiveEvaluator] = useState(false)
+
+  const { data: sourcesSummary } = useSourcesSummary()
+  const { data: evalScoreboard } = useEvaluationScoreboard()
+  const { data: dbCatalogue } = useDataCatalogue()
 
   const [pingingId, setPingingId] = useState<string | null>(null)
   const [pingResults, setPingResults] = useState<Record<string, { latency: number; time: string }>>({})
@@ -564,6 +574,116 @@ export function DataSourcesScreen({
                   : "Soil data estimated"}
               </span>
             </div>
+          </div>
+        </section>
+      )}
+
+      {/* Dataset Composition & Lineage Breakdown (Audit Transparency) */}
+      <section className="panel" style={{ padding: "20px 22px", margin: "16px 0", background: "var(--bg-card)", border: "1px solid var(--glass-border)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: "var(--ink)", display: "flex", alignItems: "center", gap: "8px" }}>
+              <Layers size={18} color="var(--primary)" />
+              Dataset Composition & Provenance Breakdown (Audit Transparency)
+            </h3>
+            <p style={{ margin: "2px 0 0", fontSize: "12px", color: "var(--ink-muted)" }}>
+              Exact count of real government records vs. interpolated and synthetic pre-season scenario rows in monthly_master.csv
+            </p>
+          </div>
+          <span style={{ fontSize: "11px", fontWeight: 700, padding: "3px 10px", borderRadius: "999px", background: "rgba(16, 185, 129, 0.15)", color: "var(--primary)", border: "1px solid var(--balanced-border)" }}>
+            {sourcesSummary ? `${sourcesSummary.real_pct}% Real Historical Base` : "13.0% Real Historical Base"}
+          </span>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", marginBottom: "14px" }}>
+          <div style={{ padding: "12px 14px", borderRadius: "8px", background: "rgba(16, 185, 129, 0.08)", border: "1px solid rgba(16, 185, 129, 0.25)" }}>
+            <small style={{ color: "var(--ink-muted)", textTransform: "uppercase", fontSize: "10px", fontWeight: 700 }}>Real Records (CBSL/HARTI/DoA)</small>
+            <div style={{ fontSize: "20px", fontWeight: 800, color: "var(--primary)", marginTop: "2px" }}>
+              {sourcesSummary?.real_count ?? 44} rows
+            </div>
+            <span style={{ fontSize: "11px", color: "var(--ink-muted)" }}>Official gazetted records</span>
+          </div>
+          <div style={{ padding: "12px 14px", borderRadius: "8px", background: "rgba(56, 189, 248, 0.08)", border: "1px solid rgba(56, 189, 248, 0.25)" }}>
+            <small style={{ color: "var(--ink-muted)", textTransform: "uppercase", fontSize: "10px", fontWeight: 700 }}>Interpolated Records</small>
+            <div style={{ fontSize: "20px", fontWeight: 800, color: "#38bdf8", marginTop: "2px" }}>
+              {sourcesSummary?.interpolated_count ?? 68} rows
+            </div>
+            <span style={{ fontSize: "11px", color: "var(--ink-muted)" }}>Bridged seasonal transitions</span>
+          </div>
+          <div style={{ padding: "12px 14px", borderRadius: "8px", background: "rgba(245, 158, 11, 0.08)", border: "1px solid rgba(245, 158, 11, 0.25)" }}>
+            <small style={{ color: "var(--ink-muted)", textTransform: "uppercase", fontSize: "10px", fontWeight: 700 }}>Synthetic Scenario Rows</small>
+            <div style={{ fontSize: "20px", fontWeight: 800, color: "var(--oversupply)", marginTop: "2px" }}>
+              {sourcesSummary?.synthetic_count ?? 226} rows
+            </div>
+            <span style={{ fontSize: "11px", color: "var(--ink-muted)" }}>Pre-season stress testing only</span>
+          </div>
+          <div style={{ padding: "12px 14px", borderRadius: "8px", background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+            <small style={{ color: "var(--ink-muted)", textTransform: "uppercase", fontSize: "10px", fontWeight: 700 }}>Total Records</small>
+            <div style={{ fontSize: "20px", fontWeight: 800, color: "var(--ink)", marginTop: "2px" }}>
+              {sourcesSummary?.total_records ?? 338} rows
+            </div>
+            <span style={{ fontSize: "11px", color: "var(--ink-muted)" }}>Master training dataset</span>
+          </div>
+        </div>
+
+        <div style={{ fontSize: "11px", color: "var(--ink-muted)", lineHeight: 1.5 }}>
+          <strong>Policy Note:</strong> GoviSense production models strictly evaluate confidence against real data. Whenever unverified synthetic data is queried, confidence badges automatically downgrade and flag the response with <code>data_quality: &quot;synthetic&quot;</code>.
+        </div>
+      </section>
+
+      {/* Model vs Baseline Evaluation Scoreboard */}
+      {evalScoreboard?.scoreboard && evalScoreboard.scoreboard.length > 0 && (
+        <section className="panel" style={{ padding: "20px 22px", margin: "16px 0", background: "var(--bg-card)", border: "1px solid var(--glass-border)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: "var(--ink)", display: "flex", alignItems: "center", gap: "8px" }}>
+                <Cpu size={18} color="var(--primary)" />
+                Model vs. Seasonal-Naive Scoreboard (Walk-Forward Backtests)
+              </h3>
+              <p style={{ margin: "2px 0 0", fontSize: "12px", color: "var(--ink-muted)" }}>
+                Verified WAPE across expanding-window walk-forward splits; serves LightGBM only when superior to baseline
+              </p>
+            </div>
+            <span style={{ fontSize: "11px", color: "var(--ink-muted)" }}>
+              Run ID: <code>{evalScoreboard.run_id}</code>
+            </span>
+          </div>
+
+          <div style={{ overflowX: "auto" }}>
+            <table className="audit-table">
+              <thead>
+                <tr>
+                  <th>Crop</th>
+                  <th>Module</th>
+                  <th>Model WAPE</th>
+                  <th>Baseline WAPE</th>
+                  <th>Served Model</th>
+                  <th>80% Interval Coverage</th>
+                  <th>Verdict</th>
+                </tr>
+              </thead>
+              <tbody>
+                {evalScoreboard.scoreboard.map((row: any, idx: number) => (
+                  <tr key={idx}>
+                    <td><strong>{row.crop === "big_onion" ? "Big Onion" : "Chilli"}</strong></td>
+                    <td>{row.module}</td>
+                    <td><strong style={{ color: "var(--primary)" }}>{row.model_wape !== null ? `${(row.model_wape * 100).toFixed(1)}%` : "N/A"}</strong></td>
+                    <td><span style={{ color: "var(--ink-muted)" }}>{row.baseline_wape !== null ? `${(row.baseline_wape * 100).toFixed(1)}%` : "N/A"}</span></td>
+                    <td>
+                      <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: 700, background: row.beat_baseline ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)", color: row.beat_baseline ? "var(--primary)" : "var(--oversupply)" }}>
+                        {row.served_model}
+                      </span>
+                    </td>
+                    <td>{row.interval_80_coverage_pct ? `${row.interval_80_coverage_pct.toFixed(1)}% (Target: 80%)` : "—"}</td>
+                    <td>
+                      <span style={{ color: row.verdict === "Usable" ? "var(--primary)" : "var(--oversupply)", fontWeight: 600 }}>
+                        {row.verdict}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
       )}

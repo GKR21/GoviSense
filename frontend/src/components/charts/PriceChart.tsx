@@ -1,4 +1,4 @@
-import { CROP_DATA_CATALOG, MONTHS } from "../../mocks/officerData"
+import { CROP_DATA_CATALOG, MONTHS } from "../../types"
 
 export function PriceChart({ crop = "Big onion" }: { crop?: string }) {
   const profile = CROP_DATA_CATALOG[crop] || CROP_DATA_CATALOG["Big onion"]

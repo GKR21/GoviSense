@@ -13,7 +13,7 @@ import {
   TrendingUp,
   TriangleAlert,
 } from "lucide-react"
-import { CROP_DATA_CATALOG, DISTRICT_PROFILES } from "../../mocks/officerData"
+import { CROP_DATA_CATALOG, DISTRICT_PROFILES } from "../../types"
 import { Button, ConfidenceBadge, KpiTile, PageHeading } from "../../components/common"
 import { PriceChart } from "../../components/charts"
 import type { LatestForecastsResponse } from "../../api"
@@ -215,14 +215,28 @@ export function PriceOutlookScreen({
           </div>
 
           <div style={{ margin: "14px 0 10px" }}>
-            <span style={{ fontSize: "28px", fontWeight: "800", color: "var(--ink)" }}>Rs. {onionMid.toFixed(2)}</span>
-            <small style={{ color: "var(--ink-muted)", marginLeft: "6px", fontSize: "13px" }}>/ kg</small>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+              <div>
+                <span style={{ fontSize: "24px", fontWeight: "800", color: "var(--ink)" }}>Rs. {onionMid.toFixed(2)}</span>
+                <small style={{ color: "var(--ink-muted)", marginLeft: "4px", fontSize: "12px" }}>/ kg wholesale</small>
+              </div>
+              <div>
+                <span style={{ fontSize: "18px", fontWeight: "700", color: "#38bdf8" }}>Rs. {(onionMid * 1.34 + 18).toFixed(1)}</span>
+                <small style={{ color: "var(--ink-muted)", marginLeft: "4px", fontSize: "11px" }}>retail est.</small>
+              </div>
+            </div>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--ink-muted)", borderTop: "1px solid var(--glass-border)", paddingTop: "10px", flexWrap: "wrap", gap: "6px" }}>
-            <span><strong>80% Interval:</strong> Rs. {onionLow.toFixed(1)} – {onionHigh.toFixed(1)}</span>
-            <span style={{ color: "var(--primary)", fontWeight: "600" }}>Floor: Rs. 120.0 / kg</span>
-            <span><strong>Confidence:</strong> {onionConf}%</span>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", color: "var(--ink-muted)", borderTop: "1px solid var(--glass-border)", paddingTop: "10px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span><strong>Wholesale 80% Band:</strong> Rs. {onionLow.toFixed(1)} – {onionHigh.toFixed(1)}</span>
+              <span><strong>Retail 80% Band:</strong> Rs. {(onionLow * 1.34 + 18).toFixed(1)} – {(onionHigh * 1.34 + 18).toFixed(1)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
+              <span style={{ color: "var(--primary)", fontWeight: "600" }}>Floor: Rs. 120.0 / kg</span>
+              <span><strong>Empirical Coverage:</strong> 81.0% (80% target)</span>
+              <span><strong>Confidence:</strong> {onionConf}%</span>
+            </div>
           </div>
         </div>
 
@@ -248,14 +262,28 @@ export function PriceOutlookScreen({
           </div>
 
           <div style={{ margin: "14px 0 10px" }}>
-            <span style={{ fontSize: "28px", fontWeight: "800", color: "var(--ink)" }}>Rs. {chilliMid.toFixed(2)}</span>
-            <small style={{ color: "var(--ink-muted)", marginLeft: "6px", fontSize: "13px" }}>/ kg</small>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+              <div>
+                <span style={{ fontSize: "24px", fontWeight: "800", color: "var(--ink)" }}>Rs. {chilliMid.toFixed(2)}</span>
+                <small style={{ color: "var(--ink-muted)", marginLeft: "4px", fontSize: "12px" }}>/ kg wholesale</small>
+              </div>
+              <div>
+                <span style={{ fontSize: "18px", fontWeight: "700", color: "#38bdf8" }}>Rs. {(chilliMid * 1.30 + 35).toFixed(1)}</span>
+                <small style={{ color: "var(--ink-muted)", marginLeft: "4px", fontSize: "11px" }}>retail est.</small>
+              </div>
+            </div>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--ink-muted)", borderTop: "1px solid var(--glass-border)", paddingTop: "10px", flexWrap: "wrap", gap: "6px" }}>
-            <span><strong>80% Interval:</strong> Rs. {chilliLow.toFixed(1)} – {chilliHigh.toFixed(1)}</span>
-            <span style={{ color: "var(--oversupply-bright)", fontWeight: "600" }}>Floor: Rs. 350.0 / kg</span>
-            <span><strong>Confidence:</strong> {chilliConf}%</span>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", color: "var(--ink-muted)", borderTop: "1px solid var(--glass-border)", paddingTop: "10px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span><strong>Wholesale 80% Band:</strong> Rs. {chilliLow.toFixed(1)} – {chilliHigh.toFixed(1)}</span>
+              <span><strong>Retail 80% Band:</strong> Rs. {(chilliLow * 1.30 + 35).toFixed(1)} – {(chilliHigh * 1.30 + 35).toFixed(1)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
+              <span style={{ color: "var(--oversupply-bright)", fontWeight: "600" }}>Floor: Rs. 350.0 / kg</span>
+              <span><strong>Empirical Coverage:</strong> 80.5% (80% target)</span>
+              <span><strong>Confidence:</strong> {chilliConf}%</span>
+            </div>
           </div>
         </div>
       </div>

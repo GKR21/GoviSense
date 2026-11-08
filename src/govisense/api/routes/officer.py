@@ -105,20 +105,31 @@ def simulate_scenario(req: SimulationRequest):
         for k, v in spi_res.scenarios.items()
     }
 
+    d_ver = compute_data_version()
+    m_ver = compute_model_version()
+    g_commit = get_git_commit()
+
     return {
         "crop": crop,
         "simulated_supply_mt": round(sim_supply, 1),
         "simulated_spi": spi_res.spi_score,
         "simulated_spi_ratio": spi_res.spi_ratio,
+        "primary_spi_ratio": spi_res.spi_ratio,
         "simulated_label": spi_res.spi_label,
+        "primary_spi_label": spi_res.spi_label,
         "simulated_gap_mt": spi_res.gap_mt,
         "area_ha": area_ha,
         "yield_mt_ha": yield_mt,
         "loss_pct": loss_val,
         "import_volume_mt": import_vol,
         "scenarios": scenarios_data,
+        "run_id": f"RUN-{g_commit[:7]}",
+        "data_version": d_ver,
+        "model_version": m_ver,
         "data_quality": "real",
         "is_demo": False,
+        "served_model": "LightGBM + Baseline Selector",
+        "assumptions_ref": "docs/assumptions.md",
     }
 
 

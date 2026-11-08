@@ -11,6 +11,7 @@ import {
   Download,
   FileText,
   Filter,
+  Lock,
   MapPin,
   RefreshCw,
   Search,
@@ -25,6 +26,8 @@ import type { GroundReport } from "../../types"
 import { Button, ConfidenceBadge, KpiTile, PageHeading } from "../../components/common"
 import {
   fetchAdoptionSimulation,
+  useAdoptionSummary,
+  useGroundReports,
   type AdoptionSimulationResponse,
   type LatestForecastsResponse,
   BASELINE_ADOPTION_SIMULATION,
@@ -45,11 +48,15 @@ export function AdoptionScreen({
   const [simData, setSimData] = useState<AdoptionSimulationResponse>(BASELINE_ADOPTION_SIMULATION)
   const [simLoading, setSimLoading] = useState(false)
 
+  const cropKey = crop.toLowerCase().includes("chilli") ? "chilli" : "big_onion"
+  const { data: adoptData, loading: adoptLoading } = useAdoptionSummary(cropKey)
+  const { data: grData } = useGroundReports(cropKey)
+
   // Fetch multi-agent adoption simulation from Item 9 endpoint
   useEffect(() => {
     let mounted = true
     setSimLoading(true)
-    fetchAdoptionSimulation(crop)
+    fetchAdoptionSimulation(cropKey)
       .then((res) => {
         if (!mounted) return
         setSimData(res)
@@ -63,21 +70,21 @@ export function AdoptionScreen({
     return () => {
       mounted = false
     }
-  }, [crop])
+  }, [cropKey])
 
-  // Aggregate user submitted reports onto baseline
-  const dynamicReportedMap: Record<string, number> = {
-    "Big onion": 1880,
-    "Chilli": 2210,
-    "Green gram": 1960,
-    "Maize": 2870,
-  }
+  // Real database acreage, adherence, and predicted vs actual from backend
+  const targetAreaHa = adoptData?.acreage?.target_area_ha ?? (cropKey === "chilli" ? 1840 : 2131)
+  const reportedPlantedHa = adoptData?.acreage?.reported_planted_area_ha ?? 0
+  const coveragePct = adoptData?.acreage?.coverage_pct ?? 0
+  const adherence = adoptData?.recommendation_adherence
+  const predVsAct = adoptData?.predicted_vs_actual
 
-  groundReports.forEach((r) => {
-    if (dynamicReportedMap[r.crop] !== undefined) {
-      dynamicReportedMap[r.crop] += r.areaHa
-    }
-  })
+  // Ground reports from API or fallback props
+  const liveReports: GroundReport[] =
+    grData?.ground_reports && grData.ground_reports.length > 0
+      ? grData.ground_reports
+      : groundReports
+  const isPrivacySuppressed = grData?.privacy_suppressed ?? false
 
   // Selected scenario from the live API response
   const activeScenario =
@@ -104,16 +111,18 @@ export function AdoptionScreen({
     (r) => r.action_type === "PLANT_EXPANSION" && r.crop.toLowerCase().includes(crop.toLowerCase()),
   )
 
-  const rows = [
-    ["Big onion", plantRec && crop === "Big onion" ? Math.round(plantRec.quantity) : 2131, simAdoption === 0 ? 2750 : Math.round(dynamicReportedMap["Big onion"])],
-    ["Chilli", 2493, Math.round(dynamicReportedMap["Chilli"])],
-    ["Green gram", 1750, Math.round(dynamicReportedMap["Green gram"])],
-    ["Maize", 3100, Math.round(dynamicReportedMap["Maize"])],
+  const cropRows = [
+    {
+      name: "Big onion",
+      targetHa: plantRec && cropKey === "big_onion" ? Math.round(plantRec.quantity) : 2131,
+      reportedHa: cropKey === "big_onion" ? reportedPlantedHa : 0,
+    },
+    {
+      name: "Chilli",
+      targetHa: 1840,
+      reportedHa: cropKey === "chilli" ? reportedPlantedHa : 0,
+    },
   ]
-
-  const totalReportedHa = rows.reduce((acc, curr) => acc + Number(curr[2]), 0)
-  const bigOnionRow = rows[0]
-  const isBigOnionOver = Number(bigOnionRow[2]) > Number(bigOnionRow[1])
 
   return (
     <>
@@ -147,7 +156,7 @@ export function AdoptionScreen({
                 borderRadius: "6px",
               }}
             >
-              {groundReports.length} Reports Live
+              {liveReports.length} Reports Loaded
             </span>
             <Button variant="secondary" icon={Download}>
               Export aggregate
@@ -229,21 +238,26 @@ export function AdoptionScreen({
 
       <div className="kpi-grid">
         <KpiTile
-          label="Farmer participation"
-          value="64%"
-          meta="1,289 of 2,012 registered"
+          label="Recommendation adherence"
+          value={adherence ? `${adherence.followed_pct}%` : "No data"}
+          meta={
+            adherence
+              ? `${adherence.followed_recommendation_count} of ${adherence.total_reporting_farmers} followed`
+              : "Awaiting farmer submissions"
+          }
           icon={Users}
+          tone={adherence && adherence.followed_pct >= 50 ? "success" : "neutral"}
         />
         <KpiTile
           label="Reported planting"
-          value={`${totalReportedHa.toLocaleString()} ha`}
-          meta={`${Math.round((totalReportedHa / 9474) * 100)}% of target extent`}
+          value={`${reportedPlantedHa.toLocaleString()} ha`}
+          meta={`${coveragePct}% of target extent (${targetAreaHa} ha)`}
           icon={Sprout}
         />
         <KpiTile
           label="Ground reports"
-          value={`${groundReports.length + 128}`}
-          meta="Live pseudonymous submissions"
+          value={isPrivacySuppressed ? "< 5 (Suppressed)" : `${liveReports.length}`}
+          meta={isPrivacySuppressed ? "Protected by differential privacy" : "Live pseudonymous submissions"}
           icon={FileText}
         />
         <KpiTile
@@ -358,20 +372,20 @@ export function AdoptionScreen({
               <h2>Recommended Quota vs. Actual Reported Extent</h2>
               <p>Hectares by crop (Anuradhapura district)</p>
             </div>
-            {isBigOnionOver && (
+            {reportedPlantedHa > targetAreaHa && (
               <span className="count-badge" style={{ background: "var(--shortage-tint)", color: "var(--shortage)", borderColor: "var(--shortage-border)" }}>
                 Over-target
               </span>
             )}
           </div>
           <div className="adoption-bars">
-            {rows.map(([name, recommended, planned]) => {
-              const recNum = Number(recommended)
-              const planNum = Number(planned)
+            {cropRows.map((r) => {
+              const recNum = r.targetHa
+              const planNum = r.reportedHa
               const isOver = planNum > recNum
               return (
-                <div className="adoption-row" key={name}>
-                  <strong>{name}</strong>
+                <div className="adoption-row" key={r.name}>
+                  <strong>{r.name}</strong>
                   <div>
                     <span>Recommended target</span>
                     <i style={{ width: `${Math.min(recNum / 35, 100)}%` }} />
@@ -396,30 +410,67 @@ export function AdoptionScreen({
           </p>
         </section>
 
+        {/* Predicted vs Actual Outcomes Table (Proposal 7.3 & Screen Matrix) */}
         <section className="panel attention-panel">
           <div className="panel-heading">
             <div>
-              <h2>Outcome Checkpoints</h2>
-              <p>Current Maha reporting cycle</p>
+              <h2>Predicted vs. Actual Outcomes</h2>
+              <p>Model forecast vs. real post-harvest market outcomes</p>
             </div>
           </div>
-          {[
-            ["Planned advisory views", "92%", "Complete"],
-            ["Ground planting reports", "74%", "In progress"],
-            ["Satellite NDVI verification", "41%", "Active scan"],
-            ["Harvest & wholesale tracking", "24%", "Upcoming"],
-          ].map(([label, value, status]) => (
-            <div className="checkpoint" key={label}>
-              <span>
-                <strong>{label}</strong>
-                <small>{status}</small>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "8px" }}>
+            <div style={{ padding: "12px", borderRadius: "8px", background: "var(--bg-card)", border: "1px solid var(--glass-border)" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--ink-muted)", textTransform: "uppercase" }}>
+                Production Volume (MT)
               </span>
-              <b>{value}</b>
-              <div>
-                <i style={{ width: value }} />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
+                <div>
+                  <small style={{ color: "var(--ink-muted)", display: "block" }}>Predicted (A1)</small>
+                  <strong style={{ fontSize: "15px", color: "var(--ink)" }}>
+                    {predVsAct?.predicted_production_mt !== null && predVsAct?.predicted_production_mt !== undefined
+                      ? `${predVsAct.predicted_production_mt.toLocaleString()} MT`
+                      : "Calculating..."}
+                  </strong>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <small style={{ color: "var(--ink-muted)", display: "block" }}>Actual Harvested</small>
+                  <strong style={{ fontSize: "15px", color: predVsAct?.actual_harvested_production_mt !== null ? "var(--primary)" : "var(--ink-muted)" }}>
+                    {predVsAct?.actual_harvested_production_mt !== null && predVsAct?.actual_harvested_production_mt !== undefined
+                      ? `${predVsAct.actual_harvested_production_mt.toLocaleString()} MT`
+                      : "Awaiting harvest reports"}
+                  </strong>
+                </div>
               </div>
             </div>
-          ))}
+
+            <div style={{ padding: "12px", borderRadius: "8px", background: "var(--bg-card)", border: "1px solid var(--glass-border)" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--ink-muted)", textTransform: "uppercase" }}>
+                Wholesale / Farmgate Price (Rs./kg)
+              </span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
+                <div>
+                  <small style={{ color: "var(--ink-muted)", display: "block" }}>Predicted (A2 P50)</small>
+                  <strong style={{ fontSize: "15px", color: "var(--ink)" }}>
+                    {predVsAct?.predicted_price_rs_kg !== null && predVsAct?.predicted_price_rs_kg !== undefined
+                      ? `Rs. ${predVsAct.predicted_price_rs_kg.toFixed(2)}`
+                      : "Calculating..."}
+                  </strong>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <small style={{ color: "var(--ink-muted)", display: "block" }}>Actual Realized</small>
+                  <strong style={{ fontSize: "15px", color: predVsAct?.actual_realized_price_rs_kg !== null ? "var(--primary)" : "var(--ink-muted)" }}>
+                    {predVsAct?.actual_realized_price_rs_kg !== null && predVsAct?.actual_realized_price_rs_kg !== undefined
+                      ? `Rs. ${predVsAct.actual_realized_price_rs_kg.toFixed(2)}`
+                      : "Awaiting market sales"}
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ fontSize: "11px", color: "var(--ink-muted)", lineHeight: 1.4, padding: "4px" }}>
+              * GoviSense continuously benchmarks A1/A2 machine predictions against verified post-harvest ground and market reports to evaluate calibration accuracy.
+            </div>
+          </div>
         </section>
       </div>
 
@@ -430,26 +481,40 @@ export function AdoptionScreen({
             <h2>Recent Ground Planting Reports (Anonymous)</h2>
             <p>Field submissions from Farmer Mobile APK and Agrarian Service Officers</p>
           </div>
-          <span className="count-badge">{groundReports.length}</span>
+          <span className="count-badge">{isPrivacySuppressed ? "< 5" : liveReports.length}</span>
         </div>
-        <div className="reports-feed-list">
-          {groundReports.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "28px 16px", color: "var(--ink-muted)" }}>
-              <p style={{ margin: "0 0 6px", fontWeight: "600", fontSize: "13px" }}>
-                No farmer ground planting reports registered yet.
-              </p>
-              <small>
-                Submissions from the Farmer Mobile APK will appear here live once filed with consent.
+
+        {isPrivacySuppressed ? (
+          <div style={{ padding: "20px", margin: "12px", borderRadius: "8px", background: "rgba(245, 158, 11, 0.08)", border: "1px solid rgba(245, 158, 11, 0.3)", display: "flex", gap: "12px", alignItems: "center" }}>
+            <Lock size={20} style={{ color: "var(--oversupply)", flexShrink: 0 }} />
+            <div>
+              <strong style={{ fontSize: "13px", color: "var(--ink)", display: "block" }}>
+                Differential Privacy Protection Active
+              </strong>
+              <small style={{ color: "var(--ink-muted)" }}>
+                Reporting cohort has fewer than 5 submissions in this district/crop. Under Sri Lankan Data Protection & ModelX Privacy guidelines (Proposal 3.4), individual submissions are suppressed until the cohort reaches 5 or more records.
               </small>
             </div>
-          ) : (
-            groundReports.slice(0, 5).map((r) => (
+          </div>
+        ) : liveReports.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "36px 16px", color: "var(--ink-muted)" }}>
+            <FileText size={32} style={{ margin: "0 auto 8px", opacity: 0.4 }} />
+            <p style={{ margin: "0 0 6px", fontWeight: "600", fontSize: "13px" }}>
+              No ground planting reports submitted yet for {cropKey === "big_onion" ? "Big Onion" : "Chilli"}.
+            </p>
+            <small>
+              Submissions from the Farmer Mobile APK will appear here live once filed with consent.
+            </small>
+          </div>
+        ) : (
+          <div className="reports-feed-list">
+            {liveReports.slice(0, 10).map((r) => (
               <div className="report-feed-item" key={r.id}>
                 <div className="report-feed-item__left">
-                  <code>{(r as any).pseudonymousId || r.farmer || r.id}</code>
+                  <code>{(r as any).pseudonymousId || (r as any).pseudonymous_farmer_id || r.farmer || r.id}</code>
                   <div>
                     <strong style={{ display: "block", color: "var(--ink)" }}>
-                      {r.crop} · {r.areaAcres} Acres ({r.areaHa} ha)
+                      {r.crop} · {r.areaAcres ? `${r.areaAcres} Acres` : ""}{r.areaHa ? ` (${r.areaHa} ha)` : ""}
                     </strong>
                     <small style={{ color: "var(--ink-muted)" }}>
                       {r.district} · Planted {r.date}
@@ -465,30 +530,32 @@ export function AdoptionScreen({
                       fontSize: "11px",
                       fontWeight: "600",
                       background:
-                        r.status === "Independent choice"
+                        r.status === "Independent choice" || (r as any).followed_recommendation === false
                           ? "var(--oversupply-tint)"
                           : "var(--primary-tint)",
                       color:
-                        r.status === "Independent choice"
+                        r.status === "Independent choice" || (r as any).followed_recommendation === false
                           ? "var(--oversupply-bright)"
                           : "var(--primary)",
                       border: `1px solid ${
-                        r.status === "Independent choice"
+                        r.status === "Independent choice" || (r as any).followed_recommendation === false
                           ? "var(--oversupply-border)"
                           : "var(--balanced-border)"
                       }`,
                     }}
                   >
-                    {r.status || "Verified"}
+                    {(r as any).followed_recommendation === false
+                      ? "Independent choice"
+                      : r.status || "Followed recommendation"}
                   </span>
                   <small style={{ display: "block", color: "var(--ink-muted)", marginTop: "2px" }}>
-                    {r.timestamp}
+                    {(r as any).timestamp || r.date}
                   </small>
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
     </>
   )

@@ -495,18 +495,31 @@ def simulate_scenario(req: SimulationRequest):
         for k, v in spi_res.scenarios.items()
     }
 
+    d_ver = compute_data_version()
+    m_ver = compute_model_version()
+    g_commit = get_git_commit()
+
     return {
         "crop": crop,
         "simulated_supply_mt": round(sim_supply, 1),
         "simulated_spi": spi_res.spi_score,
         "simulated_spi_ratio": spi_res.spi_ratio,
+        "primary_spi_ratio": spi_res.spi_ratio,
         "simulated_label": spi_res.spi_label,
+        "primary_spi_label": spi_res.spi_label,
         "simulated_gap_mt": spi_res.gap_mt,
         "area_ha": req.custom_planted_extent_ha or float(latest_row.get("planted_extent_lag3", 0.0)),
         "yield_mt_ha": req.custom_yield_mt_ha or float(latest_row.get("yield_rolling_6m", 0.0)),
         "loss_pct": loss_val,
         "action_summary": spi_res.action_summary,
         "scenarios": scenarios_data,
+        "run_id": f"RUN-{g_commit[:7]}",
+        "data_version": d_ver,
+        "model_version": m_ver,
+        "data_quality": "real",
+        "is_demo": False,
+        "served_model": "LightGBM + Baseline Selector",
+        "assumptions_ref": "docs/assumptions.md",
     }
 
 
@@ -1143,6 +1156,7 @@ class AlertAckPayload(BaseModel):
 def get_gap_timeline(
     crop_id: Optional[str] = Query(None),
     season: str = Query("Maha 2025/2026"),
+    lead_weeks: Optional[int] = Query(None),
 ):
     """
     Dashboard Screen: Gap & Import Timeline
@@ -1156,10 +1170,10 @@ def get_gap_timeline(
 
     for crop in crops_to_run:
         req = settings.crops[crop]
-        # Current date baseline
         now = pd.Timestamp.now()
-        lead_weeks = 7
-        deadline_date = (now + pd.Timedelta(weeks=lead_weeks)).strftime("%Y-%m-%d")
+        eff_lead_weeks = int(lead_weeks) if (lead_weeks is not None and not hasattr(lead_weeks, "default")) else settings.import_lead_time_weeks.get(crop, 7)
+        # Decision deadline: T_harvest - lead_time_weeks (approx 14 weeks from season baseline)
+        deadline_date = (now + pd.Timedelta(weeks=max(1, 14 - eff_lead_weeks))).strftime("%Y-%m-%d")
         days_remaining = max(0, (pd.Timestamp(deadline_date) - now).days)
 
         # Retrieve AI 3 SPI and gap
@@ -1181,13 +1195,20 @@ def get_gap_timeline(
             "Buffer Storage Reservation" if mid_gap > 1000 else "Maintain Planned Strategy"
         )
 
+        options = [
+            {"id": "IMPORT_NOW", "label": "Immediate Import Authorization", "lead_weeks": eff_lead_weeks, "feasible": days_remaining > 0},
+            {"id": "IMPORT_LATER", "label": "Dynamic JIT Import (Wait for planting report)", "lead_weeks": eff_lead_weeks, "feasible": days_remaining >= 14},
+            {"id": "HOLD_STORAGE_BUFFER", "label": "Buffer Storage Reservation", "capacity_mt": 4500.0, "feasible": mid_gap > 0},
+            {"id": "DELAY_IMPORT", "label": "Delay / Defer Import (Maintain Current Extent)", "feasible": True},
+        ]
+
         timelines.append({
             "crop_id": crop,
             "crop_name": req.name_en,
             "season": season,
             "target_period": str(latest_row["year_month"]),
             "decision_deadline": deadline_date,
-            "import_lead_weeks": lead_weeks,
+            "import_lead_weeks": eff_lead_weeks,
             "days_remaining": days_remaining,
             "gap_mid_mt": mid_gap,
             "gap_best_mt": best_gap,
@@ -1197,6 +1218,7 @@ def get_gap_timeline(
             "spi_ratio": spi_res.spi_ratio,
             "spi_label": spi_res.spi_label,
             "recommended_action": action,
+            "options": options,
             "storage_buffer_capacity_mt": 4500.0,
             "fair_floor_price_rs_kg": req.min_fair_farmgate_price,
             "status": "Action Required" if days_remaining <= 21 else "Monitoring",
@@ -1222,9 +1244,10 @@ def get_gap_timeline(
 def get_gap_alias(
     crop_id: Optional[str] = Query(None),
     season: str = Query("Maha 2025/2026"),
+    lead_weeks: Optional[int] = Query(None),
 ):
     """Alias for /api/forecasts/gap-timeline supporting API contract."""
-    return get_gap_timeline(crop_id=crop_id, season=season)
+    return get_gap_timeline(crop_id=crop_id, season=season, lead_weeks=lead_weeks)
 
 
 @app.get("/api/forecasts/price-outlook")

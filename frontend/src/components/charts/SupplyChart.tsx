@@ -1,7 +1,6 @@
 import { useMemo } from "react"
 import { ArrowDownCircle, ArrowUpCircle, CheckCircle2 } from "lucide-react"
-import { cx, type Risk } from "../../types"
-import { CROP_DATA_CATALOG, MONTHS } from "../../mocks/officerData"
+import { cx, type Risk, CROP_DATA_CATALOG, MONTHS } from "../../types"
 import { RiskBadge } from "../common/Badges"
 import type { CropForecastData } from "../../api"
 

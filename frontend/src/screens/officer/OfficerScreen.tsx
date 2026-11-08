@@ -39,7 +39,7 @@ import {
   Zap,
 } from "lucide-react"
 import { cx, type View, type ScreenState, type OfficerPage, type PolicyDecision, type GroundReport } from "../../types"
-import { CROP_DATA_CATALOG, DISTRICT_PROFILES, INITIAL_DECISION_HISTORY } from "../../mocks/officerData"
+import { CROP_DATA_CATALOG, DISTRICT_PROFILES } from "../../types"
 import {
   Button,
   IconButton,
@@ -59,6 +59,10 @@ import {
   mapApiRecordToPolicyDecision,
   getStoredAuthUser,
   clearAuthSession,
+  simulateScenarioApi,
+  useAlerts,
+  addOfficerNoteApi,
+  acknowledgeAlertApi,
   type LatestForecastsWithMeta,
   type CropForecastData,
   type AuthUser,
@@ -114,11 +118,16 @@ export function OfficerScreen({
   const [screenState, setScreenState] = useState<ScreenState>("ready")
   const [lastReport, setLastReport] = useState<GroundReport | null>(null)
   const [decision, setDecision] = useState("")
-  const [decisionHistory, setDecisionHistory] = useState<PolicyDecision[]>(INITIAL_DECISION_HISTORY)
+  const [decisionHistory, setDecisionHistory] = useState<PolicyDecision[]>([])
   const [forecastData, setForecastData] = useState<LatestForecastsWithMeta | null>(null)
   const [isLiveApi, setIsLiveApi] = useState(false)
   const [forecastLoading, setForecastLoading] = useState(true)
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => getStoredAuthUser())
+  const [simulatedMetrics, setSimulatedMetrics] = useState<any>(null)
+  const [alertsOpen, setAlertsOpen] = useState(false)
+  const [officerNoteText, setOfficerNoteText] = useState<Record<string, string>>({})
+  const [noteStatus, setNoteStatus] = useState<Record<string, string>>({})
+  const { data: alertsData, reload: reloadAlerts } = useAlerts()
 
   useEffect(() => {
     let active = true
@@ -159,6 +168,19 @@ export function OfficerScreen({
   const currentApiCropData: CropForecastData | undefined = forecastData?.crops[cropApiKey]
   const changed = area !== currentProfile.baselineArea || yieldValue !== currentProfile.baselineYield
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      simulateScenarioApi({
+        crop: cropApiKey,
+        custom_planted_extent_ha: area,
+        custom_yield_mt_ha: yieldValue,
+      }).then((res) => {
+        if (res) setSimulatedMetrics(res)
+      })
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [cropApiKey, area, yieldValue])
+
   const reset = () => {
     setArea(currentProfile.baselineArea)
     setYieldValue(currentProfile.baselineYield)
@@ -173,8 +195,9 @@ export function OfficerScreen({
     setDecision(value)
 
     const normCrop = selectedCrop.toLowerCase().includes("chilli") ? "chilli" : "big_onion"
+    let apiRes: { status: string; decision_id?: string; record_hash?: string; run_id?: string } | null = null
     try {
-      await logDecisionActionApi({
+      apiRes = await logDecisionActionApi({
         crop_id: normCrop,
         season: "Maha 2025/2026",
         officer_id: details?.officer || "Officer OFF-7710",
@@ -196,8 +219,11 @@ export function OfficerScreen({
       // offline fallback handled by logDecisionActionApi
     }
 
+    const recHash = apiRes?.record_hash || "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    const recId = apiRes?.decision_id || `DEC-${Date.now().toString(16).toUpperCase()}`
+
     const newEntry: PolicyDecision = {
-      id: `RUN-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}-${Math.floor(10 + Math.random() * 90)}`,
+      id: recId,
       date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
       timestamp: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) + " UTC",
       crop: selectedCrop,
@@ -213,7 +239,7 @@ export function OfficerScreen({
       status: "Active",
       notes: details?.notes || `Executive directive recorded from Gap & Import Timeline for ${selectedCrop} in ${selectedDistrict}.`,
       confidence: "High (94%)",
-      sha256Hash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(""),
+      sha256Hash: recHash,
       impactEstimate: details?.impactEstimate || "Dynamic buffer adjustment deployed to prevent retail price divergence.",
     }
     setDecisionHistory((prev) => [newEntry, ...prev])
@@ -389,7 +415,32 @@ export function OfficerScreen({
               </select>
             </label>
             <ConfidenceBadge level="High" />
-            <IconButton icon={Bell} label="Notifications" />
+            <div style={{ position: "relative", display: "inline-flex" }}>
+              <IconButton icon={Bell} label="Notifications" onClick={() => setAlertsOpen(true)} />
+              {alertsData && alertsData.length > 0 && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: "-2px",
+                    right: "-2px",
+                    background: "var(--shortage, #ef4444)",
+                    color: "white",
+                    borderRadius: "999px",
+                    fontSize: "10px",
+                    fontWeight: "bold",
+                    minWidth: "16px",
+                    height: "16px",
+                    padding: "0 4px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    pointerEvents: "none",
+                  }}
+                >
+                  {alertsData.length}
+                </span>
+              )}
+            </div>
             <span className="top-avatar" title={currentRole === "Admin" ? "K. Perera (Admin)" : "D. Nimal (Officer)"}>
               {currentRole === "Admin" ? "KP" : "DN"}
             </span>
@@ -612,22 +663,33 @@ export function OfficerScreen({
                   />
                   <div className="impact-card">
                     <div>
-                      <span>Projected annual harvest</span>
+                      <span>Live Simulated Supply (A1/A3)</span>
                       <strong>
-                        {Math.round(
-                          area * yieldValue,
-                        ).toLocaleString()}{" "}
-                        t
+                        {simulatedMetrics?.simulated_supply_mt
+                          ? `${Math.round(simulatedMetrics.simulated_supply_mt).toLocaleString()} MT`
+                          : `${Math.round(area * yieldValue * 0.85).toLocaleString()} MT`}
                       </strong>
                     </div>
                     <span className={cx("delta", changed && "delta--changed")}>
-                      {changed
-                        ? `${
-                            (area * yieldValue) > (currentProfile.baselineArea * currentProfile.baselineYield) ? "+" : ""
-                          }${Math.round(((area * yieldValue) / (currentProfile.baselineArea * currentProfile.baselineYield) - 1) * 100)}%`
-                        : "Baseline"}
+                      {simulatedMetrics?.primary_spi_label || (changed ? "Customized" : "Baseline")}
                     </span>
                   </div>
+                  {simulatedMetrics && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", margin: "10px 0" }}>
+                      <div style={{ padding: "8px 10px", background: "var(--bg-surface)", borderRadius: "6px", border: "1px solid var(--border)" }}>
+                        <small style={{ display: "block", fontSize: "10px", color: "var(--ink-muted)", textTransform: "uppercase" }}>SPI Ratio</small>
+                        <strong style={{ fontSize: "13px", color: simulatedMetrics.primary_spi_label === "Glut" ? "var(--oversupply)" : simulatedMetrics.primary_spi_label === "Shortage" ? "var(--shortage)" : "var(--primary)" }}>
+                          {simulatedMetrics.primary_spi_ratio ? simulatedMetrics.primary_spi_ratio.toFixed(2) : "1.00"}
+                        </strong>
+                      </div>
+                      <div style={{ padding: "8px 10px", background: "var(--bg-surface)", borderRadius: "6px", border: "1px solid var(--border)" }}>
+                        <small style={{ display: "block", fontSize: "10px", color: "var(--ink-muted)", textTransform: "uppercase" }}>Simulated Gap</small>
+                        <strong style={{ fontSize: "13px", color: simulatedMetrics.simulated_gap_mt < 0 ? "var(--shortage)" : "var(--ink)" }}>
+                          {simulatedMetrics.simulated_gap_mt ? `${simulatedMetrics.simulated_gap_mt > 0 ? "+" : ""}${Math.round(simulatedMetrics.simulated_gap_mt).toLocaleString()} MT` : "0 MT"}
+                        </strong>
+                      </div>
+                    </div>
+                  )}
                   <div className="what-if-note">
                     <Info size={16} />
                     <p>
@@ -726,6 +788,150 @@ export function OfficerScreen({
               </Button>
               <Button onClick={() => setAssumptionsOpen(false)}>
                 Apply assumptions
+              </Button>
+            </div>
+          </aside>
+        </div>
+      )}
+      {alertsOpen && (
+        <div className="drawer-overlay" onClick={() => setAlertsOpen(false)}>
+          <aside
+            className="drawer"
+            style={{ maxWidth: "480px" }}
+            onClick={(event) => event.stopPropagation()}
+            aria-label="Alerts and Farmer Inquiries"
+          >
+            <div className="drawer__header">
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Bell size={20} color="var(--primary)" />
+                <h2 style={{ margin: 0, fontSize: "16px" }}>Market Alerts & Farmer Inquiries</h2>
+              </div>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setAlertsOpen(false)}
+                aria-label="Close alerts"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="drawer__body" style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              {(!alertsData || alertsData.length === 0) ? (
+                <div style={{ textAlign: "center", padding: "40px 16px", color: "var(--ink-muted)" }}>
+                  <CheckCircle2 size={32} style={{ margin: "0 auto 8px", color: "var(--primary)" }} />
+                  <p style={{ margin: 0, fontWeight: 600 }}>All alerts cleared</p>
+                  <small>No pending glut, shortage, or farmer inquiry alerts.</small>
+                </div>
+              ) : (
+                alertsData.map((alert: any) => {
+                  const aid = alert.alert_id
+                  const isAck = alert.acknowledged
+                  const statusMsg = noteStatus[aid]
+                  return (
+                    <div
+                      key={aid}
+                      style={{
+                        padding: "14px",
+                        borderRadius: "8px",
+                        background: alert.severity === "danger" ? "rgba(239, 68, 68, 0.08)" : alert.severity === "warning" ? "rgba(245, 158, 11, 0.08)" : "var(--bg-card)",
+                        border: `1px solid ${alert.severity === "danger" ? "rgba(239, 68, 68, 0.3)" : alert.severity === "warning" ? "rgba(245, 158, 11, 0.3)" : "var(--border)"}`,
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}>
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            fontWeight: 800,
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            textTransform: "uppercase",
+                            background: alert.severity === "danger" ? "rgba(239, 68, 68, 0.2)" : alert.severity === "warning" ? "rgba(245, 158, 11, 0.2)" : "rgba(56, 189, 248, 0.2)",
+                            color: alert.severity === "danger" ? "#ef4444" : alert.severity === "warning" ? "#f59e0b" : "#38bdf8",
+                          }}
+                        >
+                          {alert.severity || "ALERT"}
+                        </span>
+                        <small style={{ color: "var(--ink-muted)", fontSize: "10px" }}>
+                          {alert.district || "Anuradhapura"} · {alert.crop_id || "All crops"}
+                        </small>
+                      </div>
+                      <p style={{ margin: "0 0 8px", fontSize: "12px", color: "var(--ink)", lineHeight: 1.4 }}>
+                        {alert.message}
+                      </p>
+
+                      {alert.ask_officer && (
+                        <div style={{ margin: "6px 0", padding: "6px 8px", borderRadius: "4px", background: "rgba(56, 189, 248, 0.15)", border: "1px solid rgba(56, 189, 248, 0.3)", fontSize: "11px", color: "var(--ink)" }}>
+                          <strong>Farmer Inquiry:</strong> Farmer requested extension officer guidance regarding this alert.
+                        </div>
+                      )}
+
+                      {alert.officer_note && (
+                        <div style={{ margin: "6px 0", padding: "6px 8px", borderRadius: "4px", background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.3)", fontSize: "11px", color: "var(--primary)" }}>
+                          <strong>Recorded Officer Note:</strong> {alert.officer_note}
+                        </div>
+                      )}
+
+                      <div style={{ marginTop: "8px" }}>
+                        <input
+                          type="text"
+                          placeholder="Add guidance note for farmers..."
+                          value={officerNoteText[aid] || ""}
+                          onChange={(e) => setOfficerNoteText((prev) => ({ ...prev, [aid]: e.target.value }))}
+                          style={{
+                            width: "100%",
+                            padding: "6px 8px",
+                            fontSize: "11px",
+                            borderRadius: "4px",
+                            border: "1px solid var(--border)",
+                            background: "var(--bg-surface)",
+                            color: "var(--ink)",
+                            marginBottom: "6px",
+                          }}
+                        />
+                        <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end", alignItems: "center" }}>
+                          {statusMsg && <small style={{ color: "var(--primary)", fontSize: "11px", marginRight: "auto" }}>{statusMsg}</small>}
+                          <Button
+                            variant="ghost"
+                            onClick={async () => {
+                              const note = officerNoteText[aid]
+                              if (!note) return
+                              try {
+                                await addOfficerNoteApi(aid, note)
+                                setNoteStatus((prev) => ({ ...prev, [aid]: "Guidance sent" }))
+                                setOfficerNoteText((prev) => ({ ...prev, [aid]: "" }))
+                                reloadAlerts()
+                              } catch {
+                                setNoteStatus((prev) => ({ ...prev, [aid]: "Failed to send" }))
+                              }
+                            }}
+                          >
+                            Send Note
+                          </Button>
+                          <Button
+                            variant={isAck ? "ghost" : "secondary"}
+                            disabled={isAck}
+                            onClick={async () => {
+                              try {
+                                await acknowledgeAlertApi(aid)
+                                setNoteStatus((prev) => ({ ...prev, [aid]: "Acknowledged" }))
+                                reloadAlerts()
+                              } catch {
+                                setNoteStatus((prev) => ({ ...prev, [aid]: "Failed to ack" }))
+                              }
+                            }}
+                          >
+                            {isAck ? "Acknowledged" : "Acknowledge"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+            <div className="drawer__footer">
+              <Button variant="secondary" onClick={() => setAlertsOpen(false)}>
+                Close
               </Button>
             </div>
           </aside>

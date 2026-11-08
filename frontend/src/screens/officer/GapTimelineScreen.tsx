@@ -37,10 +37,9 @@ import {
   Zap,
 } from "lucide-react"
 import type { PolicyDecision } from "../../types"
-import { cx } from "../../types"
-import { CROP_DATA_CATALOG, MONTHS as months } from "../../mocks/officerData"
+import { cx, CROP_DATA_CATALOG, MONTHS as months } from "../../types"
 import { Button, PageHeading, RiskBadge, SelectControl, ConfidenceBadge } from "../../components/common"
-import type { LatestForecastsResponse, RecommendationItem } from "../../api"
+import { fetchGapTimeline, type LatestForecastsResponse, type RecommendationItem } from "../../api"
 
 export function GapTimelineScreen({
   crop = "Big onion",
@@ -85,9 +84,28 @@ export function GapTimelineScreen({
   const importRec = apiRecs.find((r) => r.action_type === "TARGETED_IMPORT")
   const maintainRec = apiRecs.find((r) => r.action_type === "MAINTAIN_CURRENT_EXTENT")
 
-  // Dynamic calculations based on lead time
-  const deadlineDate = leadTime === 6 ? "25 May 2026" : leadTime === 8 ? "11 May 2026" : "18 May 2026"
-  const daysLeft = leadTime === 6 ? 51 : leadTime === 8 ? 37 : 44
+  const cropKey = crop.toLowerCase().includes("chilli") ? "chilli" : "big_onion"
+  const [timelineApiData, setTimelineApiData] = useState<any>(null)
+
+  useEffect(() => {
+    let active = true
+    fetchGapTimeline(cropKey, undefined, leadTime)
+      .then((res) => {
+        if (active && res?.timelines?.length) {
+          setTimelineApiData(res.timelines[0])
+        }
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [cropKey, leadTime])
+
+  // Dynamic calculations based on backend API and adjustable lead time
+  const deadlineDate = timelineApiData?.decision_deadline || (leadTime === 6 ? "2026-05-25" : leadTime === 8 ? "2026-05-11" : "2026-05-18")
+  const daysLeft = timelineApiData?.days_remaining ?? (leadTime === 6 ? 51 : leadTime === 8 ? 37 : 44)
+  const bestGap = timelineApiData?.gap_best_mt ?? -3654.2
+  const worstGap = timelineApiData?.gap_worst_mt ?? -7308.4
 
   // Monthly values calibrated to crop
   const monthlyData = useMemo(() => {
@@ -306,6 +324,20 @@ export function GapTimelineScreen({
           </div>
           <p className="gap-kpi-card__sub">
             Target window for July deficit coverage · Lead: {leadTime} weeks
+          </p>
+        </div>
+
+        <div className="gap-kpi-card">
+          <div className="gap-kpi-card__top">
+            <small>BEST &amp; WORST CASE GAP</small>
+            <span style={{ fontSize: "11px", fontWeight: "700", color: "#94a3b8" }}>A4 Scenarios</span>
+          </div>
+          <div className="gap-kpi-card__val" style={{ fontSize: "16px" }}>
+            <span style={{ color: "#34d399" }}>{bestGap.toLocaleString()} MT</span> /{" "}
+            <span style={{ color: "#f87171" }}>{worstGap.toLocaleString()} MT</span>
+          </div>
+          <p className="gap-kpi-card__sub">
+            Best case vs worst case gap based on yield percentiles
           </p>
         </div>
 

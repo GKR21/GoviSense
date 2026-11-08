@@ -3,6 +3,7 @@
  * Connects Frontend Dashboard and Farmer Mobile App to FastAPI backend
  */
 
+import { useState, useEffect, useCallback } from "react"
 import type { GroundReport } from "./types"
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
@@ -312,12 +313,13 @@ export async function simulateScenarioApi(payload: {
   }
 }
 
-export async function fetchGapTimeline(cropId?: string, season?: string) {
+export async function fetchGapTimeline(cropId?: string, season?: string, leadWeeks?: number) {
   try {
     const url = new URL(`${API_BASE_URL}/api/forecasts/gap-timeline`)
     if (cropId) url.searchParams.set("crop_id", cropId)
     if (season) url.searchParams.set("season", season)
-    const res = await fetch(url.toString())
+    if (leadWeeks) url.searchParams.set("lead_weeks", String(leadWeeks))
+    const res = await fetch(url.toString(), { headers: getAuthHeaders() })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return await res.json()
   } catch (err) {
@@ -569,7 +571,7 @@ export async function fetchDecisionHistory(
 
 export async function logDecisionActionApi(
   payload: DecisionLogPayloadApi,
-): Promise<{ status: string; decision_id?: string }> {
+): Promise<{ status: string; decision_id?: string; record_hash?: string; run_id?: string }> {
   try {
     const res = await fetch(`${API_BASE_URL}/api/history/log-action`, {
       method: "POST",
@@ -580,8 +582,8 @@ export async function logDecisionActionApi(
     return await res.json()
   } catch (err) {
     return {
-      status: "RECORDED_LOCAL",
-      decision_id: `DEC-${Math.random().toString(16).slice(2, 10).toUpperCase()}`,
+      status: "ERROR",
+      decision_id: undefined,
     }
   }
 }
@@ -632,15 +634,7 @@ export function mapApiRecordToPolicyDecision(r: DecisionRecordApi): {
     category = "Price alert"
   }
 
-  // Derive pseudo-hash
-  const rawHash = (r.decision_id + r.timestamp + r.officer_id).padEnd(32, "0")
-  let hashNum = 0
-  for (let i = 0; i < rawHash.length; i++) {
-    hashNum = (hashNum << 5) - hashNum + rawHash.charCodeAt(i)
-    hashNum |= 0
-  }
-  const hexPart = Math.abs(hashNum).toString(16).padStart(8, "0")
-  const sha256 = `8f3e${hexPart}e4b98c3f710a82d015c328ef6902a7b8c2d159a4b3f81e7d9036cfae2417b120`.slice(0, 64)
+  const sha256 = r.record_hash || (r as any).sha256Hash || "UNVERIFIED"
 
   const assumptionsStr =
     typeof r.assumptions === "object" && r.assumptions !== null
@@ -653,7 +647,7 @@ export function mapApiRecordToPolicyDecision(r: DecisionRecordApi): {
   const actionDisplay = `${r.action_type.replace(/_/g, " ")}${r.quantity ? ` (${r.quantity.toLocaleString()} ${r.unit})` : ""}`
 
   return {
-    id: r.decision_id || `DEC-${Math.random().toString(16).slice(2, 10).toUpperCase()}`,
+    id: r.decision_id || "DEC-UNSAVED",
     date: dateStr,
     timestamp: timeStr,
     crop: cropName,
@@ -840,47 +834,178 @@ export async function loginUser(
     }
   } catch (err) {
     // If backend cannot be reached, validate credentials with authorized baseline
-    const emailClean = email.trim().toLowerCase()
-    if (password.length >= 4) {
-      const fallbackRole =
-        role ||
-        (emailClean.includes("admin")
-          ? "Admin"
-          : emailClean.includes("farmer")
-            ? "Farmer"
-            : "Officer")
-      const fallbackUser: AuthUser = {
-        email: emailClean,
-        role: fallbackRole,
-        name: emailClean.includes("nimal")
-          ? "D. Nimal Bandara"
-          : emailClean.includes("admin")
-            ? "K. Perera"
-            : emailClean.includes("sunil")
-              ? "Sunil Bandara"
-              : "Authorized User",
-        designation:
-          fallbackRole === "Admin"
-            ? "System Administrator"
-            : fallbackRole === "Farmer"
-              ? "Registered Farmer"
-              : "Agricultural Planning Officer",
-        district: "Anuradhapura",
-        officer_id: `OFF-${Math.floor(1000 + Math.random() * 9000)}`,
-      }
-      const fakeJwt = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(fallbackUser))}.sig`
-      saveAuthSession(fakeJwt, fallbackUser)
-      return {
-        success: true,
-        token: fakeJwt,
-        user: fallbackUser,
-      }
-    }
     return {
       success: false,
-      error: "Authentication service offline or invalid password (minimum 4 characters).",
+      error: "Authentication failed. Server is unreachable or credentials are invalid.",
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Typed Endpoints & Mutation Methods
+// ---------------------------------------------------------------------------
+
+export async function fetchHealth() {
+  const res = await fetch(`${API_BASE_URL}/api/health`, { headers: getAuthHeaders() })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return await res.json()
+}
+
+export async function fetchEvaluationScoreboard(cropId?: string) {
+  const url = new URL(`${API_BASE_URL}/api/evaluation/scoreboard`)
+  if (cropId) url.searchParams.set("crop_id", cropId)
+  const res = await fetch(url.toString(), { headers: getAuthHeaders() })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return await res.json()
+}
+
+export async function fetchPricesLatest() {
+  const res = await fetch(`${API_BASE_URL}/api/prices/latest`, { headers: getAuthHeaders() })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return await res.json()
+}
+
+export async function acknowledgeAlertApi(
+  alertId: string,
+  payload?: { ask_officer?: boolean; officer_note?: string; user_id?: string },
+) {
+  const res = await fetch(`${API_BASE_URL}/api/alerts/${encodeURIComponent(alertId)}/ack`, {
+    method: "POST",
+    headers: getAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(payload || {}),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return await res.json()
+}
+
+export async function askOfficerInquiryApi(alertId: string, question: string, farmerId?: string) {
+  const res = await fetch(`${API_BASE_URL}/api/alerts/${encodeURIComponent(alertId)}/ask-officer`, {
+    method: "POST",
+    headers: getAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ question, farmer_id: farmerId }),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return await res.json()
+}
+
+export async function addOfficerNoteApi(alertId: string, officerNote: string) {
+  const res = await fetch(`${API_BASE_URL}/api/alerts/${encodeURIComponent(alertId)}/officer-note`, {
+    method: "POST",
+    headers: getAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ officer_note: officerNote }),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return await res.json()
+}
+
+// ---------------------------------------------------------------------------
+// Typed React Query Hooks (Phase 4.1 Requirement)
+// Each hook returns { data, loading, error, refetch }
+// ---------------------------------------------------------------------------
+
+export interface UseApiQueryResult<T> {
+  data: T | null
+  loading: boolean
+  error: string | null
+  refetch: () => void
+}
+
+export function useApiQuery<T>(
+  fetcher: () => Promise<T>,
+  deps: any[] = [],
+): UseApiQueryResult<T> {
+  const [data, setData] = useState<T | null>(null)
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const execute = useCallback(() => {
+    let active = true
+    setLoading(true)
+    setError(null)
+    fetcher()
+      .then((res) => {
+        if (active) {
+          setData(res)
+          setLoading(false)
+        }
+      })
+      .catch((err) => {
+        if (active) {
+          setError(err?.message || "Failed to load data from server")
+          setLoading(false)
+        }
+      })
+    return () => {
+      active = false
+    }
+  }, deps)
+
+  useEffect(() => {
+    const cleanup = execute()
+    return cleanup
+  }, [execute])
+
+  return { data, loading, error, refetch: execute }
+}
+
+export function useHealth() {
+  return useApiQuery(fetchHealth, [])
+}
+
+export function useLatestForecasts(cropId?: string) {
+  return useApiQuery(fetchLatestForecasts, [cropId])
+}
+
+export function useGapTimeline(cropId?: string, season?: string) {
+  return useApiQuery(() => fetchGapTimeline(cropId, season), [cropId, season])
+}
+
+export function usePriceOutlook(cropId?: string) {
+  return useApiQuery(() => fetchPriceOutlook(cropId), [cropId])
+}
+
+export function useAdoptionSummary(cropId?: string, season?: string) {
+  return useApiQuery(() => fetchAdoptionSummary(cropId, season), [cropId, season])
+}
+
+export function useAdoptionSimulation(cropId?: string) {
+  return useApiQuery(() => fetchAdoptionSimulation(cropId), [cropId])
+}
+
+export function useDecisionHistory(cropId?: string, season?: string, limit?: number) {
+  return useApiQuery(() => fetchDecisionHistory(cropId, season, limit), [cropId, season, limit])
+}
+
+export function useDataCatalogue() {
+  return useApiQuery(fetchDataCatalogue, [])
+}
+
+export function useSourcesSummary() {
+  return useApiQuery(fetchSourcesSummary, [])
+}
+
+export function useEvaluationScoreboard(cropId?: string) {
+  return useApiQuery(() => fetchEvaluationScoreboard(cropId), [cropId])
+}
+
+export function usePipelineRuns() {
+  return useApiQuery(fetchPipelineRuns, [])
+}
+
+export function useAlerts() {
+  return useApiQuery(fetchAlerts, [])
+}
+
+export function useGroundReports(cropId?: string, district?: string) {
+  return useApiQuery(() => fetchGroundReports(cropId, district), [cropId, district])
+}
+
+export function usePricesLatest() {
+  return useApiQuery(fetchPricesLatest, [])
+}
+
+export function useFarmerTop3(params: Parameters<typeof fetchFarmerTop3>[0]) {
+  return useApiQuery(() => fetchFarmerTop3(params), [JSON.stringify(params)])
 }
 
 
