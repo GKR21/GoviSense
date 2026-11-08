@@ -3,6 +3,8 @@
  * Connects Frontend Dashboard and Farmer Mobile App to FastAPI backend
  */
 
+import type { GroundReport } from "./types"
+
 export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
 
 export interface CropForecastData {
@@ -215,6 +217,78 @@ export async function submitPlantingReportApi(payload: {
     return await res.json()
   } catch (err) {
     return { status: "ACCEPTED_OFFLINE", ...payload }
+  }
+}
+
+export interface PlantingReportApi {
+  crop_id: string
+  season: string
+  planned_area_ha: number
+  actual_area_ha: number
+  consent_given: boolean
+  pseudonymous_id: string
+  harvest_outcome_mt?: number | null
+  sale_price_rs_kg?: number | null
+  sale_channel?: string | null
+  notes?: string | null
+  report_id: string
+  timestamp: string
+}
+
+export async function fetchPlantingReports(
+  cropId?: string,
+  season?: string,
+): Promise<{ reports: PlantingReportApi[]; isLive: boolean }> {
+  try {
+    const url = new URL(`${API_BASE_URL}/api/feedback/planting-reports`)
+    if (cropId && cropId !== "all" && cropId !== "All crops") {
+      const normCrop = cropId.toLowerCase().includes("chilli")
+        ? "chilli"
+        : cropId.toLowerCase().includes("onion")
+          ? "big_onion"
+          : cropId.toLowerCase().replace(/\s+/g, "_")
+      url.searchParams.set("crop_id", normCrop)
+    }
+    if (season) {
+      url.searchParams.set("season", season)
+    }
+    const res = await fetch(url.toString())
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data: PlantingReportApi[] = await res.json()
+    return { reports: data, isLive: true }
+  } catch (err) {
+    return { reports: [], isLive: false }
+  }
+}
+
+export function mapPlantingReportToGroundReport(r: PlantingReportApi): GroundReport {
+  const dt = new Date(r.timestamp)
+  const isValid = !isNaN(dt.getTime())
+  const dateStr = isValid ? dt.toISOString().slice(0, 10) : r.timestamp.slice(0, 10)
+  const timeStr = isValid
+    ? dt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+    : r.timestamp.slice(11, 16)
+
+  const cropName =
+    r.crop_id === "big_onion"
+      ? "Big onion"
+      : r.crop_id === "chilli"
+        ? "Chilli"
+        : r.crop_id.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+
+  const areaHa = r.actual_area_ha > 0 ? r.actual_area_ha : r.planned_area_ha
+  const areaAcres = parseFloat((areaHa * 2.47105).toFixed(2))
+
+  return {
+    id: r.report_id,
+    crop: cropName,
+    areaHa,
+    areaAcres,
+    date: dateStr,
+    district: "Anuradhapura",
+    timestamp: timeStr,
+    status: r.consent_given ? "Verified" : "Pending",
+    farmer: r.pseudonymous_id || "Anonymous Farmer",
   }
 }
 
