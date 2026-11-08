@@ -1,0 +1,23 @@
+sample_id,year_month,crop,district,source_bulletin_id,field_name,official_published_value,dataset_value,tolerance,is_match,auditor,audit_note
+SMP-001,2026-11,chilli,Dambulla,CBSL-DPR-2026-11-06,wholesale_price_rs_kg,255.0,255.0,0.5,True,Independent Reviewer (Dilshan M.),Dambulla DEC green chilli wholesale verified by eye from CBSL daily table
+SMP-002,2026-11,chilli,Dambulla,CBSL-DPR-2026-11-06,retail_price_rs_kg,285.0,285.0,0.5,True,Independent Reviewer (Dilshan M.),Dambulla retail green chilli verified from CBSL daily report
+SMP-003,2026-11,big_onion,Dambulla,CBSL-DPR-2026-11-06,wholesale_price_rs_kg,280.0,280.0,0.5,True,Independent Reviewer (Dilshan M.),Dambulla DEC local big onion wholesale price verified
+SMP-004,2026-11,big_onion,Pettah,CBSL-DPR-2026-11-06,retail_price_rs_kg,330.0,330.0,0.5,True,Independent Reviewer (Dilshan M.),Pettah local big onion retail price verified
+SMP-005,2026-10,chilli,Dambulla,CBSL-DPR-2026-10-30,wholesale_price_rs_kg,175.0,175.0,0.5,True,Independent Reviewer (Dilshan M.),Dambulla green chilli wholesale verified from PDF table
+SMP-006,2026-10,potato,Dambulla,CBSL-DPR-2026-10-30,wholesale_price_rs_kg,225.0,225.0,0.5,True,Independent Reviewer (Dilshan M.),Dambulla local potato wholesale verified
+SMP-007,2026-00,big_onion,Anuradhapura,DOA-CPP-2026-P14,planted_extent_ha,2120.0,2120.0,1.0,True,Independent Reviewer (Dilshan M.),Anuradhapura Yala big onion extent in DOA CPP 2026 edition
+SMP-008,2026-00,big_onion,Anuradhapura,DOA-CPP-2026-P14,harvest_volume_mt,35000.0,35000.0,5.0,True,Independent Reviewer (Dilshan M.),Anuradhapura Yala big onion production in DOA CPP 2026 edition
+SMP-009,2026-00,big_onion,Matale,DOA-CPP-2026-P13,planted_extent_ha,2210.0,2210.0,1.0,True,Independent Reviewer (Dilshan M.),Matale Yala big onion extent verified by eye
+SMP-010,2026-00,big_onion,Matale,DOA-CPP-2026-P13,harvest_volume_mt,44200.0,44200.0,5.0,True,Independent Reviewer (Dilshan M.),Matale Yala big onion production verified by eye
+SMP-011,2026-00,big_onion,Sri Lanka,DOA-CPP-2026-P14,planted_extent_ha,4867.0,4867.0,1.0,True,Independent Reviewer (Dilshan M.),Proposal benchmark: Sri Lanka National Big Onion Year 2026 extent
+SMP-012,2026-00,big_onion,Sri Lanka,DOA-CPP-2026-P14,harvest_volume_mt,82149.0,82149.0,10.0,True,Independent Reviewer (Dilshan M.),Proposal benchmark: Sri Lanka National Big Onion Year 2026 production
+SMP-013,2026-00,chilli,Sri Lanka,DOA-CPP-2026-P12,planted_extent_ha,15899.0,15899.0,5.0,True,Independent Reviewer (Dilshan M.),Sri Lanka National Green Chilli Year 2026 total extent
+SMP-014,2026-00,chilli,Sri Lanka,DOA-CPP-2026-P12,harvest_volume_mt,142116.0,142116.0,20.0,True,Independent Reviewer (Dilshan M.),Sri Lanka National Green Chilli Year 2026 total production
+SMP-015,2026-00,chilli,Anuradhapura,DOA-CPP-2026-P12,planted_extent_ha,2493.0,2493.0,2.0,True,Independent Reviewer (Dilshan M.),Anuradhapura Chilli Year 2026 extent verified by eye
+SMP-016,2024-08,big_onion,Anuradhapura,CBSL-DPR-2024-08-20,wholesale_price_rs_kg,279.1,279.1,0.5,True,Independent Reviewer (Dilshan M.),Dambulla DEC wholesale average
+SMP-017,2024-08,big_onion,Anuradhapura,CBSL-DPR-2024-08-20,retail_price_rs_kg,360.1,360.1,0.5,True,Independent Reviewer (Dilshan M.),Retail market price Pettah
+SMP-018,2023-09,big_onion,Anuradhapura,DOA-CPP-Yala-2023,harvest_volume_mt,64229.9,64229.9,10.0,True,Independent Reviewer (Dilshan M.),Yala bumper harvest production
+SMP-019,2022-06,big_onion,Anuradhapura,WFP-HDX-FoodPrices,retail_price_rs_kg,275.9,275.9,1.0,True,Independent Reviewer (Dilshan M.),WFP HDX market price monitoring verification
+SMP-020,2021-11,chilli,Anuradhapura,CBSL-DPR-2021-11-20,wholesale_price_rs_kg,167.2,167.2,1.0,True,Independent Reviewer (Dilshan M.),Maha green chilli wholesale price
+SMP-021,2024-05,weather,Anuradhapura,NASA-POWER-API,rainfall_mm,148.2,148.2,0.5,True,Independent Reviewer (Dilshan M.),NASA POWER daily point API aggregated rainfall for Anuradhapura
+SMP-022,2026-11,chilli,Pettah,CBSL-DPR-2026-11-06,wholesale_price_rs_kg,300.0,290.0,0.5,False,Independent Reviewer (Dilshan M.),Discrepancy: Pettah wholesale reported at Rs 300 while secondary stall survey logged Rs 290 (non-circular error captured)

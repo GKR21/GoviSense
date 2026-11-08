@@ -17,3 +17,4 @@ frontend/dist/
 *.so
 .DS_Store
 .vscode/
+*.egg-info/

@@ -1,0 +1,18 @@
+{
+  "short_name": "GoviSense",
+  "name": "GoviSense Farmer App",
+  "description": "Smart Crop Advisory & Ground Reporting for Sri Lankan Farmers",
+  "start_url": "/?view=farmer",
+  "background_color": "#070e14",
+  "theme_color": "#10b981",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}
+

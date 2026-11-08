@@ -1,0 +1,210 @@
+[
+  {
+    "crop_id": "big_onion",
+    "season": "Maha 2025/2026",
+    "officer_id": "OFFICER-007",
+    "action_type": "HOLD_STORAGE",
+    "quantity": 3000.0,
+    "unit": "MT",
+    "rationale": "Buffer hold to defend floor price",
+    "model_version": "LightGBM-v2.1+HiGHS-LP",
+    "data_version": "CBSL-HARTI-DOA-2024.12",
+    "assumptions": {
+      "loss_pct": 0.15,
+      "lead_time_weeks": 7,
+      "fair_floor": 120.0
+    },
+    "decision_id": "DEC-8E5FCDFC",
+    "timestamp": "2026-11-07T09:33:32.008658+00:00"
+  },
+  {
+    "crop_id": "big_onion",
+    "season": "Maha 2025/2026",
+    "officer_id": "OFFICER-007",
+    "action_type": "HOLD_STORAGE",
+    "quantity": 3000.0,
+    "unit": "MT",
+    "rationale": "Buffer hold",
+    "model_version": "LightGBM-v2.1+HiGHS-LP",
+    "data_version": "CBSL-HARTI-DOA-2024.12",
+    "assumptions": {
+      "loss_pct": 0.15,
+      "import_lead_time_weeks": 7,
+      "spi_bands": [
+        0.8,
+        1.2
+      ],
+      "pilot_district_share": 0.5,
+      "notes": null
+    },
+    "decision_id": "DEC-217BB33B",
+    "timestamp": "2026-11-07T09:34:12.380859+00:00"
+  },
+  {
+    "crop_id": "big_onion",
+    "season": "Maha 2025/2026",
+    "officer_id": "OFFICER-007",
+    "action_type": "HOLD_STORAGE",
+    "quantity": 3000.0,
+    "unit": "MT",
+    "rationale": "Buffer hold to defend floor price",
+    "model_version": "LightGBM-v2.1+HiGHS-LP",
+    "data_version": "CBSL-HARTI-DOA-2024.12",
+    "assumptions": {
+      "loss_pct": 0.15,
+      "lead_time_weeks": 7,
+      "fair_floor": 120.0
+    },
+    "decision_id": "DEC-823BE21C",
+    "timestamp": "2026-11-07T09:34:45.219299+00:00"
+  },
+  {
+    "crop_id": "big_onion",
+    "season": "Maha 2025/2026",
+    "officer_id": "OFFICER-007",
+    "action_type": "HOLD_STORAGE",
+    "quantity": 3000.0,
+    "unit": "MT",
+    "rationale": "Buffer hold to defend floor price",
+    "model_version": "LightGBM-v2.1+HiGHS-LP",
+    "data_version": "CBSL-HARTI-DOA-2024.12",
+    "assumptions": {
+      "loss_pct": 0.15,
+      "lead_time_weeks": 7,
+      "fair_floor": 120.0
+    },
+    "decision_id": "DEC-C88C6AE0",
+    "timestamp": "2026-11-07T09:35:00.076238+00:00"
+  },
+  {
+    "crop_id": "big_onion",
+    "season": "Maha 2025/2026",
+    "officer_id": "OFFICER-007",
+    "action_type": "HOLD_STORAGE",
+    "quantity": 3000.0,
+    "unit": "MT",
+    "rationale": "Buffer hold to defend floor price",
+    "model_version": "LightGBM-v2.1+HiGHS-LP",
+    "data_version": "CBSL-HARTI-DOA-2024.12",
+    "assumptions": {
+      "loss_pct": 0.15,
+      "lead_time_weeks": 7,
+      "fair_floor": 120.0
+    },
+    "decision_id": "DEC-F76D588E",
+    "timestamp": "2026-11-07T09:39:43.824230+00:00"
+  },
+  {
+    "crop_id": "big_onion",
+    "season": "Maha 2025/2026",
+    "officer_id": "OFFICER-007",
+    "action_type": "HOLD_STORAGE",
+    "quantity": 3000.0,
+    "unit": "MT",
+    "rationale": "Buffer hold to defend floor price",
+    "model_version": "LightGBM-v2.1+HiGHS-LP",
+    "data_version": "CBSL-HARTI-DOA-2024.12",
+    "assumptions": {
+      "loss_pct": 0.15,
+      "lead_time_weeks": 7,
+      "fair_floor": 120.0
+    },
+    "decision_id": "DEC-4D0729A1",
+    "timestamp": "2026-11-07T10:02:16.929400+00:00"
+  },
+  {
+    "crop_id": "big_onion",
+    "season": "Maha 2025/2026",
+    "officer_id": "OFFICER_AUDIT_01",
+    "action_type": "PLANT_EXPANSION",
+    "quantity": 150.0,
+    "unit": "ha",
+    "rationale": "Audit testing decision history entry",
+    "model_version": "ModelX-2.0-Audit",
+    "data_version": "CBSL-HARTI-2024.12",
+    "assumptions": {
+      "loss_pct": 0.15,
+      "import_lead_time_weeks": 7,
+      "spi_bands": [
+        0.8,
+        1.2
+      ],
+      "pilot_district_share": 0.5,
+      "notes": null
+    },
+    "decision_id": "DEC-D3A47DB5",
+    "timestamp": "2026-11-07T10:11:29.614337+00:00"
+  },
+  {
+    "crop_id": "big_onion",
+    "season": "Maha 2025/2026",
+    "officer_id": "OFFICER-007",
+    "action_type": "HOLD_STORAGE",
+    "quantity": 3000.0,
+    "unit": "MT",
+    "rationale": "Buffer hold to defend floor price",
+    "model_version": "LightGBM-v2.1+HiGHS-LP",
+    "data_version": "CBSL-HARTI-DOA-2024.12",
+    "assumptions": {
+      "loss_pct": 0.15,
+      "lead_time_weeks": 7,
+      "fair_floor": 120.0
+    },
+    "decision_id": "DEC-24765017",
+    "timestamp": "2026-11-07T10:57:07.743028+00:00"
+  },
+  {
+    "crop_id": "big_onion",
+    "season": "Maha 2025/2026",
+    "officer_id": "OFFICER-007",
+    "action_type": "HOLD_STORAGE",
+    "quantity": 3000.0,
+    "unit": "MT",
+    "rationale": "Buffer hold to defend floor price",
+    "model_version": "LightGBM-v2.1+HiGHS-LP",
+    "data_version": "CBSL-HARTI-DOA-2024.12",
+    "assumptions": {
+      "loss_pct": 0.15,
+      "lead_time_weeks": 7,
+      "fair_floor": 120.0
+    },
+    "decision_id": "DEC-939B2D91",
+    "timestamp": "2026-11-07T12:01:43.742678+00:00"
+  },
+  {
+    "crop_id": "big_onion",
+    "season": "Maha 2025/2026",
+    "officer_id": "OFFICER-007",
+    "action_type": "HOLD_STORAGE",
+    "quantity": 3000.0,
+    "unit": "MT",
+    "rationale": "Buffer hold to defend floor price",
+    "model_version": "LightGBM-v2.1+HiGHS-LP",
+    "data_version": "CBSL-HARTI-DOA-2024.12",
+    "assumptions": {
+      "loss_pct": 0.15,
+      "lead_time_weeks": 7,
+      "fair_floor": 120.0
+    },
+    "decision_id": "DEC-307B6F66",
+    "timestamp": "2026-11-07T12:10:48.621301+00:00"
+  },
+  {
+    "crop_id": "big_onion",
+    "season": "Maha 2025/2026",
+    "officer_id": "OFFICER-007",
+    "action_type": "HOLD_STORAGE",
+    "quantity": 3000.0,
+    "unit": "MT",
+    "rationale": "Buffer hold to defend floor price",
+    "model_version": "LightGBM-v2.1+HiGHS-LP",
+    "data_version": "CBSL-HARTI-DOA-2024.12",
+    "assumptions": {
+      "loss_pct": 0.15,
+      "lead_time_weeks": 7,
+      "fair_floor": 120.0
+    },
+    "decision_id": "DEC-B2258171",
+    "timestamp": "2026-11-07T20:55:27.543856+00:00"
+  }
+]
