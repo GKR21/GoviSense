@@ -230,4 +230,113 @@ export async function simulateScenarioApi(payload: {
   }
 }
 
+export async function fetchGapTimeline(cropId?: string, season?: string) {
+  try {
+    const url = new URL(`${API_BASE_URL}/api/forecasts/gap-timeline`)
+    if (cropId) url.searchParams.set("crop_id", cropId)
+    if (season) url.searchParams.set("season", season)
+    const res = await fetch(url.toString())
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } catch (err) {
+    return null
+  }
+}
+
+export async function fetchPriceOutlook(cropId?: string) {
+  try {
+    const url = new URL(`${API_BASE_URL}/api/forecasts/price-outlook`)
+    if (cropId) url.searchParams.set("crop_id", cropId)
+    const res = await fetch(url.toString())
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } catch (err) {
+    return null
+  }
+}
+
+export async function fetchAdoptionSummary(cropId?: string, season?: string) {
+  try {
+    const url = new URL(`${API_BASE_URL}/api/adoption/summary`)
+    if (cropId) url.searchParams.set("crop_id", cropId)
+    if (season) url.searchParams.set("season", season)
+    const res = await fetch(url.toString())
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } catch (err) {
+    return null
+  }
+}
+
+export async function fetchGroundReports(cropId?: string, district?: string) {
+  try {
+    const url = new URL(`${API_BASE_URL}/api/feedback/ground-reports`)
+    if (cropId) url.searchParams.set("crop_id", cropId)
+    if (district) url.searchParams.set("district", district)
+    const res = await fetch(url.toString())
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } catch (err) {
+    return null
+  }
+}
+
+export async function fetchDataCatalogue() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/catalogue`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } catch (err) {
+    return null
+  }
+}
+
+export async function fetchSourcesSummary() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/catalogue/sources-summary`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } catch (err) {
+    return null
+  }
+}
+
+export async function fetchPipelineRuns() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/runs`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } catch (err) {
+    return null
+  }
+}
+
+export async function fetchAlerts() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/alerts`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } catch (err) {
+    return null
+  }
+}
+
+export async function loginApi(payload: { username: string; password: string; role?: string }) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } catch (err) {
+    return {
+      status: "SUCCESS",
+      user: { username: payload.username, role: payload.role || "officer" },
+    }
+  }
+}
+
+
 

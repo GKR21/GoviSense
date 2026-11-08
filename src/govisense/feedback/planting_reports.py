@@ -20,6 +20,8 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 from govisense.config import PROCESSED_DATA_DIR, settings
+from govisense.db.session import get_session, init_db
+from govisense.db.models import PlantingReportModel
 from govisense.models.target_area import TargetAreaCalculator, TargetAreaResult
 from govisense.models.a3_supply_pressure import SupplyPressureEngine, SPIResult
 from govisense.models.demand_estimator import DemandEstimator
@@ -70,23 +72,94 @@ class ReTriggerResult:
 
 class PlantingReportStore:
     """
-    In-memory and persistent JSON storage for planting reports.
-    Provides aggregation and automatic pipeline re-triggering.
+    Persistent storage for planting reports in PostgreSQL (or SQLite fallback),
+    with synced JSON snapshot and pipeline re-triggering.
     """
 
-    def __init__(self, storage_path: Optional[Path] = None):
+    def __init__(self, storage_path: Optional[Path] = None, sync_db: Optional[bool] = None):
         self.storage_path = storage_path or _DEFAULT_STORE_PATH
+        self.sync_db = sync_db if sync_db is not None else (storage_path is None)
         self._reports: List[PlantingReport] = []
+        if self.sync_db:
+            try:
+                init_db()
+            except Exception:
+                pass
         self._load()
 
     def _load(self) -> None:
-        if self.storage_path.exists():
+        # 1. Try loading from PostgreSQL database if sync_db is enabled
+        loaded_from_db = False
+        if self.sync_db:
+            try:
+                with get_session() as session:
+                    db_reports = session.query(PlantingReportModel).order_by(PlantingReportModel.timestamp.desc()).all()
+                    if db_reports:
+                        self._reports = [
+                            PlantingReport(
+                                crop_id=r.crop_id,
+                                season=r.season,
+                                planned_area_ha=float(r.planned_area_ha),
+                                actual_area_ha=float(r.actual_area_ha),
+                                consent_given=bool(r.consent_given),
+                                pseudonymous_id=r.pseudonymous_id,
+                                harvest_outcome_mt=float(r.harvest_outcome_mt) if r.harvest_outcome_mt is not None else None,
+                                sale_price_rs_kg=float(r.sale_price_rs_kg) if r.sale_price_rs_kg is not None else None,
+                                sale_channel=r.sale_channel,
+                                notes=r.notes,
+                                report_id=r.report_id,
+                                timestamp=r.timestamp.isoformat() if hasattr(r.timestamp, "isoformat") else str(r.timestamp),
+                            )
+                            for r in db_reports
+                        ]
+                        loaded_from_db = True
+            except Exception:
+                loaded_from_db = False
+
+        # 2. If DB is empty, load from JSON file and sync to DB
+        if not loaded_from_db and self.storage_path.exists():
             try:
                 with open(self.storage_path, "r", encoding="utf-8") as f:
                     raw_data = json.load(f)
                     self._reports = [PlantingReport(**item) for item in raw_data]
+                    if self.sync_db:
+                        self._sync_to_db()
             except Exception:
                 self._reports = []
+
+    def _sync_to_db(self) -> None:
+        """Seed DB from in-memory reports."""
+        if not self.sync_db:
+            return
+        try:
+            with get_session() as session:
+                for r in self._reports:
+                    ts = None
+                    if r.timestamp:
+                        try:
+                            ts = datetime.fromisoformat(r.timestamp.replace("Z", "+00:00"))
+                        except Exception:
+                            ts = datetime.now(timezone.utc)
+                    else:
+                        ts = datetime.now(timezone.utc)
+                    model = PlantingReportModel(
+                        report_id=r.report_id,
+                        crop_id=r.crop_id,
+                        season=r.season,
+                        planned_area_ha=r.planned_area_ha,
+                        actual_area_ha=r.actual_area_ha,
+                        consent_given=r.consent_given,
+                        pseudonymous_id=r.pseudonymous_id,
+                        harvest_outcome_mt=r.harvest_outcome_mt,
+                        sale_price_rs_kg=r.sale_price_rs_kg,
+                        sale_channel=r.sale_channel,
+                        notes=r.notes,
+                        timestamp=ts,
+                    )
+                    session.merge(model)
+                session.commit()
+        except Exception:
+            pass
 
     def _save(self) -> None:
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
@@ -110,6 +183,37 @@ class PlantingReportStore:
         self._reports.append(report)
         self._save()
 
+        # Persist to PostgreSQL database
+        if self.sync_db:
+            try:
+                with get_session() as session:
+                    ts = None
+                    if report.timestamp:
+                        try:
+                            ts = datetime.fromisoformat(report.timestamp.replace("Z", "+00:00"))
+                        except Exception:
+                            ts = datetime.now(timezone.utc)
+                    else:
+                        ts = datetime.now(timezone.utc)
+                    model = PlantingReportModel(
+                        report_id=report.report_id,
+                        crop_id=report.crop_id,
+                        season=report.season,
+                        planned_area_ha=report.planned_area_ha,
+                        actual_area_ha=report.actual_area_ha,
+                        consent_given=report.consent_given,
+                        pseudonymous_id=report.pseudonymous_id,
+                        harvest_outcome_mt=report.harvest_outcome_mt,
+                        sale_price_rs_kg=report.sale_price_rs_kg,
+                        sale_channel=report.sale_channel,
+                        notes=report.notes,
+                        timestamp=ts,
+                    )
+                    session.merge(model)
+                    session.commit()
+            except Exception:
+                pass
+
         total_actual = self.get_total_reported_area(report.crop_id, report.season)
         return {
             "status": "ACCEPTED",
@@ -127,6 +231,37 @@ class PlantingReportStore:
         season: Optional[str] = None,
     ) -> List[PlantingReport]:
         """Retrieve stored reports, optionally filtered by crop and season."""
+        # Query PostgreSQL database
+        if self.sync_db:
+            try:
+                with get_session() as session:
+                    q = session.query(PlantingReportModel)
+                    if crop_id:
+                        q = q.filter(PlantingReportModel.crop_id == crop_id)
+                    if season:
+                        q = q.filter(PlantingReportModel.season == season)
+                    db_rows = q.order_by(PlantingReportModel.timestamp.desc()).all()
+                    if db_rows:
+                        return [
+                            PlantingReport(
+                                crop_id=r.crop_id,
+                                season=r.season,
+                                planned_area_ha=float(r.planned_area_ha),
+                                actual_area_ha=float(r.actual_area_ha),
+                                consent_given=bool(r.consent_given),
+                                pseudonymous_id=r.pseudonymous_id,
+                                harvest_outcome_mt=float(r.harvest_outcome_mt) if r.harvest_outcome_mt is not None else None,
+                                sale_price_rs_kg=float(r.sale_price_rs_kg) if r.sale_price_rs_kg is not None else None,
+                                sale_channel=r.sale_channel,
+                                notes=r.notes,
+                                report_id=r.report_id,
+                                timestamp=r.timestamp.isoformat() if hasattr(r.timestamp, "isoformat") else str(r.timestamp),
+                            )
+                            for r in db_rows
+                        ]
+            except Exception:
+                pass
+
         results = self._reports
         if crop_id:
             results = [r for r in results if r.crop_id == crop_id]

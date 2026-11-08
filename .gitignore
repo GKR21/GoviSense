@@ -1,5 +1,6 @@
 data/raw/*
 data/interim/*
+data/database/*
 !data/**/.gitkeep
 models_store/*
 !models_store/.gitkeep
@@ -18,3 +19,6 @@ frontend/dist/
 .DS_Store
 .vscode/
 *.egg-info/
+*.db
+*.sqlite*
+govisense_pgdata/

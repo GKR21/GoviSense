@@ -24,6 +24,8 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 from govisense.config import PROCESSED_DATA_DIR
+from govisense.db.session import get_session, init_db
+from govisense.db.models import DecisionRecordModel
 
 
 _DEFAULT_HISTORY_PATH = PROCESSED_DATA_DIR / "decision_history.json"
@@ -161,21 +163,94 @@ class DecisionRecord:
 class DecisionHistoryStore:
     """
     Persistent audit ledger for decisions, assumptions, and model runs.
+    Saves to PostgreSQL (or SQLite fallback) as primary storage,
+    maintaining a synced JSON audit snapshot file.
     """
 
-    def __init__(self, storage_path: Optional[Path] = None):
+    def __init__(self, storage_path: Optional[Path] = None, sync_db: Optional[bool] = None):
         self.storage_path = storage_path or _DEFAULT_HISTORY_PATH
+        self.sync_db = sync_db if sync_db is not None else (storage_path is None)
         self._records: List[DecisionRecord] = []
+        if self.sync_db:
+            try:
+                init_db()
+            except Exception:
+                pass
         self._load()
 
     def _load(self) -> None:
-        if self.storage_path.exists():
+        # 1. Try loading from PostgreSQL database if sync_db enabled
+        loaded_from_db = False
+        if self.sync_db:
+            try:
+                with get_session() as session:
+                    db_records = session.query(DecisionRecordModel).order_by(DecisionRecordModel.timestamp.desc()).all()
+                    if db_records:
+                        self._records = [
+                            DecisionRecord(
+                                crop_id=r.crop_id,
+                                season=r.season,
+                                officer_id=r.officer_id,
+                                action_type=r.action_type,
+                                quantity=float(r.quantity),
+                                unit=r.unit,
+                                rationale=r.rationale,
+                                model_version=r.model_version,
+                                data_version=r.data_version,
+                                assumptions=r.assumptions or {},
+                                decision_id=r.decision_id,
+                                timestamp=r.timestamp.isoformat() if hasattr(r.timestamp, "isoformat") else str(r.timestamp),
+                            )
+                            for r in db_records
+                        ]
+                        loaded_from_db = True
+            except Exception:
+                loaded_from_db = False
+
+        # 2. If DB was empty or failed, load from JSON file snapshot
+        if not loaded_from_db and self.storage_path.exists():
             try:
                 with open(self.storage_path, "r", encoding="utf-8") as f:
                     raw_data = json.load(f)
                     self._records = [DecisionRecord(**item) for item in raw_data]
+                    if self.sync_db:
+                        self._sync_to_db()
             except Exception:
                 self._records = []
+
+    def _sync_to_db(self) -> None:
+        """Seed DB with in-memory records."""
+        if not self.sync_db:
+            return
+        try:
+            with get_session() as session:
+                for r in self._records:
+                    ts = None
+                    if r.timestamp:
+                        try:
+                            ts = datetime.fromisoformat(r.timestamp.replace("Z", "+00:00"))
+                        except Exception:
+                            ts = datetime.now(timezone.utc)
+                    else:
+                        ts = datetime.now(timezone.utc)
+                    db_model = DecisionRecordModel(
+                        decision_id=r.decision_id,
+                        crop_id=r.crop_id,
+                        season=r.season,
+                        officer_id=r.officer_id,
+                        action_type=r.action_type,
+                        quantity=r.quantity,
+                        unit=r.unit,
+                        rationale=r.rationale,
+                        model_version=r.model_version,
+                        data_version=r.data_version,
+                        assumptions=r.assumptions,
+                        timestamp=ts,
+                    )
+                    session.merge(db_model)
+                session.commit()
+        except Exception:
+            pass
 
     def _save(self) -> None:
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
@@ -186,6 +261,38 @@ class DecisionHistoryStore:
         """Record an officer action with snapshot of model version and assumptions."""
         self._records.append(record)
         self._save()
+
+        # Persist to PostgreSQL database
+        if self.sync_db:
+            try:
+                with get_session() as session:
+                    ts = None
+                    if record.timestamp:
+                        try:
+                            ts = datetime.fromisoformat(record.timestamp.replace("Z", "+00:00"))
+                        except Exception:
+                            ts = datetime.now(timezone.utc)
+                    else:
+                        ts = datetime.now(timezone.utc)
+                    db_model = DecisionRecordModel(
+                        decision_id=record.decision_id,
+                        crop_id=record.crop_id,
+                        season=record.season,
+                        officer_id=record.officer_id,
+                        action_type=record.action_type,
+                        quantity=record.quantity,
+                        unit=record.unit,
+                        rationale=record.rationale,
+                        model_version=record.model_version,
+                        data_version=record.data_version,
+                        assumptions=record.assumptions,
+                        timestamp=ts,
+                    )
+                    session.merge(db_model)
+                    session.commit()
+            except Exception:
+                pass
+
         return {
             "status": "RECORDED",
             "decision_id": record.decision_id,
@@ -201,12 +308,41 @@ class DecisionHistoryStore:
         limit: int = 50,
     ) -> List[DecisionRecord]:
         """List historical decisions, newest first."""
+        if self.sync_db:
+            try:
+                with get_session() as session:
+                    q = session.query(DecisionRecordModel)
+                    if crop_id:
+                        q = q.filter(DecisionRecordModel.crop_id == crop_id)
+                    if season:
+                        q = q.filter(DecisionRecordModel.season == season)
+                    rows = q.order_by(DecisionRecordModel.timestamp.desc()).limit(limit).all()
+                    if rows:
+                        return [
+                            DecisionRecord(
+                                crop_id=r.crop_id,
+                                season=r.season,
+                                officer_id=r.officer_id,
+                                action_type=r.action_type,
+                                quantity=float(r.quantity),
+                                unit=r.unit,
+                                rationale=r.rationale,
+                                model_version=r.model_version,
+                                data_version=r.data_version,
+                                assumptions=r.assumptions or {},
+                                decision_id=r.decision_id,
+                                timestamp=r.timestamp.isoformat() if hasattr(r.timestamp, "isoformat") else str(r.timestamp),
+                            )
+                            for r in rows
+                        ]
+            except Exception:
+                pass
+
         records = self._records
         if crop_id:
             records = [r for r in records if r.crop_id == crop_id]
         if season:
             records = [r for r in records if r.season == season]
-        # Return sorted descending by timestamp
         records = sorted(records, key=lambda r: r.timestamp, reverse=True)
         lim = int(limit) if isinstance(limit, int) else 50
         return records[:lim]
