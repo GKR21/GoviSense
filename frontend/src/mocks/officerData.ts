@@ -1,11 +1,7 @@
 import type { CropDataProfile, GroundReport, PolicyDecision } from "../types"
 
-export const INITIAL_GROUND_REPORTS: GroundReport[] = [
-  { id: "REP-91A2", crop: "Big onion", areaAcres: 2.0, areaHa: 0.81, date: "2026-10-20", district: "Anuradhapura", timestamp: "Yesterday 14:20", farmer: "LK-NC-0842", status: "Verified" },
-  { id: "REP-83B1", crop: "Chilli", areaAcres: 1.5, areaHa: 0.61, date: "2026-10-21", district: "Anuradhapura", timestamp: "Yesterday 16:45", farmer: "LK-NC-0911", status: "Verified" },
-  { id: "REP-77C4", crop: "Green gram", areaAcres: 3.0, areaHa: 1.21, date: "2026-10-22", district: "Anuradhapura", timestamp: "Today 09:15", farmer: "LK-NC-0105", status: "Verified" },
-  { id: "REP-62D9", crop: "Big onion", areaAcres: 2.5, areaHa: 1.01, date: "2026-10-23", district: "Anuradhapura", timestamp: "Today 11:30", farmer: "LK-NC-0419", status: "Pending" },
-]
+// Live planting reports are fetched from GET /api/feedback/planting-reports
+export const INITIAL_GROUND_REPORTS: GroundReport[] = []
 
 export const INITIAL_DECISION_HISTORY: PolicyDecision[] = [
   {
