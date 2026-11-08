@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import {
   ArrowDownCircle,
   ArrowUpCircle,
@@ -19,8 +19,10 @@ import {
   Layers,
   Leaf,
   MoreHorizontal,
+  PencilLine,
   Plus,
   RefreshCw,
+  RotateCcw,
   Save,
   Search,
   Settings,
@@ -50,6 +52,17 @@ import {
   ScreenStateView,
 } from "../../components/common"
 import { SupplyChart } from "../../components/charts"
+import {
+  fetchLatestForecasts,
+  fetchDecisionHistory,
+  logDecisionActionApi,
+  mapApiRecordToPolicyDecision,
+  getStoredAuthUser,
+  clearAuthSession,
+  type LatestForecastsWithMeta,
+  type CropForecastData,
+  type AuthUser,
+} from "../../api"
 
 import { OverviewScreen } from "./OverviewScreen"
 import { GapTimelineScreen } from "./GapTimelineScreen"
@@ -87,6 +100,7 @@ export function OfficerScreen({
 }) {
   const [currentRole, setCurrentRole] = useState<"Officer" | "Admin">(initialRole)
   const [selectedCrop, setSelectedCrop] = useState("Big onion")
+  const currentProfile = CROP_DATA_CATALOG[selectedCrop] || CROP_DATA_CATALOG["Big onion"]
   const [selectedDistrict, setSelectedDistrict] = useState("Anuradhapura")
   const [selectedSeason, setSelectedSeason] = useState("Maha 2026")
   const [scenario, setScenario] = useState<"Low" | "Middle" | "High">("Middle")
@@ -101,11 +115,53 @@ export function OfficerScreen({
   const [lastReport, setLastReport] = useState<GroundReport | null>(null)
   const [decision, setDecision] = useState("")
   const [decisionHistory, setDecisionHistory] = useState<PolicyDecision[]>(INITIAL_DECISION_HISTORY)
-  const changed = area !== 2131 || yieldValue !== 16.45
+  const [forecastData, setForecastData] = useState<LatestForecastsWithMeta | null>(null)
+  const [isLiveApi, setIsLiveApi] = useState(false)
+  const [forecastLoading, setForecastLoading] = useState(true)
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => getStoredAuthUser())
+
+  useEffect(() => {
+    let active = true
+    setForecastLoading(true)
+    fetchLatestForecasts()
+      .then((res) => {
+        if (!active) return
+        setForecastData(res)
+        setIsLiveApi(res.isLive)
+        setForecastLoading(false)
+      })
+      .catch(() => {
+        if (!active) return
+        setForecastLoading(false)
+      })
+
+    fetchDecisionHistory()
+      .then((res) => {
+        if (!active) return
+        if (res.isLive && res.records.length > 0) {
+          setDecisionHistory(res.records.map(mapApiRecordToPolicyDecision))
+        }
+      })
+      .catch(() => {
+        // fallback to INITIAL_DECISION_HISTORY
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const cropApiKey = selectedCrop.toLowerCase().includes("onion")
+    ? "big_onion"
+    : selectedCrop.toLowerCase().includes("chilli")
+      ? "chilli"
+      : selectedCrop.toLowerCase().replace(/\s+/g, "_")
+  const currentApiCropData: CropForecastData | undefined = forecastData?.crops[cropApiKey]
+  const changed = area !== currentProfile.baselineArea || yieldValue !== currentProfile.baselineYield
 
   const reset = () => {
-    setArea(2131)
-    setYieldValue(16.45)
+    setArea(currentProfile.baselineArea)
+    setYieldValue(currentProfile.baselineYield)
   }
 
   const save = () => {
@@ -113,24 +169,49 @@ export function OfficerScreen({
     window.setTimeout(() => setSaved(false), 2600)
   }
 
-  const recordDecision = (value: string, details?: Partial<PolicyDecision>) => {
+  const recordDecision = async (value: string, details?: Partial<PolicyDecision>) => {
     setDecision(value)
+
+    const normCrop = selectedCrop.toLowerCase().includes("chilli") ? "chilli" : "big_onion"
+    try {
+      await logDecisionActionApi({
+        crop_id: normCrop,
+        season: "Maha 2025/2026",
+        officer_id: details?.officer || "Officer OFF-7710",
+        action_type: value.toUpperCase().replace(/\s+/g, "_"),
+        quantity: 1200,
+        unit: "MT",
+        rationale: details?.impactEstimate || details?.notes || `Policy directive: ${value}`,
+        model_version: "LightGBM-v2.1+HiGHS-LP",
+        data_version: "CBSL-HARTI-DOA-2024.12",
+        assumptions: {
+          lead_time_weeks: details?.leadTime || 7,
+          loss_pct: 0.15,
+          district: selectedDistrict,
+          notes: details?.notes,
+        },
+        notes: details?.notes,
+      })
+    } catch {
+      // offline fallback handled by logDecisionActionApi
+    }
+
     const newEntry: PolicyDecision = {
       id: `RUN-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}-${Math.floor(10 + Math.random() * 90)}`,
       date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
       timestamp: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) + " UTC",
       crop: selectedCrop,
       district: selectedDistrict,
-      modelVersion: "v2.4.1",
-      dataVersion: "CPP 3.2 · HARTI Live · 2,418 Ground Reports",
-      assumptions: details?.assumptions || `Loss 12% · Lead ${details?.leadTime || 7}w`,
+      modelVersion: "LightGBM-v2.1+HiGHS-LP",
+      dataVersion: "CBSL-HARTI-DOA-2024.12",
+      assumptions: details?.assumptions || `Loss 15% · Lead ${details?.leadTime || 7}w`,
       leadTime: details?.leadTime || 7,
       action: value,
       category: details?.category || "Import quota",
-      officer: details?.officer || "Dr. N. Ranasinghe",
-      designation: details?.designation || "Chief Agricultural Economist, Dept of Agriculture",
+      officer: details?.officer || "Officer OFF-7710",
+      designation: details?.designation || "Authorized Agricultural Decision Maker",
       status: "Active",
-      notes: details?.notes || `Executive directive recorded from Gap & Import Timeline simulator for ${selectedCrop} in ${selectedDistrict}.`,
+      notes: details?.notes || `Executive directive recorded from Gap & Import Timeline for ${selectedCrop} in ${selectedDistrict}.`,
       confidence: "High (94%)",
       sha256Hash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(""),
       impactEstimate: details?.impactEstimate || "Dynamic buffer adjustment deployed to prevent retail price divergence.",
@@ -145,7 +226,7 @@ export function OfficerScreen({
 
   return (
     <div className="officer-app">
-      <DemoRibbon />
+      <DemoRibbon isLive={isLiveApi} />
       <aside className="sidebar">
         <div className="brand">
           <div className="brand__mark">
@@ -189,13 +270,31 @@ export function OfficerScreen({
           <button
             className="profile-card"
             type="button"
-            onClick={() => setPage("Login")}
-            title="Switch User / Role"
+            onClick={() => {
+              clearAuthSession()
+              setPage("Login")
+            }}
+            title="Click to Switch User or Sign Out"
           >
-            <span className="avatar">{currentRole === "Admin" ? "KP" : "DN"}</span>
+            <span className="avatar">
+              {currentUser
+                ? currentUser.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase()
+                : currentRole === "Admin"
+                  ? "KP"
+                  : "DN"}
+            </span>
             <span>
-              <strong>{currentRole === "Admin" ? "K. Perera" : "D. Nimal"}</strong>
-              <small>{currentRole === "Admin" ? "System Administrator" : "Planning Officer"}</small>
+              <strong>
+                {currentUser?.name || (currentRole === "Admin" ? "K. Perera" : "D. Nimal")}
+              </strong>
+              <small>
+                {currentUser?.designation || (currentRole === "Admin" ? "System Administrator" : "Planning Officer")}
+              </small>
             </span>
             <MoreHorizontal size={17} />
           </button>
@@ -211,19 +310,9 @@ export function OfficerScreen({
               options={["Big onion", "Chilli", "Green gram", "Maize", "Red onion", "Potato"]}
               onChange={(crop) => {
                 setSelectedCrop(crop)
-                if (crop === "Big onion") {
-                  setArea(2131)
-                  setYieldValue(16.45)
-                } else if (crop === "Chilli") {
-                  setArea(2493)
-                  setYieldValue(5.2)
-                } else if (crop === "Green gram") {
-                  setArea(1750)
-                  setYieldValue(1.4)
-                } else if (crop === "Maize") {
-                  setArea(3100)
-                  setYieldValue(4.8)
-                }
+                const base = CROP_DATA_CATALOG[crop] || CROP_DATA_CATALOG["Big onion"]
+                setArea(base.baselineArea)
+                setYieldValue(base.baselineYield)
               }}
             />
             <SelectControl
@@ -315,7 +404,10 @@ export function OfficerScreen({
             />
           ) : page === "Login" ? (
             <LoginScreen
-              onLogin={(selectedRole) => {
+              onLogin={(selectedRole, user) => {
+                if (user) {
+                  setCurrentUser(user)
+                }
                 if (selectedRole === "Farmer") {
                   setView("farmer")
                 } else if (selectedRole === "Admin") {
@@ -337,25 +429,43 @@ export function OfficerScreen({
               scenario={scenario}
               onOpenSupply={() => setPage("Supply pressure")}
               onOpenGap={() => setPage("Gap & import timeline")}
+              apiCropData={currentApiCropData}
+              isLiveApi={isLiveApi}
             />
           ) : page === "Gap & import timeline" ? (
             <GapTimelineScreen
               crop={selectedCrop}
               district={selectedDistrict}
               onRecord={recordDecision}
+              forecastData={forecastData}
+              isLiveApi={isLiveApi}
             />
           ) : page === "Price outlook" ? (
-            <PriceOutlookScreen crop={selectedCrop} district={selectedDistrict} />
+            <PriceOutlookScreen
+              crop={selectedCrop}
+              district={selectedDistrict}
+              forecastData={forecastData}
+              isLiveApi={isLiveApi}
+            />
           ) : page === "Adoption tracker" ? (
-            <AdoptionScreen groundReports={groundReports} />
+            <AdoptionScreen
+              groundReports={groundReports}
+              crop={selectedCrop}
+              forecastData={forecastData}
+              isLiveApi={isLiveApi}
+            />
           ) : page === "Decision history" ? (
             <HistoryScreen
               decision={decision}
               decisionHistory={decisionHistory}
               crop={selectedCrop}
+              isLiveApi={isLiveApi}
             />
           ) : page === "Data sources" ? (
-            <DataSourcesScreen />
+            <DataSourcesScreen
+              crop={selectedCrop}
+              isLiveApi={isLiveApi}
+            />
           ) : page === "Settings" ? (
             <SettingsScreen />
           ) : (
@@ -394,7 +504,12 @@ export function OfficerScreen({
                     Key insight · middle scenario
                   </span>
                   <strong>
-                    {selectedCrop} harvest in {selectedSeason} ({selectedDistrict}): {CROP_DATA_CATALOG[selectedCrop]?.spiLabel || "Monitored"} (SPI: {CROP_DATA_CATALOG[selectedCrop]?.spiAnnualScore || -0.63}). {CROP_DATA_CATALOG[selectedCrop]?.ai4Action || ""}
+                    {selectedCrop} harvest in {selectedSeason} ({selectedDistrict}):{" "}
+                    {currentApiCropData?.ai3_supply_pressure_index.spi_label || currentProfile.spiLabel || "Balanced"}{" "}
+                    (SPI: {currentApiCropData?.ai3_supply_pressure_index.spi_score !== undefined
+                      ? (currentApiCropData.ai3_supply_pressure_index.spi_score > 0 ? "+" : "") + currentApiCropData.ai3_supply_pressure_index.spi_score.toFixed(2)
+                      : (currentProfile.spiAnnualScore !== undefined ? currentProfile.spiAnnualScore : "+0.08")}).{" "}
+                    {currentApiCropData?.ai3_supply_pressure_index.action_summary || currentProfile.ai4Action || "Maintain planting extent."}
                   </strong>
                   <p>
                     High oversupply risk. Consider shifting part of planned area
@@ -437,6 +552,8 @@ export function OfficerScreen({
                     yieldValue={yieldValue}
                     selectedMonth={selectedMonth}
                     onSelectMonth={setSelectedMonth}
+                    apiCropData={currentApiCropData}
+                    isLive={isLiveApi}
                   />
                   <div className="chart-footer">
                     <div>
@@ -470,35 +587,35 @@ export function OfficerScreen({
                   </div>
                   <div className="pilot-baseline">
                     <span>Current plan</span>
-                    <strong>35,051 t</strong>
-                    <small>from 2,131 ha in Anuradhapura</small>
+                    <strong>{Math.round(currentProfile.baselineArea * currentProfile.baselineYield).toLocaleString()} t</strong>
+                    <small>from {currentProfile.baselineArea.toLocaleString()} ha in {selectedDistrict}</small>
                   </div>
                   <SliderField
                     label="Planted area"
                     value={area}
-                    min={1200}
-                    max={3000}
+                    min={Math.round(currentProfile.baselineArea * 0.4)}
+                    max={Math.round(currentProfile.baselineArea * 1.8)}
                     step={10}
                     unit="ha"
                     onChange={setArea}
-                    helper="Baseline 2,131"
+                    helper={`Baseline ${currentProfile.baselineArea.toLocaleString()} ha`}
                   />
                   <SliderField
                     label="Expected yield"
                     value={yieldValue}
-                    min={10}
-                    max={22}
-                    step={0.05}
+                    min={parseFloat((currentProfile.baselineYield * 0.4).toFixed(2))}
+                    max={parseFloat((currentProfile.baselineYield * 1.8).toFixed(2))}
+                    step={currentProfile.baselineYield > 5 ? 0.1 : 0.05}
                     unit="t/ha"
                     onChange={setYieldValue}
-                    helper="Baseline 16.45"
+                    helper={`Baseline ${currentProfile.baselineYield.toFixed(2)} t/ha`}
                   />
                   <div className="impact-card">
                     <div>
                       <span>Projected annual harvest</span>
                       <strong>
                         {Math.round(
-                          35051 * (area / 2131) * (yieldValue / 16.45),
+                          area * yieldValue,
                         ).toLocaleString()}{" "}
                         t
                       </strong>
@@ -506,8 +623,8 @@ export function OfficerScreen({
                     <span className={cx("delta", changed && "delta--changed")}>
                       {changed
                         ? `${
-                            area > 2131 ? "+" : ""
-                          }${Math.round(((area / 2131) * (yieldValue / 16.45) - 1) * 100)}%`
+                            (area * yieldValue) > (currentProfile.baselineArea * currentProfile.baselineYield) ? "+" : ""
+                          }${Math.round(((area * yieldValue) / (currentProfile.baselineArea * currentProfile.baselineYield) - 1) * 100)}%`
                         : "Baseline"}
                     </span>
                   </div>

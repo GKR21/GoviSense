@@ -1,3 +1,4 @@
+import React from "react"
 import type { LucideIcon } from "lucide-react"
 import { cx } from "../../types"
 
@@ -10,7 +11,7 @@ export function KpiTile({
 }: {
   label: string
   value: string
-  meta: string
+  meta: React.ReactNode
   icon: LucideIcon
   tone?: string
 }) {

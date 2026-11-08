@@ -1,4 +1,4 @@
-import { BarChart3, Database, SlidersHorizontal, Smartphone, Sprout } from "lucide-react"
+import { BarChart3, Database, Smartphone, Sprout } from "lucide-react"
 import { cx, type View } from "../../types"
 
 export function WorkspaceSwitcher({
@@ -49,15 +49,6 @@ export function WorkspaceSwitcher({
         >
           <Smartphone size={15} />
           <span>Farmer App</span>
-        </button>
-        <button
-          className={view === "system" ? "active" : ""}
-          onClick={() => setView("system")}
-          type="button"
-          title="GoviSense design system, tokens & component library"
-        >
-          <SlidersHorizontal size={15} />
-          <span>System UI</span>
         </button>
       </div>
     </div>

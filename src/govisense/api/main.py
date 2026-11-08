@@ -41,6 +41,7 @@ from govisense.db import (
     AlertStatusModel,
 )
 from govisense.simulation.agent_sim import MarketAdoptionSimulator, calculate_interval_coverage
+from govisense.api.routes.auth import router as auth_router
 
 app = FastAPI(
     title="GoviSense API",
@@ -56,6 +57,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth_router)
 
 # Global in-memory cache for models and data
 cached_df: Optional[pd.DataFrame] = None
@@ -196,7 +199,9 @@ def get_latest_forecasts():
                 "lower_bound_rs_kg": a2_res.lower_bound,
                 "upper_bound_rs_kg": a2_res.upper_bound,
                 "direction": a2_res.direction,
-                "confidence": a2_res.direction_confidence
+                "confidence": a2_res.direction_confidence,
+                "selected_model": getattr(a2_res, "selected_model", "lightgbm"),
+                "forecast_source": getattr(a2_res, "source", "model"),
             }
         }
 
@@ -532,6 +537,21 @@ def submit_planting_report(payload: PlantingReportPayload):
         return report_store.submit_report(report)
     except ValueError as e:
         return {"status": "ERROR", "message": str(e)}
+
+
+@app.get("/api/feedback/planting-reports")
+def get_planting_reports(
+    crop_id: Optional[str] = Query(None),
+    season: Optional[str] = Query(None),
+):
+    """
+    Item 7: Retrieve actual planting reports submitted by farmers / extension officers.
+    """
+    eff_crop = str(crop_id) if crop_id is not None and not hasattr(crop_id, "default") else None
+    eff_season = str(season) if season is not None and not hasattr(season, "default") else None
+    reports = report_store.get_reports(crop_id=eff_crop, season=eff_season)
+    from dataclasses import asdict
+    return [asdict(r) for r in reports]
 
 
 @app.post("/api/feedback/retrigger")
