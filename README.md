@@ -111,10 +111,10 @@ python -m pytest tests/
 ┌────────────────────────────────────────────────────────┐
 │                   GoviSense Ecosystem                  │
 ├──────────────────────────┬─────────────────────────────┤
-│   Government Web App     │     Farmer Mobile App       │
-│      (Server Hosted)     │   (Standalone Android APK)  │
+│   Government Web App     │     Unified Mobile App      │
+│      (Server Hosted)     │   (Farmer + Officer Field)  │
 │   React 19 + TypeScript  │       Flutter + Dart        │
-│    Directory: frontend/  │    Directory: farmer_app/   │
+│    Directory: frontend/  │      Directory: mobile/     │
 └────────────┬─────────────┴──────────────┬──────────────┘
              │                            │
              │   REST API & WebSockets    │
@@ -135,10 +135,10 @@ npm --prefix frontend install
 npm --prefix frontend run dev
 ```
 
-### Building the Farmer Android APK (Flutter)
+### Building the Unified Mobile APK (Flutter)
 ```powershell
-cd farmer_app
+cd mobile
 flutter pub get
 flutter build apk --release
-# Output APK: farmer_app/build/app/outputs/flutter-apk/app-release.apk
+# Output APK: mobile/build/app/outputs/flutter-apk/app-release.apk
 ```

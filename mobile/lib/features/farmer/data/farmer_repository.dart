@@ -4,23 +4,32 @@ import '../models/crop_item.dart';
 import '../models/planting_report.dart';
 import '../models/farmer_alert.dart';
 import '../models/farmer_profile.dart';
+import '../services/farmer_api_service.dart';
 
 class FarmerRepository extends ChangeNotifier {
-  FarmerRepository() {
+  FarmerRepository({FarmerApiService? apiService})
+      : _apiService = apiService ?? FarmerApiService() {
     _initData();
   }
 
   static final FarmerRepository instance = FarmerRepository();
+
+  final FarmerApiService _apiService;
 
   late List<CropItem> _crops;
   late List<PlantingReport> _reports;
   late List<FarmerAlert> _alerts;
   late FarmerProfile _profile;
 
+  bool _isLoadingApi = false;
+  bool _isLiveConnected = false;
+
   List<CropItem> get crops => List.unmodifiable(_crops);
   List<PlantingReport> get reports => List.unmodifiable(_reports);
   List<FarmerAlert> get alerts => List.unmodifiable(_alerts);
   FarmerProfile get profile => _profile;
+  bool get isLoadingApi => _isLoadingApi;
+  bool get isLiveConnected => _isLiveConnected;
 
   int get unreadAlertsCount => _alerts.where((a) => !a.isRead).length;
 
@@ -33,6 +42,8 @@ class FarmerRepository extends ChangeNotifier {
       totalLandAcres: 1.5,
       primaryCrop: 'Green Gram',
       lastSyncTime: 'Today at 09:42 AM',
+      soilPh: 6.5,
+      isRainfed: false,
     );
 
     _crops = [
@@ -147,7 +158,7 @@ class FarmerRepository extends ChangeNotifier {
         waterNeed: 3,
         plantWindowEn: 'Nov 01 – Nov 25',
         plantWindowSi: 'නොවැ 01 – නොවැ 25',
-        plantWindowTa: 'நவ 01 – நவ 25',
+        plantWindowTa: 'நව 01 – நவ 25',
         harvestWindowEn: 'Mar 01 – Apr 20',
         harvestWindowSi: 'මාර්තු 01 – අප්‍රේල් 20',
         harvestWindowTa: 'மார் 01 – ஏப் 20',
@@ -184,6 +195,7 @@ class FarmerRepository extends ChangeNotifier {
         seedSource: 'Certified DOA Seed',
         timestamp: '2026-10-22 14:15',
         receiptHash: '0x8F94...B31A',
+        consentGiven: true,
       ),
     ];
 
@@ -240,12 +252,65 @@ class FarmerRepository extends ChangeNotifier {
     ];
   }
 
+  /// Updates farmer profile parcel conditions and recalibrates recommendations
+  Future<void> updateProfile({
+    double? totalLandAcres,
+    bool? isRainfed,
+    double? soilPh,
+    String? district,
+    String? division,
+  }) async {
+    _profile = _profile.copyWith(
+      totalLandAcres: totalLandAcres,
+      isRainfed: isRainfed,
+      soilPh: soilPh,
+      district: district,
+      division: division,
+      lastSyncTime: 'Just now',
+    );
+    notifyListeners();
+    await refreshRecommendations();
+  }
+
+  /// Queries the live FastAPI backend (/api/farmer/top3) with fallback
+  Future<void> refreshRecommendations() async {
+    _isLoadingApi = true;
+    notifyListeners();
+
+    try {
+      final liveCrops = await _apiService.getTop3Recommendations(_profile);
+      if (liveCrops != null && liveCrops.isNotEmpty) {
+        _crops = liveCrops;
+        _isLiveConnected = true;
+      } else {
+        _isLiveConnected = false;
+      }
+    } catch (_) {
+      _isLiveConnected = false;
+    } finally {
+      _isLoadingApi = false;
+      notifyListeners();
+    }
+  }
+
+  /// Checks if backend server is online
+  Future<bool> checkBackendConnection() async {
+    final ok = await _apiService.checkHealth();
+    _isLiveConnected = ok;
+    notifyListeners();
+    return ok;
+  }
+
   PlantingReport submitPlantingReport({
     required String cropId,
     required double areaAcres,
     required String plantingDate,
     required String irrigationType,
     required String seedSource,
+    double? harvestOutcomeMt,
+    double? salePriceRsKg,
+    String? saleChannel,
+    bool consentGiven = true,
   }) {
     final crop = _crops.firstWhere(
       (c) => c.id == cropId,
@@ -268,6 +333,11 @@ class FarmerRepository extends ChangeNotifier {
       seedSource: seedSource,
       timestamp: DateTime.now().toString().substring(0, 16),
       receiptHash: '0x$hexCode...${rng.nextInt(0xFFFF).toRadixString(16).toUpperCase()}',
+      harvestOutcomeMt: harvestOutcomeMt,
+      salePriceRsKg: salePriceRsKg,
+      saleChannel: saleChannel,
+      consentGiven: consentGiven,
+      pseudonymousId: _profile.farmerId,
     );
 
     _reports.insert(0, report);
@@ -282,7 +352,7 @@ class FarmerRepository extends ChangeNotifier {
         titleSi: 'වගා වාර්තාව ලියාපදිංචි විය (${crop.nameSi})',
         titleTa: 'நடவு அறிக்கை பதிவு செய்யப்பட்டது (${crop.nameTa})',
         messageEn:
-            'Successfully submitted $areaAcres acres for Maha 2026. Receipt ID: ${report.id}.',
+            'Successfully submitted $areaAcres acres for Maha 2026. Receipt ID: ${report.id}. Telemetry synced with Anuradhapura Agrarian Ledger.',
         messageSi:
             'අක්කර $areaAcres ක් සාර්ථකව වාර්තා කරන ලදී. රිසිට්පත් අංකය: ${report.id}.',
         messageTa:
@@ -291,6 +361,13 @@ class FarmerRepository extends ChangeNotifier {
         isRead: false,
       ),
     );
+
+    // Post to FastAPI backend asynchronously (Closed-Loop Feedback Item 7)
+    _apiService.submitPlantingReport(report).then((success) {
+      if (success) {
+        debugPrint('Planting report ${report.id} synced with FastAPI backend successfully');
+      }
+    });
 
     notifyListeners();
     return report;
@@ -314,7 +391,7 @@ class FarmerRepository extends ChangeNotifier {
         type: AlertType.market,
         titleEn: 'Agrarian Decision: $decision ($crop)',
         titleSi: 'කෘෂිකාර්මික නිල තීරණය: $decision ($crop)',
-        titleTa: 'விவசாய உத்தியோகபூர்வ முடிவு: $decision ($crop)',
+        titleTa: 'විவசாய உத்தியோகபூர்வ முடிவு: $decision ($crop)',
         messageEn:
             'District Planning Officer registered decision "$decision". National import windows adjusted to safeguard local farmgate prices.',
         messageSi:

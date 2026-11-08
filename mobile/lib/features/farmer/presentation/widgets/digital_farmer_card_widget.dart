@@ -143,8 +143,8 @@ class DigitalFarmerCardWidget extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          // Footer division and land
+          const SizedBox(height: 18),
+          // Footer division, land extent, and soil pH
           Container(
             padding: const EdgeInsets.only(top: 14),
             decoration: BoxDecoration(
@@ -156,20 +156,30 @@ class DigitalFarmerCardWidget extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('AGRARIAN DIVISION', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                    const Text('AGRARIAN DIVISION', style: TextStyle(color: Colors.white70, fontSize: 9)),
                     Text(
                       profile.division,
-                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Text('LAND EXTENT', style: TextStyle(color: Colors.white70, fontSize: 9)),
+                    Text(
+                      '${profile.totalLandAcres} Ac (${profile.isRainfed ? "Rainfed" : "Irrigated"})',
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Text('REGISTERED LAND', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                    const Text('SOIL pH', style: TextStyle(color: Colors.white70, fontSize: 9)),
                     Text(
-                      '${profile.totalLandAcres} Acres',
-                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                      '${profile.soilPh.toStringAsFixed(1)} pH',
+                      style: const TextStyle(color: AppTheme.accent, fontSize: 11, fontWeight: FontWeight.w900),
                     ),
                   ],
                 ),
@@ -181,4 +191,3 @@ class DigitalFarmerCardWidget extends StatelessWidget {
     );
   }
 }
-

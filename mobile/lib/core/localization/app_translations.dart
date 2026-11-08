@@ -51,18 +51,28 @@ class AppTranslations {
       'harvestPeriod': 'Harvest Period',
       'chooseCta': 'Choose & Report',
       'detailsCta': 'Cultivation Guide',
+      // Market Prices
+      'marketPrices': 'DEC Market Prices',
+      'marketPricesSub': 'Daily wholesale & retail commodity prices at Dambulla & Keppetipola DECs',
       // Report Wizard
       'reportTitle': 'Record Your Planting Plan',
       'reportSub': 'Contribute to district planning and receive subsidized agrarian support.',
       'step1': 'Select Crop',
       'step2': 'Area & Water',
-      'step3': 'Date & Seeds',
+      'step3': 'Date & Telemetry',
       'landSizeLabel': 'Cultivated Area (Acres)',
       'waterSourceLabel': 'Water Source',
       'dateLabel': 'Expected Sowing Date',
       'seedSourceLabel': 'Seed Variety & Origin',
       'submitReport': 'Confirm & Submit to District',
       'privacyNotice': 'Your submission is encrypted and published only as an anonymous aggregate statistic.',
+      'harvestOutcomeLabel': 'Harvest Outcome (MT - Optional)',
+      'salePriceLabel': 'Realized Sale Price (Rs./kg - Optional)',
+      'saleChannelLabel': 'Marketing Channel',
+      // Profile & Calibration
+      'soilPhLabel': 'Soil pH Level',
+      'waterRegime': 'Irrigation Type',
+      'recalibrateCta': 'Recalibrate Crop Recommendations',
       // Success
       'reportSuccessTitle': 'Planting Recorded Successfully',
       'receiptTitle': 'Digital Cultivation Receipt',
@@ -115,18 +125,28 @@ class AppTranslations {
       'harvestPeriod': 'අස්වනු නෙළන කාලය',
       'chooseCta': 'තෝරාගෙන වාර්තා කරන්න',
       'detailsCta': 'වගා උපදෙස්',
+      // Market Prices
+      'marketPrices': 'වෙළඳපොළ මිල ගණන්',
+      'marketPricesSub': 'දඹුල්ල සහ කැප්පෙටිපොල ආර්ථික මධ්‍යස්ථානවල දෛනික තොග හා සිල්ලර මිල',
       // Report Wizard
       'reportTitle': 'ඔබේ වගා සැලැස්ම වාර්තා කරන්න',
       'reportSub': 'දිස්ත්‍රික් සැලසුම්කරණයට දායක වී සහනාධාර පහසුකම් ලබාගන්න.',
       'step1': 'බෝගය තෝරන්න',
       'step2': 'ඉඩම සහ ජලය',
-      'step3': 'දිනය සහ බීජ',
+      'step3': 'දිනය සහ දත්ත සටහන',
       'landSizeLabel': 'වගා බිම් ප්‍රමාණය (අක්කර)',
       'waterSourceLabel': 'ජල මූලාශ්‍රය',
       'dateLabel': 'සිටුවන දිනය',
       'seedSourceLabel': 'බීජ ප්‍රභේදය',
       'submitReport': 'තහවුරු කර යොමු කරන්න',
       'privacyNotice': 'ඔබේ දත්ත රහස්‍ය සාමූහික සංඛ්‍යාලේඛනයක් ලෙස පමණක් භාවිත වේ.',
+      'harvestOutcomeLabel': 'අස්වනු ප්‍රමාණය (මෙට්‍රික් ටොන් - විකල්ප)',
+      'salePriceLabel': 'විකිණූ සාමාන්‍ය මිල (රු./කි.ග්‍රෑ. - විකල්ප)',
+      'saleChannelLabel': 'අලෙවි කළ මාර්ගය',
+      // Profile & Calibration
+      'soilPhLabel': 'පසේ pH අගය',
+      'waterRegime': 'ජල සම්පාදන ක්‍රමය',
+      'recalibrateCta': 'බෝග නිර්දේශ නැවත ගණනය කරන්න',
       // Success
       'reportSuccessTitle': 'වගා වාර්තාව සාර්ථකව සුරැකිණි',
       'receiptTitle': 'ඩිජිටල් වගා රිසිට්පත',
@@ -179,18 +199,28 @@ class AppTranslations {
       'harvestPeriod': 'அறுவடை காலம்',
       'chooseCta': 'தேர்வு செய்து அறிக்கையிடுக',
       'detailsCta': 'பயிர் வழிகாட்டி',
+      // Market Prices
+      'marketPrices': 'சந்தை விலைகள்',
+      'marketPricesSub': 'தம்புள்ளை மற்றும் கெப்பெட்டிபொல மையங்களின் தினசரி விலை விபரம்',
       // Report Wizard
       'reportTitle': 'உங்கள் நடவுத் திட்டத்தை பதிவு செய்க',
       'reportSub': 'மாவட்ட பயிர் திட்டமிடலுக்கு பங்களித்து மானிய உதவிகளைப் பெறுங்கள்.',
       'step1': 'பயிரைத் தேர்ந்தெடுக்கவும்',
       'step2': 'நிலம் & நீர்',
-      'step3': 'தேதி & விதைகள்',
+      'step3': 'தேதி & தரவு பதிவு',
       'landSizeLabel': 'பயிரிடப்படும் பரப்பளவு (ஏக்கர்)',
       'waterSourceLabel': 'நீர் ஆதாரம்',
       'dateLabel': 'நடவு தேதி',
       'seedSourceLabel': 'விதை ரகம்',
       'submitReport': 'உறுதி செய்து சமர்ப்பிக்கவும்',
       'privacyNotice': 'உங்கள் தரவு ரகசிய கூட்டு புள்ளிவிவரமாக மட்டுமே பயன்படுத்தப்படும்.',
+      'harvestOutcomeLabel': 'அறுவடை அளவு (மெட்ரிக் டன் - விருப்பம்)',
+      'salePriceLabel': 'விற்பனை விலை (ரூ./கிலோ - விருப்பம்)',
+      'saleChannelLabel': 'சந்தைப்படுத்தல் வழி',
+      // Profile & Calibration
+      'soilPhLabel': 'மண் pH அளவு',
+      'waterRegime': 'நீர்ப்பாசன முறை',
+      'recalibrateCta': 'பயிர் பரிந்துரைகளை மீண்டும் கணக்கிடுக',
       // Success
       'reportSuccessTitle': 'நடவு அறிக்கை வெற்றிகரமாக சேமிக்கப்பட்டது',
       'receiptTitle': 'டிஜிட்டல் சாகுபடி ரசீது',
@@ -210,4 +240,3 @@ class AppTranslations {
     },
   };
 }
-

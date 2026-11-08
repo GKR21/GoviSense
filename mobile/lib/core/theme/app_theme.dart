@@ -16,6 +16,7 @@ class AppTheme {
   static const background = Color(0xFFF7F9F6); // Anti-glare warm paper
   static const surface = Colors.white;
   static const cardBorder = Color(0xFFE3EAE4);
+  static const neutral800 = Color(0xFF16241D);
   static const neutral700 = Color(0xFF23332A);
   static const neutral600 = Color(0xFF506358);
   static const neutral400 = Color(0xFF7A8C82);
