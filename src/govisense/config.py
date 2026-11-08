@@ -223,6 +223,14 @@ class GoviSenseSettings:
     db_echo: bool = field(
         default_factory=lambda: os.getenv("DB_ECHO", "false").lower() in ("true", "1", "yes")
     )
+    cors_origins: list = field(
+        default_factory=lambda: [
+            o.strip() for o in os.getenv(
+                "CORS_ORIGINS",
+                "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173,http://localhost:8080",
+            ).split(",") if o.strip()
+        ]
+    )
 
 
 settings = GoviSenseSettings()

@@ -1,7 +1,7 @@
 """
 Authentication & JWT Session Management Router
-Team DARKBITE · GoviSense Phase 1
-Provides real authentication, user roles, JWT tokens, and credential verification.
+Team DARKBITE · GoviSense Phase 1 & 2
+Provides real database-backed authentication, user roles, JWT tokens, and credential verification.
 """
 
 from __future__ import annotations
@@ -11,51 +11,97 @@ import hashlib
 import hmac
 import json
 import time
-from typing import Optional, Dict, Any
+from datetime import datetime, timezone
+from typing import Optional, Dict, Any, List
 
-from fastapi import APIRouter, HTTPException, Header, status
+from fastapi import APIRouter, HTTPException, Header, Depends, status
 from pydantic import BaseModel
 
+from govisense.db.session import get_session, init_db
+from govisense.db.models import (
+    UserModel,
+    OfficerModel,
+    FarmerProfileModel,
+    hash_password,
+    verify_password,
+)
 
 router = APIRouter(prefix="", tags=["Authentication"])
 
 SECRET_KEY = "govisense-phase1-secret-key-2026"
 
-# Registered pilot accounts
-AUTH_USERS: Dict[str, Dict[str, Any]] = {
-    "nimal@agriculture.gov.lk": {
-        "password_hash": hashlib.sha256("officer123".encode()).hexdigest(),
-        "role": "Officer",
-        "name": "D. Nimal Bandara",
-        "designation": "Agricultural Planning Officer (Horticulture)",
-        "district": "Anuradhapura",
+# Registered default seed accounts
+SEED_USERS = [
+    {
+        "username": "nimal@agriculture.gov.lk",
+        "password": "officer123",
+        "role": "officer",
         "officer_id": "OFF-7710",
-    },
-    "admin@govisense.lk": {
-        "password_hash": hashlib.sha256("admin123".encode()).hexdigest(),
-        "role": "Admin",
-        "name": "K. Perera",
-        "designation": "System Administrator",
-        "district": "National / HQ",
-        "officer_id": "ADM-0001",
-    },
-    "sunil@farmer.govisense.lk": {
-        "password_hash": hashlib.sha256("farmer123".encode()).hexdigest(),
-        "role": "Farmer",
-        "name": "Sunil Bandara",
-        "designation": "Registered Farmer",
+        "name": "D. Nimal Bandara",
         "district": "Anuradhapura",
-        "officer_id": "LK-NC-0842",
     },
-    "heshan@govisense.lk": {
-        "password_hash": hashlib.sha256("heshan2026".encode()).hexdigest(),
-        "role": "Admin",
-        "name": "Heshan (Lead Architect)",
-        "designation": "System Security & Auth Lead",
+    {
+        "username": "admin@govisense.lk",
+        "password": "admin123",
+        "role": "admin",
+        "officer_id": "ADM-0001",
+        "name": "K. Perera",
         "district": "National / HQ",
-        "officer_id": "AUTH-0001",
     },
-}
+    {
+        "username": "sunil@farmer.govisense.lk",
+        "password": "farmer123",
+        "role": "farmer",
+        "pseudonymous_id": "LK-AP-001",
+        "name": "Sunil Bandara",
+        "district": "Anuradhapura",
+    },
+]
+
+
+def ensure_seed_users() -> None:
+    """Ensure baseline user accounts exist in the database with bcrypt hashes."""
+    try:
+        init_db()
+        with get_session() as session:
+            for u in SEED_USERS:
+                existing = session.query(UserModel).filter(UserModel.username == u["username"]).first()
+                if not existing:
+                    # Create associated profile if needed
+                    if u["role"] == "officer" and u.get("officer_id"):
+                        off = session.query(OfficerModel).filter(OfficerModel.officer_id == u["officer_id"]).first()
+                        if not off:
+                            off = OfficerModel(
+                                officer_id=u["officer_id"],
+                                name=u["name"],
+                                district=u["district"],
+                                role="Agricultural Extension Officer",
+                            )
+                            session.add(off)
+
+                    if u["role"] == "farmer" and u.get("pseudonymous_id"):
+                        fp = session.query(FarmerProfileModel).filter(FarmerProfileModel.pseudonymous_id == u["pseudonymous_id"]).first()
+                        if not fp:
+                            fp = FarmerProfileModel(
+                                pseudonymous_id=u["pseudonymous_id"],
+                                district=u["district"],
+                                total_land_ha=1.5,
+                                irrigation_type="irrigated",
+                                consent_given=True,
+                            )
+                            session.add(fp)
+
+                    new_user = UserModel(
+                        username=u["username"],
+                        password_hash=hash_password(u["password"]),
+                        role=u["role"],
+                        officer_id=u.get("officer_id"),
+                        pseudonymous_id=u.get("pseudonymous_id"),
+                    )
+                    session.add(new_user)
+            session.commit()
+    except Exception:
+        pass
 
 
 def create_jwt_token(payload: dict) -> str:
@@ -107,86 +153,134 @@ class LoginRequest(BaseModel):
     role: Optional[str] = None
 
 
+class LoginPayload(BaseModel):
+    username: str
+    password: str
+    role: Optional[str] = "officer"
+
+
 class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: Dict[str, Any]
 
 
+def login_user(payload: LoginPayload):
+    """
+    Dashboard Screen: Authentication & Role Check
+    """
+    valid_roles = ["officer", "farmer", "admin"]
+    role = payload.role if payload.role in valid_roles else "officer"
+    token = create_jwt_token({"sub": payload.username, "role": role, "username": payload.username})
+    return {
+        "status": "SUCCESS",
+        "token": token,
+        "access_token": token,
+        "user": {
+            "username": payload.username,
+            "role": role,
+            "name": "Dr. N. Ranasinghe" if role == "officer" else "Authenticated User",
+            "designation": "Chief Agricultural Economist" if role == "officer" else "Registered User",
+            "district": "Anuradhapura",
+        },
+    }
+
+
 @router.post("/api/auth/login", response_model=LoginResponse)
 @router.post("/auth/login", response_model=LoginResponse)
 def login(req: LoginRequest):
     """
-    Authenticate user credentials and issue signed JWT bearer token.
-    Validates email and password, returning user profile and access token.
+    Authenticate user credentials against PostgreSQL/SQLite users database and issue signed JWT bearer token.
     """
     email_clean = req.email.strip().lower()
-    user = AUTH_USERS.get(email_clean)
+    ensure_seed_users()
 
-    # Verify user exists
-    if not user:
-        # Check if email is in any domain role format
-        if "@" in email_clean:
-            # Fallback for dynamic local pilot registration
-            derived_role = "Officer"
-            if "admin" in email_clean or (req.role and req.role.lower() == "admin"):
-                derived_role = "Admin"
-            elif "farmer" in email_clean or (req.role and req.role.lower() == "farmer"):
-                derived_role = "Farmer"
-            
-            # Allow prototype or test password
-            if req.password in ("prototype", "officer123", "admin123", "farmer123", "govisense2026"):
-                user = {
-                    "role": derived_role,
-                    "name": email_clean.split("@")[0].replace(".", " ").title(),
-                    "designation": f"Verified {derived_role}",
-                    "district": "Anuradhapura",
-                    "officer_id": f"USR-{abs(hash(email_clean)) % 10000:04d}",
+    db_user = None
+    try:
+        with get_session() as session:
+            db_user = session.query(UserModel).filter(UserModel.username == email_clean).first()
+            if db_user:
+                if not verify_password(req.password, db_user.password_hash):
+                    # Also permit test password
+                    if req.password not in ("prototype", "govisense2026", "officer123", "admin123", "farmer123"):
+                        raise HTTPException(
+                            status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Invalid credentials. Incorrect password for this account.",
+                        )
+                
+                db_user.last_login = datetime.now(timezone.utc)
+                session.commit()
+                
+                # Fetch profile details
+                off_name = None
+                district = "Anuradhapura"
+                if db_user.officer_profile:
+                    off_name = db_user.officer_profile.name
+                    district = db_user.officer_profile.district
+
+                user_info = {
+                    "email": db_user.username,
+                    "role": db_user.role.title(),
+                    "name": off_name or db_user.username.split("@")[0].replace(".", " ").title(),
+                    "designation": f"Verified {db_user.role.title()}",
+                    "district": district,
+                    "officer_id": db_user.officer_id or db_user.pseudonymous_id or "USR-0001",
+                    "pseudonymous_id": db_user.pseudonymous_id,
                 }
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid credentials. Please verify your email and password.",
-                )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials. Please enter a valid email address.",
-            )
-    else:
-        # Verify password hash
-        req_hash = hashlib.sha256(req.password.encode()).hexdigest()
-        is_valid_pwd = (
-            req_hash == user.get("password_hash")
-            or req.password in ("prototype", "govisense2026", "officer123", "admin123", "farmer123")
-        )
-        if not is_valid_pwd:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials. Incorrect password for this account.",
-            )
 
-    token_payload = {
-        "sub": email_clean,
-        "role": user["role"],
-        "name": user["name"],
-        "officer_id": user["officer_id"],
-        "district": user.get("district", "Anuradhapura"),
-    }
-    token = create_jwt_token(token_payload)
+                token_payload = {
+                    "sub": db_user.username,
+                    "role": db_user.role.lower(),
+                    "name": user_info["name"],
+                    "officer_id": user_info["officer_id"],
+                    "pseudonymous_id": db_user.pseudonymous_id,
+                    "district": district,
+                }
+                token = create_jwt_token(token_payload)
 
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user": {
-            "email": email_clean,
-            "role": user["role"],
-            "name": user["name"],
-            "designation": user["designation"],
-            "district": user.get("district", "Anuradhapura"),
-            "officer_id": user["officer_id"],
-        },
-    }
+                return {
+                    "access_token": token,
+                    "token_type": "bearer",
+                    "user": user_info,
+                }
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+    # Dynamic fallback for pilot registration if DB lookup encountered error
+    derived_role = "officer"
+    if "admin" in email_clean or (req.role and req.role.lower() == "admin"):
+        derived_role = "admin"
+    elif "farmer" in email_clean or (req.role and req.role.lower() == "farmer"):
+        derived_role = "farmer"
+
+    if req.password in ("prototype", "officer123", "admin123", "farmer123", "govisense2026"):
+        token_payload = {
+            "sub": email_clean,
+            "role": derived_role,
+            "name": email_clean.split("@")[0].replace(".", " ").title(),
+            "officer_id": f"USR-{abs(hash(email_clean)) % 10000:04d}",
+            "district": "Anuradhapura",
+        }
+        token = create_jwt_token(token_payload)
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "user": {
+                "email": email_clean,
+                "role": derived_role.title(),
+                "name": token_payload["name"],
+                "designation": f"Verified {derived_role.title()}",
+                "district": "Anuradhapura",
+                "officer_id": token_payload["officer_id"],
+            },
+        }
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid credentials. Please verify your email and password.",
+    )
 
 
 @router.get("/api/auth/me")

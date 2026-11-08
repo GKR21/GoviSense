@@ -1,0 +1,27 @@
+{
+  "GLUT_WARNING": {
+    "en": "Supply Pressure Index for {crop} indicates high risk of market glut in {month}. Projected supply exceeds demand by {excess_pct}%.",
+    "si": "{month} මාසයේදී {crop} සඳහා සැපයුම් පීඩන දර්ශකය මඟින් වෙළඳපල අතිරික්තයක් (Glut) ඇතිවීමේ ඉහළ අවදානමක් පෙන්නුම් කරයි. පුරෝකථනය කරන ලද සැපයුම ඉල්ලුමට වඩා {excess_pct}% කින් වැඩිය.",
+    "ta": "{month} மாதத்தில் {crop} பயிருக்கான விநியோக அழுத்தக் குறியீடு சந்தையில் அதிகப்படியான விநியோக அபாயத்தை (Glut) காட்டுகிறது. உத்தேச விநியோகம் தேவையை விட {excess_pct}% அதிகமாக உள்ளது."
+  },
+  "SHORTAGE_RISK": {
+    "en": "Supply Pressure Index for {crop} indicates critical shortage risk in {month}. Supply deficit estimated at {deficit_mt} MT.",
+    "si": "{month} මාසයේදී {crop} සඳහා සැපයුම් පීඩන දර්ශකය මඟින් තීරණාත්මක හිඟයක් (Shortage) පෙන්නුම් කරයි. ඇස්තමේන්තුගත හිඟය මෙට්‍රික් ටොන් {deficit_mt} කි.",
+    "ta": "{month} மாதத்தில் {crop} பயிருக்கு கடுமையான பற்றாக்குறை ஆபத்து (Shortage) உள்ளது என விநியோக அழுத்தக் குறியீடு காட்டுகிறது. உத்தேச பற்றாக்குறை {deficit_mt} மெட்ரிக் தொன்."
+  },
+  "IMPORT_WINDOW_CLOSING": {
+    "en": "Decision deadline for {crop} import policy is approaching in {days_left} days ({deadline}). Action required: {recommended_action}.",
+    "si": "{crop} ආනයන ප්‍රතිපත්ති තීරණ ගැනීමේ අවසන් දිනය තව දින {days_left} කින් ({deadline}) එළඹේ. නිර්දේශිත ක්‍රියාමාර්ගය: {recommended_action}.",
+    "ta": "{crop} இறக்குமதி கொள்கை முடிவுக்கான காலக்கெடு இன்னும் {days_left} நாட்களில் ({deadline}) முடிவடைகிறது. பரிந்துரைக்கப்பட்ட நடவடிக்கை: {recommended_action}."
+  },
+  "TARGET_FULL_WARNING": {
+    "en": "Target planting acreage for {crop} in {district} has reached 110% of seasonal quota. Recommended action: STOP planting or switch to alternative crops.",
+    "si": "{district} දිස්ත්‍රික්කයේ {crop} සඳහා ඉලක්කගත වගා බිම් ප්‍රමාණය කන්නයේ ඉලක්කයෙන් 110% ඉක්මවා ඇත. නිර්දේශය: වගා කිරීම නවත්වන්න හෝ විකල්ප බෝග වෙත මාරු වන්න.",
+    "ta": "{district} மாவட்டத்தில் {crop} பயிருக்கான உத்தேச பயிர்ச்செய்கை பரப்பு பருவகால இலக்கின் 110% ஐ எட்டியுள்ளது. பரிந்துரை: பயிரிடுவதை நிறுத்துங்கள் அல்லது மாற்று பயிர்களுக்கு மாறுங்கள்."
+  },
+  "PRICE_DROP_ALERT": {
+    "en": "Wholesale price forecast for {crop} in {month} indicates downward pressure below {floor_price} Rs/kg.",
+    "si": "{month} මාසයේදී {crop} තොග මිල කිලෝවකට රු. {floor_price} ට වඩා අඩුවීමේ ප්‍රවණතාවක් පුරෝකථනය කර ඇත.",
+    "ta": "{month} மாதத்தில் {crop} மொத்த விலை கிலோவுக்கு ரூ. {floor_price} இற்கும் குறையும் என கணிக்கப்பட்டுள்ளது."
+  }
+}

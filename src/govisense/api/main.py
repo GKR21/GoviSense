@@ -5,6 +5,9 @@ AI 3 (Supply Pressure Index), and AI 4 (Gap-Filling Optimization).
 Also provides WP2 endpoints: /api/farmer/top3 (farmer crop recommendation).
 """
 
+from contextlib import asynccontextmanager
+import logging
+
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -42,28 +45,64 @@ from govisense.db import (
     MonthlyDataModel,
     AlertModel,
     AlertStatusModel,
+    EvaluationResultModel,
 )
 from govisense.simulation.agent_sim import MarketAdoptionSimulator, calculate_interval_coverage
 from govisense.provenance import compute_data_version, compute_model_version, get_git_commit
 from govisense.evaluation.backtest import run_walk_forward_evaluation
-from govisense.api.routes.auth import router as auth_router
 
-app = FastAPI(
-    title="GoviSense API",
-    description="Agricultural Supply Pressure & Price Forecasting System for Sri Lanka",
-    version="1.0.0"
+# Import modular routers
+from govisense.api.routes.auth import (
+    router as auth_router,
+    ensure_seed_users,
+    login_user,
+    LoginPayload,
+)
+from govisense.api.routes.alerts import (
+    router as alerts_router,
+    list_alerts,
+    acknowledge_alert,
+    AlertAckPayload,
+    OfficerNoteRequest,
+    AskOfficerRequest,
+)
+from govisense.api.routes.feedback import (
+    router as feedback_router,
+    list_ground_reports,
+    submit_planting_report,
+    submit_harvest_report,
+    get_planting_reports,
+    retrigger_pipeline,
+)
+from govisense.api.routes.data import (
+    router as data_router,
+    list_data_catalogue,
+    get_sources_summary,
+    get_adoption_summary,
+    get_latest_prices,
+    get_evaluation_scoreboard,
+)
+from govisense.api.routes.officer import (
+    router as officer_router,
+    list_pipeline_runs,
+    get_pipeline_run_detail,
+    save_decision_action,
+    get_officer_decision_history,
+)
+from govisense.api.routes.farmer import (
+    router as farmer_router,
+    farmer_top3_recommendations,
+    create_or_update_farmer_profile,
+    get_farmer_history,
 )
 
-# Enable CORS for React frontend (localhost:8443)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+# Configure structured logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
+logger = logging.getLogger("govisense.api")
 
-app.include_router(auth_router)
 
 # Global in-memory cache for models and data
 cached_df: Optional[pd.DataFrame] = None
@@ -86,7 +125,6 @@ def _ensure_models_loaded():
         load_and_train()
 
 
-@app.on_event("startup")
 def load_and_train():
     global cached_df, a1_models, a2_models
     try:
@@ -112,6 +150,39 @@ def load_and_train():
         a2_models[crop] = a2
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """FastAPI application lifespan: load models, initialize DB, seed users."""
+    load_and_train()
+    ensure_seed_users()
+    yield
+
+
+app = FastAPI(
+    title="GoviSense API",
+    description="Agricultural Supply Pressure & Price Forecasting System for Sri Lanka",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+# Configured CORS: explicit allowed origins, no wildcard credential security risk
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount modular routers
+app.include_router(auth_router)
+app.include_router(alerts_router)
+app.include_router(feedback_router)
+app.include_router(data_router)
+app.include_router(officer_router)
+app.include_router(farmer_router)
+
+
 @app.get("/")
 def root():
     return {
@@ -130,11 +201,21 @@ def health():
     d_ver = compute_data_version()
     m_ver = compute_model_version()
     g_commit = get_git_commit()
+
+    data_age_days = 15
+    try:
+        if cached_df is not None and "date" in cached_df.columns:
+            latest_date = pd.to_datetime(cached_df["date"]).max()
+            data_age_days = max(1, (datetime.now() - latest_date).days)
+    except Exception:
+        data_age_days = 15
+
     return {
         "status": "ok",
         "active_database": dialect,
         "dialect": dialect,
         "is_fallback": is_fallback,
+        "data_age_days": data_age_days,
         "data_version": d_ver,
         "model_version": m_ver,
         "git_commit": g_commit,
@@ -236,9 +317,85 @@ def get_latest_forecasts():
     d_ver = compute_data_version()
     m_ver = compute_model_version()
     g_commit = get_git_commit()
+    run_id = f"RUN-{g_commit[:7]}"
+
+    # Phase 3.2: Persist pipeline execution and forecast snapshots to database
+    try:
+        with get_session() as session:
+            run_rec = session.query(PipelineRunModel).filter(PipelineRunModel.run_id == run_id).first()
+            if not run_rec:
+                run_rec = PipelineRunModel(
+                    run_id=run_id,
+                    trigger="scheduled",
+                    model_version=m_ver,
+                    data_version=d_ver,
+                    git_commit=g_commit[:40],
+                    assumptions={
+                        "loss_pct": 0.15,
+                        "import_lead_weeks": 7,
+                        "spi_bands": [0.8, 1.2],
+                        "cif_colombo": settings.cif_colombo_rs_per_mt,
+                    },
+                )
+                session.add(run_rec)
+                session.commit()
+
+            for crop, c_res in results.items():
+                target_month = c_res["target_period"]
+                snap = (
+                    session.query(ForecastSnapshotModel)
+                    .filter(
+                        ForecastSnapshotModel.run_id == run_id,
+                        ForecastSnapshotModel.crop_id == crop,
+                        ForecastSnapshotModel.forecast_for_month == target_month,
+                    )
+                    .first()
+                )
+                ai1 = c_res["ai1_harvest_forecast"]
+                ai3 = c_res["ai3_supply_pressure_index"]
+                ai2 = c_res["ai2_price_forecast"]
+                w_price = ai2.get("wholesale_price_rs_kg", 150.0)
+                r_price = compute_modeled_retail_price(w_price, crop=crop)
+
+                if not snap:
+                    snap = ForecastSnapshotModel(
+                        run_id=run_id,
+                        crop_id=crop,
+                        district=settings.pilot_district,
+                        season=target_month,
+                        forecast_for_month=target_month,
+                        horizon_months=1,
+                        price_p10=ai2.get("lower_bound_rs_kg"),
+                        price_p50=w_price,
+                        price_p90=ai2.get("upper_bound_rs_kg"),
+                        retail_price_rs_kg=round(r_price, 2),
+                        retail_price_method="CBSL-calibrated-margin",
+                        supply_low_mt=ai1.get("lower_bound_10_mt"),
+                        supply_mid_mt=ai1.get("point_forecast_mt", 0.0),
+                        supply_high_mt=ai1.get("upper_bound_90_mt"),
+                        demand_mt=ai3.get("projected_demand_mt", 0.0),
+                        spi_ratio_low=ai3.get("scenarios", {}).get("low", {}).get("spi_ratio"),
+                        spi_ratio_mid=ai3.get("spi_ratio", 1.0),
+                        spi_ratio_high=ai3.get("scenarios", {}).get("high", {}).get("spi_ratio"),
+                        spi_label=ai3.get("spi_label", "BALANCED"),
+                        spi_raw=ai3.get("spi_score", 0.0),
+                        gap_best_mt=ai3.get("gap_mt"),
+                        gap_worst_mt=ai3.get("gap_mt"),
+                        import_lead_weeks=settings.import_lead_time_weeks.get(crop, 7),
+                        price_model_used=ai2.get("selected_model", "LightGBM"),
+                        supply_model_used="A1-HarvestVolume",
+                        confidence_badge="medium",
+                        confidence_score=75.0,
+                        data_quality="verified",
+                        is_demo=False,
+                    )
+                    session.add(snap)
+            session.commit()
+    except Exception as e:
+        logger.warning("Could not persist forecast snapshots to database: %s", e)
 
     return {
-        "run_id": f"RUN-{g_commit[:7]}",
+        "run_id": run_id,
         "data_version": d_ver,
         "model_version": m_ver,
         "data_quality": "real",
@@ -834,6 +991,7 @@ class HarvestReportPayload(BaseModel):
     crop_id: str
     season: str = "Maha 2025/2026"
     area_harvested_ha: float
+    harvest_date: Optional[str] = None
     harvest_quantity_kg: float
     loss_kg: float = 0.0
     quantity_sold_kg: float = 0.0
@@ -1140,406 +1298,71 @@ def get_price_outlook(crop_id: Optional[str] = Query(None)):
     }
 
 
-@app.get("/api/adoption/summary")
-def get_adoption_summary(
-    crop_id: str = Query("big_onion"),
-    season: str = Query("Maha 2025/2026"),
-):
+# ---------------------------------------------------------------------------
+# Re-exports & Aliases for Modular Routers (Phase 3.7 & 3.8)
+# ---------------------------------------------------------------------------
+
+from govisense.api.routes.data import (
+    get_adoption_summary,
+    list_data_catalogue,
+    get_latest_prices,
+    get_evaluation_scoreboard,
+)
+from govisense.api.routes.alerts import (
+    get_alerts as list_alerts,
+    acknowledge_alert,
+    ask_officer_inquiry as ask_officer_on_alert,
+)
+from govisense.api.routes.officer import (
+    list_runs as list_pipeline_runs,
+    get_run_detail as get_pipeline_run_by_id,
+    record_officer_decision,
+    simulate_scenario,
+)
+from govisense.api.routes.feedback import (
+    submit_planting_report,
+    submit_harvest_report,
+    list_ground_reports,
+    retrigger_pipeline,
+)
+from govisense.api.routes.farmer import (
+    farmer_top3_recommendations as farmer_top3,
+)
+
+
+class AlertAckPayload(BaseModel):
+    user_id: str = "USR-001"
+    ask_officer: bool = False
+    officer_note: Optional[str] = None
+
+
+def fill_forecast_actuals(
+    crop_id: str,
+    season: str,
+    actual_price_rs_kg: Optional[float] = None,
+    actual_production_mt: Optional[float] = None,
+) -> int:
     """
-    Dashboard Screen: Adoption Tracker
-    Provides:
-      1. Recommended vs Reported planting area.
-      2. Recommendation adherence breakdown (yes, partly, no).
-      3. Predicted vs Realized prices and harvest outcomes.
+    Fills actual price and production in matching forecast_snapshots rows
+    when post-harvest reports or CBSL prices arrive (Proposal 3.2).
     """
-    eff_crop = str(crop_id) if crop_id is not None and not hasattr(crop_id, "default") else (getattr(crop_id, "default", "big_onion") or "big_onion")
-    eff_season = str(season) if season is not None and not hasattr(season, "default") else (getattr(season, "default", "Maha 2025/2026") or "Maha 2025/2026")
     with get_session() as session:
-        reports = (
-            session.query(PlantingReportModel)
-            .filter(PlantingReportModel.crop_id == eff_crop, PlantingReportModel.season == eff_season)
+        snaps = (
+            session.query(ForecastSnapshotModel)
+            .filter(
+                ForecastSnapshotModel.crop_id == crop_id,
+                ForecastSnapshotModel.season == season,
+            )
             .all()
         )
-        harvests = (
-            session.query(HarvestReportModel)
-            .filter(HarvestReportModel.crop_id == eff_crop, HarvestReportModel.season == eff_season)
-            .all()
-        )
-
-    # Aggregations
-    total_reported_ha = sum(r.actual_area_ha or r.planned_area_ha for r in reports) if reports else 1420.0
-    target_area_ha = 2131.0 if eff_crop == "big_onion" else 1840.0
-    coverage_pct = round((total_reported_ha / target_area_ha) * 100.0, 1)
-
-    followed_yes = sum(1 for r in reports if r.followed_recommendation == "yes")
-    followed_partly = sum(1 for r in reports if r.followed_recommendation == "partly")
-    followed_no = sum(1 for r in reports if r.followed_recommendation == "no")
-    total_responses = max(1, followed_yes + followed_partly + followed_no)
-
-    if not reports:
-        # Default mock baseline when no reports submitted yet
-        followed_yes = 64
-        followed_partly = 24
-        followed_no = 12
-        total_responses = 100
-
-    adherence_pct = round((followed_yes / total_responses) * 100.0, 1)
-
-    # Realized outcomes
-    total_harvest_kg = sum(h.harvest_quantity_kg for h in harvests) if harvests else 2840000.0
-    avg_sale_price = (
-        round(sum(h.sale_price_rs_kg for h in harvests if h.sale_price_rs_kg) / max(1, len(harvests)), 1)
-        if harvests
-        else 355.0
-    )
-
-    return {
-        "crop_id": eff_crop,
-        "season": eff_season,
-        "district": "Anuradhapura",
-        "acreage": {
-            "target_area_ha": target_area_ha,
-            "reported_planted_area_ha": total_reported_ha,
-            "coverage_pct": coverage_pct,
-        },
-        "recommendation_adherence": {
-            "followed_yes_count": followed_yes,
-            "followed_partly_count": followed_partly,
-            "followed_no_count": followed_no,
-            "adherence_pct": adherence_pct,
-        },
-        "predicted_vs_actual": {
-            "predicted_price_rs_kg": 364.5,
-            "actual_realized_price_rs_kg": avg_sale_price,
-            "price_delta_pct": round(((avg_sale_price - 364.5) / 364.5) * 100, 2),
-            "predicted_production_mt": 2963.1,
-            "actual_harvested_production_mt": round(total_harvest_kg / 1000.0, 1),
-            "error_wape": 0.042,
-        },
-    }
-
-
-@app.get("/api/feedback/ground-reports")
-def list_ground_reports(
-    crop_id: Optional[str] = Query(None),
-    district: Optional[str] = Query("Anuradhapura"),
-    limit: int = Query(50),
-):
-    """
-    Dashboard Screen: Ground Reports List
-    Returns farmer planting submissions formatted for dashboard table.
-    Enforces Strict Privacy: No names, No phone numbers; pseudonymous IDs only.
-    """
-    eff_crop = str(crop_id) if crop_id is not None and not hasattr(crop_id, "default") else None
-    eff_district = str(district) if district is not None and not hasattr(district, "default") else (getattr(district, "default", "Anuradhapura") or "Anuradhapura")
-    eff_limit = int(limit) if limit is not None and not hasattr(limit, "default") else int(getattr(limit, "default", 50) or 50)
-
-    with get_session() as session:
-        q = session.query(PlantingReportModel)
-        if eff_crop:
-            q = q.filter(PlantingReportModel.crop_id == eff_crop)
-        if eff_district:
-            q = q.filter(PlantingReportModel.district == eff_district)
-        rows = q.order_by(PlantingReportModel.timestamp.desc()).limit(eff_limit).all()
-
-        formatted = []
-        for r in rows:
-            ha = r.actual_area_ha if r.actual_area_ha is not None else r.planned_area_ha
-            acres = round(ha * 2.47105, 2)
-            formatted.append({
-                "id": r.report_id,
-                "crop": settings.crops.get(r.crop_id, settings.crops["big_onion"]).name_en,
-                "crop_id": r.crop_id,
-                "areaAcres": acres,
-                "areaHa": ha,
-                "date": str(r.planting_date) if r.planting_date else str(r.timestamp)[:10],
-                "district": r.district,
-                "timestamp": str(r.timestamp)[:16],
-                "farmer": r.pseudonymous_id,
-                "status": "Verified" if r.actual_area_ha is not None else "Pending",
-            })
-        return {"ground_reports": formatted}
-
-
-@app.get("/api/catalogue")
-def list_data_catalogue():
-    """
-    Dashboard Screen: Data Sources Page (Registry)
-    Returns publisher, licence, temporal range, and primary data sources.
-    """
-    with get_session() as session:
-        records = session.query(DataCatalogueModel).all()
-        if not records:
-            # Seed default if empty
-            from scripts.init_database import DEMO_CATALOGUE
-            for cat in DEMO_CATALOGUE:
-                session.merge(DataCatalogueModel(**cat))
-            session.commit()
-            records = session.query(DataCatalogueModel).all()
-        return [r.to_dict() for r in records]
-
-
-@app.get("/api/catalogue/sources-summary")
-def get_sources_summary():
-    """
-    Dashboard Screen: Data Sources Page (Audit Transparency)
-    Calculates proportion of real vs. interpolated vs. synthetic records.
-    """
-    with get_session() as session:
-        total = session.query(MonthlyDataModel).count()
-        real = session.query(MonthlyDataModel).filter(MonthlyDataModel.source_type == "real").count()
-        interpolated = session.query(MonthlyDataModel).filter(MonthlyDataModel.source_type == "interpolated").count()
-        synthetic = session.query(MonthlyDataModel).filter(MonthlyDataModel.source_type == "synthetic").count()
-
-    if total == 0:
-        total = 338
-        real = 44
-        interpolated = 68
-        synthetic = 226
-
-    real_pct = round((real / total) * 100.0, 1)
-
-    return {
-        "total_records": total,
-        "real_count": real,
-        "interpolated_count": interpolated,
-        "synthetic_count": synthetic,
-        "real_pct": real_pct,
-        "data_freshness_days": 15,
-        "last_sync_date": datetime.now(timezone.utc).isoformat(),
-        "sources": [
-            {"name": "CBSL Retail Bulletin", "status": "Online", "licence": "Open Government Data"},
-            {"name": "HARTI Daily Market Reports", "status": "Online", "licence": "Public Domain"},
-            {"name": "DOA Socio-Economics (CPP)", "status": "Online", "licence": "DOA Research Access"},
-            {"name": "NASA POWER Weather Agroclimatology", "status": "Online", "licence": "NASA Open Science"},
-        ]
-    }
-
-
-@app.get("/api/runs")
-def list_pipeline_runs(limit: int = Query(20)):
-    """
-    Dashboard Screen: Run Traceability
-    Lists pipeline executions with git commit, model version, and exact assumptions snapshot.
-    """
-    eff_limit = int(limit) if limit is not None and not hasattr(limit, "default") else int(getattr(limit, "default", 20) or 20)
-    with get_session() as session:
-        runs = session.query(PipelineRunModel).order_by(PipelineRunModel.created_at.desc()).limit(eff_limit).all()
-        if not runs:
-            # Seed demo run if empty
-            demo_run = PipelineRunModel(
-                run_id="RUN-260404-18",
-                trigger="scheduled",
-                model_version="GoviSense-v2.4.1",
-                data_version="CPP 3.2 · HARTI 04/04 · 2,418 Live Ground Reports",
-                assumptions={
-                    "loss_pct": 0.12,
-                    "import_lead_weeks": 7,
-                    "farmgate_floor_rs_kg": 280.0,
-                    "spi_glut_threshold": 1.2,
-                    "spi_shortage_threshold": 0.8,
-                },
-                git_commit="c74caf1",
-            )
-            session.add(demo_run)
-            session.commit()
-            runs = [demo_run]
-        return [r.to_dict() for r in runs]
-
-
-@app.get("/api/alerts")
-def list_alerts(limit: int = Query(20)):
-    """
-    Dashboard Screen: In-App Alerts for Extension Officers & Farmers
-    """
-    eff_limit = int(limit) if limit is not None and not hasattr(limit, "default") else int(getattr(limit, "default", 20) or 20)
-    with get_session() as session:
-        alerts = session.query(AlertModel).order_by(AlertModel.created_at.desc()).limit(eff_limit).all()
-        if not alerts:
-            # Seed demo alert if empty
-            demo_alert = AlertModel(
-                alert_id="ALT-2026-001",
-                crop_id="big_onion",
-                district="Anuradhapura",
-                type="GLUT_WARNING",
-                severity="critical",
-                message_key="alert.glut.delay_planting",
-                params={"spi_ratio": 1.28, "month": "2026-04", "recommended_action": "STORE"},
-            )
-            session.add(demo_alert)
-            session.commit()
-            alerts = [demo_alert]
-        return [a.to_dict() for a in alerts]
-
-
-@app.post("/api/alerts/{alert_id}/acknowledge")
-def acknowledge_alert(alert_id: str, payload: AlertAckPayload):
-    """
-    Acknowledge an alert and record optional officer assistance request.
-    """
-    with get_session() as session:
-        status = AlertStatusModel(
-            alert_id=alert_id,
-            user_id=payload.user_id,
-            read_at=datetime.now(timezone.utc),
-            acknowledged_at=datetime.now(timezone.utc),
-            ask_officer=payload.ask_officer,
-            officer_note=payload.officer_note,
-        )
-        session.add(status)
+        for s in snaps:
+            if actual_price_rs_kg is not None:
+                s.actual_price_rs_kg = actual_price_rs_kg
+            if actual_production_mt is not None:
+                s.actual_production_mt = actual_production_mt
         session.commit()
-        return {"status": "ACKNOWLEDGED", "alert_id": alert_id}
+        return len(snaps)
 
-
-@app.post("/api/auth/login")
-def login_user(payload: LoginPayload):
-    """
-    Dashboard Screen: Authentication & Role Check
-    """
-    # Demo credentials verification for officer, farmer, admin
-    valid_roles = ["officer", "farmer", "admin"]
-    role = payload.role if payload.role in valid_roles else "officer"
-    
-    return {
-        "status": "SUCCESS",
-        "token": f"govisense-jwt-{uuid.uuid4().hex[:12]}",
-        "user": {
-            "username": payload.username,
-            "role": role,
-            "name": "Dr. N. Ranasinghe" if role == "officer" else "Authenticated User",
-            "designation": "Chief Agricultural Economist" if role == "officer" else "Registered User",
-            "district": "Anuradhapura",
-        }
-    }
-
-
-@app.get("/api/runs/{run_id}")
-def get_pipeline_run_by_id(run_id: str):
-    """Fetches details of a specific pipeline execution run."""
-    with get_session() as session:
-        run = session.query(PipelineRunModel).filter_by(run_id=run_id).first()
-        if not run:
-            from fastapi import HTTPException
-            raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
-        data = run.to_dict()
-        data["forecast_count"] = session.query(ForecastSnapshotModel).filter_by(run_id=run_id).count()
-        data["decision_count"] = session.query(DecisionRecordModel).filter_by(run_id=run_id).count()
-        return data
-
-
-@app.post("/api/alerts/{alert_id}/ack")
-def acknowledge_alert_ack_alias(alert_id: str, payload: AlertAckPayload):
-    """Contract alias for /api/alerts/{alert_id}/acknowledge"""
-    return acknowledge_alert(alert_id, payload)
-
-
-@app.post("/api/alerts/{alert_id}/ask-officer")
-def ask_officer_on_alert(alert_id: str, payload: Dict[str, Any]):
-    """Farmer inquiry on an active warning alert."""
-    farmer_id = payload.get("farmer_id", "FARMER-UNKNOWN")
-    question = payload.get("question", "")
-    with get_session() as session:
-        status = AlertStatusModel(
-            alert_id=alert_id,
-            user_id=farmer_id,
-            read_at=datetime.now(timezone.utc),
-            acknowledged_at=datetime.now(timezone.utc),
-            ask_officer=True,
-            officer_note=f"Inquiry: {question}",
-        )
-        session.add(status)
-        session.commit()
-        return {
-            "status": "INQUIRY_SENT",
-            "alert_id": alert_id,
-            "farmer_id": farmer_id,
-        }
-
-
-@app.get("/api/prices/latest")
-def get_latest_prices():
-    """Current wholesale and retail market prices with provenance."""
-    _ensure_models_loaded()
-    prices = []
-    as_of_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    for crop in ["big_onion", "chilli"]:
-        crop_df = cached_df[cached_df["crop"] == crop].sort_values("date").dropna(subset=["wholesale_price_rs_kg"])
-        if not crop_df.empty:
-            latest = crop_df.iloc[-1]
-            as_of_date = str(latest["year_month"])
-            w_price = float(latest["wholesale_price_rs_kg"])
-            r_price = (
-                float(latest["retail_price_rs_kg"])
-                if pd.notna(latest.get("retail_price_rs_kg"))
-                else compute_modeled_retail_price(w_price, crop=crop)
-            )
-            prices.append({
-                "crop": crop,
-                "market": "Dambulla Dedicated Economic Centre",
-                "date": str(latest["year_month"]),
-                "wholesale_price_rs_kg": w_price,
-                "retail_price_rs_kg": round(r_price, 2),
-                "data_quality": "real",
-                "is_outdated": False,
-            })
-    return {"as_of": as_of_date, "prices": prices}
-
-
-@app.get("/api/evaluation/scoreboard")
-def get_evaluation_scoreboard():
-    """Walk-forward evaluation scoreboard (WAPE, coverage, baseline comparisons)."""
-    report = run_walk_forward_evaluation()
-    d_ver = compute_data_version()
-    m_ver = compute_model_version()
-    g_commit = get_git_commit()
-    run_id = f"RUN-{g_commit[:7]}"
-
-    scoreboard = []
-    for crop in ["big_onion", "chilli"]:
-        c_data = report.get(crop, {})
-        a3 = c_data.get("a3_supply_forecast", {})
-        a2 = c_data.get("a2_price_forecast", {})
-
-        wape_m1 = a3.get("wape_model")
-        wape_b1 = a3.get("wape_baseline")
-        beat1 = (wape_m1 is not None and wape_b1 is not None) and (wape_m1 < wape_b1)
-        scoreboard.append({
-            "crop": crop,
-            "module": "A3 Supply Forecast",
-            "model_wape": wape_m1,
-            "baseline_wape": wape_b1,
-            "served_model": a3.get("source", "baseline"),
-            "beat_baseline": beat1,
-            "interval_80_coverage_pct": a3.get("interval_80_coverage_pct", 75.0),
-            "eval_points": a3.get("eval_points", 48),
-            "verdict": "Usable" if beat1 or a3.get("source") else "Not usable",
-        })
-
-        wape_m2 = a2.get("wape_model")
-        wape_b2 = a2.get("wape_baseline")
-        beat2 = (wape_m2 is not None and wape_b2 is not None) and (wape_m2 < wape_b2)
-        scoreboard.append({
-            "crop": crop,
-            "module": "A2 Price Forecast",
-            "model_wape": wape_m2,
-            "baseline_wape": wape_b2,
-            "served_model": a2.get("source", "model"),
-            "beat_baseline": beat2,
-            "interval_80_coverage_pct": None,
-            "eval_points": a2.get("eval_points", 48),
-            "verdict": "Usable" if beat2 else "Usable with limits",
-        })
-
-    return {
-        "run_id": run_id,
-        "data_version": d_ver,
-        "model_version": m_ver,
-        "data_quality": "real",
-        "is_demo": False,
-        "served_model": "LightGBM + Baseline Selector",
-        "assumptions_ref": "docs/assumptions.md",
-        "scoreboard": scoreboard,
-    }
 
 
 

@@ -38,6 +38,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, relationship
 
+import bcrypt
+import hmac
+
 from govisense.provenance import (
     compute_data_version,
     compute_model_version,
@@ -45,6 +48,33 @@ from govisense.provenance import (
 )
 
 Base = declarative_base()
+
+
+def hash_password(plain_password: str) -> str:
+    """Hash password using bcrypt."""
+    salt = bcrypt.gensalt(rounds=12)
+    return bcrypt.hashpw(plain_password.encode("utf-8"), salt).decode("utf-8")
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify password against bcrypt hash or fallback to legacy SHA-256 for transition."""
+    if not hashed_password:
+        return False
+    if hashed_password.startswith("$2b$") or hashed_password.startswith("$2a$"):
+        try:
+            return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+        except Exception:
+            return False
+    sha = hashlib.sha256(plain_password.encode("utf-8")).hexdigest()
+    return hmac.compare_digest(sha, hashed_password)
+
+
+def validate_season_format(season: str) -> bool:
+    """Validates season format: e.g. Maha 2024/2025, Yala 2025."""
+    import re
+    if not season or not isinstance(season, str):
+        return False
+    return bool(re.match(r"^(Maha\s+\d{4}/\d{4}|Yala\s+\d{4})$", season.strip(), re.IGNORECASE))
 
 
 def compute_sha256_hash(data: Dict[str, Any]) -> str:
@@ -76,6 +106,7 @@ class PipelineRunModel(Base):
     decisions = relationship("DecisionRecordModel", back_populates="run", cascade="all, delete-orphan")
     forecasts = relationship("ForecastSnapshotModel", back_populates="run", cascade="all, delete-orphan")
     alerts = relationship("AlertModel", back_populates="run", cascade="all, delete-orphan")
+    evaluations = relationship("EvaluationResultModel", back_populates="run", cascade="all, delete-orphan")
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -379,6 +410,7 @@ class HarvestReportModel(Base):
     __table_args__ = (
         CheckConstraint("harvest_quantity_kg >= 0", name="chk_harvest_qty_positive"),
         CheckConstraint("area_harvested_ha > 0", name="chk_harvest_area_positive"),
+        CheckConstraint("quantity_sold_kg + loss_kg + quantity_stored_kg <= harvest_quantity_kg + 0.01", name="chk_disposition_le_harvest"),
         Index("idx_harvest_crop_season", "crop_id", "season"),
     )
 
@@ -392,6 +424,11 @@ class HarvestReportModel(Base):
         if self.area_harvested_ha and self.area_harvested_ha > 0:
             return round((self.harvest_quantity_kg / 1000.0) / self.area_harvested_ha, 2)
         return 0.0
+
+    @yield_mt_per_ha.setter
+    def yield_mt_per_ha(self, val: float):
+        # Dynamically derived from harvest_quantity_kg and area_harvested_ha
+        pass
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -441,6 +478,7 @@ class ForecastSnapshotModel(Base):
     price_p50 = Column(Float, nullable=False)  # predicted farmgate price
     price_p90 = Column(Float, nullable=True)
     retail_price_rs_kg = Column(Float, nullable=True)
+    retail_price_method = Column(String(50), nullable=False, default="CBSL-calibrated-margin")
     retail_price_p10 = Column(Float, nullable=True)
     retail_price_p90 = Column(Float, nullable=True)
 
@@ -455,6 +493,7 @@ class ForecastSnapshotModel(Base):
     spi_ratio_mid = Column(Float, nullable=False)
     spi_ratio_high = Column(Float, nullable=True)
     spi_label = Column(String(20), nullable=False)  # GLUT, SHORTAGE, BALANCED
+    spi_raw = Column(Float, nullable=True)          # Raw ratio or metric
     spi_delta_mid = Column(Float, nullable=True)    # Optional (S - D) / D
 
     # Optimization Gap & Decision Deadlines
@@ -469,6 +508,7 @@ class ForecastSnapshotModel(Base):
     supply_model_used = Column(String(50), nullable=False, default="A1-Baseline-Lagged-SMA")
     confidence_badge = Column(String(20), nullable=False, default="medium")  # high, medium, low
     confidence_score = Column(Float, nullable=False, default=60.0)  # 0 to 100%
+    data_quality = Column(String(30), nullable=False, default="verified")  # verified, estimated, no_data
     is_demo = Column(Boolean, nullable=False, default=False)
 
     # Evaluation Ground Truth (Filled post-harvest for walk-forward validation)
@@ -497,6 +537,7 @@ class ForecastSnapshotModel(Base):
             "price_p50": float(self.price_p50),
             "price_p90": float(self.price_p90) if self.price_p90 is not None else None,
             "retail_price_rs_kg": float(self.retail_price_rs_kg) if self.retail_price_rs_kg is not None else None,
+            "retail_price_method": self.retail_price_method,
             "supply_low_mt": float(self.supply_low_mt) if self.supply_low_mt is not None else None,
             "supply_mid_mt": float(self.supply_mid_mt),
             "supply_high_mt": float(self.supply_high_mt) if self.supply_high_mt is not None else None,
@@ -505,6 +546,7 @@ class ForecastSnapshotModel(Base):
             "spi_ratio_mid": float(self.spi_ratio_mid),
             "spi_ratio_high": float(self.spi_ratio_high) if self.spi_ratio_high is not None else None,
             "spi_label": self.spi_label,
+            "spi_raw": float(self.spi_raw) if self.spi_raw is not None else None,
             "spi_delta_mid": float(self.spi_delta_mid) if self.spi_delta_mid is not None else None,
             "gap_best_mt": float(self.gap_best_mt) if self.gap_best_mt is not None else None,
             "gap_worst_mt": float(self.gap_worst_mt) if self.gap_worst_mt is not None else None,
@@ -515,6 +557,7 @@ class ForecastSnapshotModel(Base):
             "supply_model_used": self.supply_model_used,
             "confidence_badge": self.confidence_badge,
             "confidence_score": float(self.confidence_score),
+            "data_quality": self.data_quality,
             "is_demo": bool(self.is_demo),
             "actual_price_rs_kg": float(self.actual_price_rs_kg) if self.actual_price_rs_kg is not None else None,
             "actual_production_mt": float(self.actual_production_mt) if self.actual_production_mt is not None else None,
@@ -679,3 +722,48 @@ class AlertStatusModel(Base):
             "ask_officer": bool(self.ask_officer),
             "officer_note": self.officer_note,
         }
+
+
+# ===========================================================================
+# 7. Model Evaluation Scoreboard & Backtest Ledger
+# ===========================================================================
+
+class EvaluationResultModel(Base):
+    """
+    Model Evaluation Scoreboard & Backtest Results Ledger.
+    Corresponds to PostgreSQL table: evaluation_results
+    """
+    __tablename__ = "evaluation_results"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    run_id = Column(String(36), ForeignKey("runs.run_id"), nullable=True, index=True)
+    crop_id = Column(String(50), nullable=False, index=True)
+    model_name = Column(String(50), nullable=False)   # A1_harvest, A2_price, A3_spi, etc.
+    metric_name = Column(String(50), nullable=False)  # WAPE, MAE, RMSE, coverage_80, warning_precision, warning_recall
+    metric_value = Column(Float, nullable=False)
+    baseline_name = Column(String(50), nullable=True) # seasonal_naive, dummy_majority
+    baseline_value = Column(Float, nullable=True)
+    beat_baseline = Column(Boolean, nullable=False, default=True)
+    evaluation_period = Column(String(50), nullable=True) # e.g. "2020-2024", "fold_5"
+    details = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+
+    # Relationships
+    run = relationship("PipelineRunModel", back_populates="evaluations")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "run_id": self.run_id,
+            "crop_id": self.crop_id,
+            "model_name": self.model_name,
+            "metric_name": self.metric_name,
+            "metric_value": float(self.metric_value),
+            "baseline_name": self.baseline_name,
+            "baseline_value": float(self.baseline_value) if self.baseline_value is not None else None,
+            "beat_baseline": bool(self.beat_baseline),
+            "evaluation_period": self.evaluation_period,
+            "details": self.details or {},
+            "created_at": self.created_at.isoformat() if hasattr(self.created_at, "isoformat") else str(self.created_at),
+        }
+

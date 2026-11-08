@@ -6,6 +6,9 @@ Team DARKBITE · ModelX 2.0 Proposal Specification
 from govisense.db.models import (
     Base,
     compute_sha256_hash,
+    hash_password,
+    verify_password,
+    validate_season_format,
     PipelineRunModel,
     DecisionRecordModel,
     FarmerProfileModel,
@@ -18,6 +21,7 @@ from govisense.db.models import (
     MonthlyDataModel,
     AlertModel,
     AlertStatusModel,
+    EvaluationResultModel,
 )
 from govisense.db.session import (
     get_engine,
@@ -48,6 +52,10 @@ __all__ = [
     "MonthlyDataModel",
     "AlertModel",
     "AlertStatusModel",
+    "EvaluationResultModel",
+    "hash_password",
+    "verify_password",
+    "validate_season_format",
     "get_engine",
     "get_session",
     "get_db",

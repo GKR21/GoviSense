@@ -318,6 +318,8 @@ class DecisionHistoryStore:
             pass
 
     def _save(self) -> None:
+        if self.sync_db:
+            return  # Production path: DB only, no runtime write to json
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.storage_path, "w", encoding="utf-8") as f:
             json.dump([asdict(r) for r in self._records], f, indent=2)
