@@ -21,6 +21,48 @@ from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from govisense.config import settings
 from govisense.models.demand_estimator import DemandEstimator
+from govisense.data.crop_requirements import load_crop_requirements
+
+
+def compute_harvest_month(planting_month: int, duration_months: float = 3.5) -> int:
+    """
+    Compute harvest peak month = planting month + duration (rounded).
+    e.g. big onion duration = 3.5 months -> 4 months lag.
+    """
+    duration_int = int(round(duration_months))
+    return ((planting_month + duration_int - 1) % 12) + 1
+
+
+def compute_phenology_supply(
+    planted_area_ha: float,
+    yield_mt_ha: float,
+    loss_pct: float = 0.15,
+    unreported_area_ratio: Optional[float] = None,
+) -> Dict[str, Any]:
+    """
+    Agronomic supply with phenology spread and unreported smallholder plots.
+    Supply = area * yield * (1 - post_harvest_loss).
+    Phenology curve spreads harvest: 20% in month t, 60% in month t+1, 20% in month t+2.
+    """
+    if unreported_area_ratio is None:
+        unreported_area_ratio = (settings.unreported_area_ratio_min + settings.unreported_area_ratio_max) / 2.0
+
+    effective_area_ha = planted_area_ha * (1.0 + unreported_area_ratio)
+    total_effective_supply_mt = effective_area_ha * yield_mt_ha * (1.0 - loss_pct)
+
+    return {
+        "planted_area_ha": round(planted_area_ha, 1),
+        "unreported_area_ratio": round(unreported_area_ratio, 3),
+        "effective_area_ha": round(effective_area_ha, 1),
+        "yield_mt_ha": round(yield_mt_ha, 2),
+        "loss_pct": round(loss_pct, 2),
+        "total_effective_supply_mt": round(total_effective_supply_mt, 1),
+        "phenology_curve": {
+            "early_month_20pct": round(total_effective_supply_mt * 0.20, 1),
+            "peak_month_60pct": round(total_effective_supply_mt * 0.60, 1),
+            "late_month_20pct": round(total_effective_supply_mt * 0.20, 1),
+        },
+    }
 
 
 @dataclass
@@ -60,8 +102,14 @@ class SupplyPressureEngine:
     def __init__(self):
         self.glut_threshold = settings.spi_glut_threshold
         self.shortage_threshold = settings.spi_shortage_threshold
+        self.glut_ratio_threshold = settings.spi_ratio_glut_threshold
+        self.shortage_ratio_threshold = settings.spi_ratio_shortage_threshold
         self.crops_cfg = settings.crops
         self._demand_estimator = DemandEstimator()
+        try:
+            self._crop_reqs = load_crop_requirements()
+        except Exception:
+            self._crop_reqs = {}
 
     def project_monthly_demand(self, crop: str, month: int, scenario: str = "mid") -> float:
         """
@@ -82,12 +130,15 @@ class SupplyPressureEngine:
         supply_low_mt: Optional[float] = None,
         supply_high_mt: Optional[float] = None,
         loss_pct: float = 0.15,
+        glut_ratio_threshold: Optional[float] = None,
+        shortage_ratio_threshold: Optional[float] = None,
     ) -> SPIResult:
         """
         Compute SPI score using forecast supply vs projected demand.
-        Calculates both the ratio formula (SPI = Supply / Demand, bands 0.8 / 1.2)
-        and deviation formula (SPI = (Supply - Demand) / Demand, bands ±0.15).
-        Generates low, mid, and high uncertainty scenarios.
+        Primary SPI: Ratio formula (SPI = Supply / Demand, bands 0.8 / 1.2).
+        Secondary field: Deviation formula (SPI = (Supply - Demand) / Demand).
+        Generates low, mid, and high uncertainty scenarios by varying yield
+        across historical percentiles (10th, 50th, 90th), keeping demand at projected demand.
         """
         demand_est_mid = self._demand_estimator.estimate(crop, month, scenario="mid")
         demand_est_low = self._demand_estimator.estimate(crop, month, scenario="low")
@@ -100,7 +151,8 @@ class SupplyPressureEngine:
         effective_supply = (forecast_supply_mt * net_retention) + (import_volume_mt * 0.40)
         gap_mt = effective_supply - projected_demand
 
-        # Delta formula: (S - D) / D
+        # Primary ratio formula: S / D
+        # Secondary delta formula: (S - D) / D
         if projected_demand <= 0:
             spi_score = 0.0
             spi_ratio = 1.0
@@ -111,48 +163,58 @@ class SupplyPressureEngine:
         spi_score = round(float(np.clip(spi_score, -0.65, 0.75)), 3)
         spi_ratio = round(float(np.clip(spi_ratio, 0.35, 1.75)), 3)
 
-        # Classification based on 0.8 / 1.2 ratio bands (equivalent to ±0.15/0.20 delta)
-        if spi_ratio > 1.20 or spi_score > self.glut_threshold:
+        glut_ratio = glut_ratio_threshold if glut_ratio_threshold is not None else self.glut_ratio_threshold
+        shortage_ratio = shortage_ratio_threshold if shortage_ratio_threshold is not None else self.shortage_ratio_threshold
+
+        # Primary classification based on 0.8 / 1.2 ratio bands (configurable in config.py, adjustable by officers)
+        if spi_ratio > glut_ratio or spi_score > self.glut_threshold:
             label = "Glut"
             action = "Oversupply detected: Farm-gate crash risk. Activate storage buffers / defer imports."
-        elif spi_ratio < 0.80 or spi_score < self.shortage_threshold:
+        elif spi_ratio < shortage_ratio or spi_score < self.shortage_threshold:
             label = "Shortage"
             action = "Deficit detected: Consumer price spike risk. Nudge planting expansion or plan targeted imports."
         else:
             label = "Balanced"
             action = "Supply & demand in equilibrium. Stable market conditions expected."
 
-        # Compute three scenarios (low, mid, high)
-        s_low = supply_low_mt if supply_low_mt is not None else forecast_supply_mt * 0.85
-        s_high = supply_high_mt if supply_high_mt is not None else forecast_supply_mt * 1.15
+        # Scenarios: vary yield across historical percentiles (10th, 50th, 90th), NOT vary demand
+        req_key = crop if crop != "chilli" else "chilli_green"
+        req = self._crop_reqs.get(req_key)
+        if req and req.yield_mid_mt_ha > 0:
+            ratio_p10 = req.yield_low_mt_ha / req.yield_mid_mt_ha
+            ratio_p90 = req.yield_high_mt_ha / req.yield_mid_mt_ha
+        else:
+            ratio_p10 = 0.80
+            ratio_p90 = 1.25
+
+        s_low = supply_low_mt if supply_low_mt is not None else forecast_supply_mt * ratio_p10
+        s_high = supply_high_mt if supply_high_mt is not None else forecast_supply_mt * ratio_p90
 
         eff_low = (s_low * net_retention) + (import_volume_mt * 0.40)
         eff_high = (s_high * net_retention) + (import_volume_mt * 0.40)
 
-        # Low scenario (pessimistic: lowest supply vs highest demand)
-        d_high = demand_est_high.demand_mt
-        gap_low = eff_low - d_high
-        ratio_low = eff_low / max(d_high, 1.0)
-        score_low = gap_low / max(d_high, 1.0)
-        label_low = "Glut" if ratio_low > 1.20 else ("Shortage" if ratio_low < 0.80 else "Balanced")
+        # Low scenario (10th percentile yield vs projected demand)
+        gap_low = eff_low - projected_demand
+        ratio_low = eff_low / max(projected_demand, 1.0)
+        score_low = gap_low / max(projected_demand, 1.0)
+        label_low = "Glut" if ratio_low > glut_ratio else ("Shortage" if ratio_low < shortage_ratio else "Balanced")
 
-        # Mid scenario
+        # Mid scenario (50th percentile yield vs projected demand)
         ratio_mid = spi_ratio
         score_mid = spi_score
         label_mid = label
 
-        # High scenario (optimistic: highest supply vs lowest demand)
-        d_low = demand_est_low.demand_mt
-        gap_high = eff_high - d_low
-        ratio_high = eff_high / max(d_low, 1.0)
-        score_high = gap_high / max(d_low, 1.0)
-        label_high = "Glut" if ratio_high > 1.20 else ("Shortage" if ratio_high < 0.80 else "Balanced")
+        # High scenario (90th percentile yield vs projected demand)
+        gap_high = eff_high - projected_demand
+        ratio_high = eff_high / max(projected_demand, 1.0)
+        score_high = gap_high / max(projected_demand, 1.0)
+        label_high = "Glut" if ratio_high > glut_ratio else ("Shortage" if ratio_high < shortage_ratio else "Balanced")
 
         scenarios_dict = {
             "low": SPIScenario(
                 scenario="low",
                 supply_mt=round(s_low, 1),
-                demand_mt=round(d_high, 1),
+                demand_mt=round(projected_demand, 1),
                 gap_mt=round(gap_low, 1),
                 spi_ratio=round(ratio_low, 3),
                 spi_score=round(score_low, 3),
@@ -170,7 +232,7 @@ class SupplyPressureEngine:
             "high": SPIScenario(
                 scenario="high",
                 supply_mt=round(s_high, 1),
-                demand_mt=round(d_low, 1),
+                demand_mt=round(projected_demand, 1),
                 gap_mt=round(gap_high, 1),
                 spi_ratio=round(ratio_high, 3),
                 spi_score=round(score_high, 3),

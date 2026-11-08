@@ -267,6 +267,8 @@ class SimulationRequest(BaseModel):
     custom_yield_mt_ha: Optional[float] = None
     custom_import_volume_mt: Optional[float] = None
     custom_loss_pct: Optional[float] = None
+    custom_glut_ratio_threshold: Optional[float] = None
+    custom_shortage_ratio_threshold: Optional[float] = None
 
 
 @app.post("/api/simulate")
@@ -306,6 +308,8 @@ def simulate_scenario(req: SimulationRequest):
         month=int(latest_row["month"]),
         import_volume_mt=import_vol,
         loss_pct=loss_val,
+        glut_ratio_threshold=req.custom_glut_ratio_threshold,
+        shortage_ratio_threshold=req.custom_shortage_ratio_threshold,
     )
 
     scenarios_data = {

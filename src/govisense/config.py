@@ -88,9 +88,69 @@ class GoviSenseSettings:
     pilot_district_population: float = 940_000.0  # Anuradhapura district
     matale_district_population: float = 515_000.0  # Matale district
     
-    # SPI Thresholds
+    # SPI Thresholds (Configurable in config.py, adjustable by officers in /api/simulate)
+    # Source: Proposal Section 6; HARTI Market Outlook; docs/assumptions.md
     spi_glut_threshold: float = 0.15
     spi_shortage_threshold: float = -0.15
+    spi_ratio_glut_threshold: float = 1.20
+    spi_ratio_shortage_threshold: float = 0.80
+
+    # Unreported area ratio range [min, max]
+    # Source: DOA Agricultural Statistics Unit (ASU) & HARTI Market Research Division (MRD); docs/assumptions.md
+    unreported_area_ratio_min: float = 0.10
+    unreported_area_ratio_max: float = 0.25
+
+    # Lead times for importation (weeks)
+    # Source: CBSL & Sri Lanka Ports Authority (SLPA) Shipping Trade Bulletin; docs/assumptions.md
+    import_lead_time_weeks: Dict[str, int] = field(default_factory=lambda: {
+        "big_onion": 7,
+        "potato": 6,
+        "chilli": 6,
+        "red_onion": 6,
+    })
+
+    # Linear Programming Cost Parameters for Decision Optimizer (A4)
+    # Sources cited in docs/assumptions.md
+    storage_cost_rs_per_mt_month: Dict[str, float] = field(default_factory=lambda: {
+        "big_onion": 4500.0,
+        "chilli": 6000.0,
+        "red_onion": 5000.0,
+        "potato": 4000.0,
+    })
+    transport_cost_rs_per_mt_km: float = 45.0  # NTC Freight Tariff Schedule 2025
+    distance_to_dambulla_km: Dict[str, float] = field(default_factory=lambda: {
+        "Anuradhapura": 65.0,
+        "Matale": 45.0,
+    })
+    cif_colombo_rs_per_mt: Dict[str, float] = field(default_factory=lambda: {
+        "big_onion": 140000.0,
+        "chilli": 420000.0,
+        "red_onion": 210000.0,
+        "potato": 180000.0,
+    })
+    import_tariff_rs_per_mt: Dict[str, float] = field(default_factory=lambda: {
+        "big_onion": 50000.0,
+        "chilli": 150000.0,
+        "red_onion": 60000.0,
+        "potato": 50000.0,
+    })
+    unmet_demand_penalty_rs_per_mt: Dict[str, float] = field(default_factory=lambda: {
+        "big_onion": 350000.0,
+        "chilli": 900000.0,
+        "red_onion": 450000.0,
+        "potato": 380000.0,
+    })
+
+    # Farmer Allocation Constraints (A1)
+    # Source: Proposal Section 6 & DOA Extension Guidelines; docs/assumptions.md
+    allocation_change_cap_pct: float = 0.30
+    max_farmer_single_crop_share: float = 0.60
+    oversupply_stop_rule_threshold: float = 1.10
+
+    # Retail Price Modeling (A2)
+    # Source: CBSL Weekly Economic Indicators & HARTI retail-to-wholesale margins; docs/assumptions.md
+    transport_markup_rs_kg: float = 12.0
+    retail_margin_ratio: float = 0.18
     
     # Crop Definitions
     crops: Dict[str, CropConfig] = field(default_factory=lambda: {
