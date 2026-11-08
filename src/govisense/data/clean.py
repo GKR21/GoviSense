@@ -78,6 +78,13 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
         # 7. Import volume lags
         g["import_volume_lag1"] = g["import_volume_mt"].shift(1)
         
+        # 8. Local vs Import Price Gap (Wholesale Lag1 - Landed Import CIF & Tariff)
+        cif_per_kg = (
+            settings.cif_colombo_rs_per_mt.get(crop_name, 140000.0)
+            + settings.import_tariff_rs_per_mt.get(crop_name, 50000.0)
+        ) / 1000.0
+        g["local_vs_import_gap"] = g["wholesale_price_rs_kg"].shift(1) - cif_per_kg
+        
         dfs.append(g)
         
     featured_df = pd.concat(dfs, axis=0).reset_index(drop=True)

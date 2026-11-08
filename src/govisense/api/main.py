@@ -16,7 +16,7 @@ import pandas as pd
 from govisense.config import settings, HUB_SHARE
 from govisense.data.clean import load_monthly_dataset, engineer_features
 from govisense.models.a1_allocation import HarvestVolumeForecaster
-from govisense.models.a2_price_forecast import PriceForecaster
+from govisense.models.a2_price_forecast import PriceForecaster, compute_modeled_retail_price
 from govisense.models.a3_supply_pressure import SupplyPressureEngine, SPIResult
 from govisense.models.a4_gap_deadline import GapFillingOptimizer, FarmerAllocationOptimizer
 from govisense.models.demand_estimator import DemandEstimator
@@ -992,7 +992,7 @@ def get_price_outlook(crop_id: Optional[str] = Query(None)):
         p50 = float(a2_res.best_forecast)
         p10 = float(a2_res.lower_bound)
         p90 = float(a2_res.upper_bound)
-        retail_p50 = round(p50 * 1.35, 1)  # retail markup approx 35% in western province
+        retail_p50 = compute_modeled_retail_price(p50, crop=crop)
 
         # Pull past 6 months trend
         past_6 = cached_df[cached_df["crop"] == crop].sort_values("date").tail(6)
@@ -1372,7 +1372,11 @@ def get_latest_prices():
             latest = crop_df.iloc[-1]
             as_of_date = str(latest["year_month"])
             w_price = float(latest["wholesale_price_rs_kg"])
-            r_price = float(latest.get("retail_price_rs_kg", w_price * 1.35))
+            r_price = (
+                float(latest["retail_price_rs_kg"])
+                if pd.notna(latest.get("retail_price_rs_kg"))
+                else compute_modeled_retail_price(w_price, crop=crop)
+            )
             prices.append({
                 "crop": crop,
                 "market": "Dambulla Dedicated Economic Centre",
