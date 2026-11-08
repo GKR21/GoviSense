@@ -87,6 +87,7 @@ export function OfficerScreen({
 }) {
   const [currentRole, setCurrentRole] = useState<"Officer" | "Admin">(initialRole)
   const [selectedCrop, setSelectedCrop] = useState("Big onion")
+  const currentProfile = CROP_DATA_CATALOG[selectedCrop] || CROP_DATA_CATALOG["Big onion"]
   const [selectedDistrict, setSelectedDistrict] = useState("Anuradhapura")
   const [selectedSeason, setSelectedSeason] = useState("Maha 2026")
   const [scenario, setScenario] = useState<"Low" | "Middle" | "High">("Middle")
@@ -101,11 +102,11 @@ export function OfficerScreen({
   const [lastReport, setLastReport] = useState<GroundReport | null>(null)
   const [decision, setDecision] = useState("")
   const [decisionHistory, setDecisionHistory] = useState<PolicyDecision[]>(INITIAL_DECISION_HISTORY)
-  const changed = area !== 2131 || yieldValue !== 16.45
+  const changed = area !== currentProfile.baselineArea || yieldValue !== currentProfile.baselineYield
 
   const reset = () => {
-    setArea(2131)
-    setYieldValue(16.45)
+    setArea(currentProfile.baselineArea)
+    setYieldValue(currentProfile.baselineYield)
   }
 
   const save = () => {
@@ -211,19 +212,9 @@ export function OfficerScreen({
               options={["Big onion", "Chilli", "Green gram", "Maize", "Red onion", "Potato"]}
               onChange={(crop) => {
                 setSelectedCrop(crop)
-                if (crop === "Big onion") {
-                  setArea(2131)
-                  setYieldValue(16.45)
-                } else if (crop === "Chilli") {
-                  setArea(2493)
-                  setYieldValue(5.2)
-                } else if (crop === "Green gram") {
-                  setArea(1750)
-                  setYieldValue(1.4)
-                } else if (crop === "Maize") {
-                  setArea(3100)
-                  setYieldValue(4.8)
-                }
+                const base = CROP_DATA_CATALOG[crop] || CROP_DATA_CATALOG["Big onion"]
+                setArea(base.baselineArea)
+                setYieldValue(base.baselineYield)
               }}
             />
             <SelectControl
@@ -470,35 +461,35 @@ export function OfficerScreen({
                   </div>
                   <div className="pilot-baseline">
                     <span>Current plan</span>
-                    <strong>35,051 t</strong>
-                    <small>from 2,131 ha in Anuradhapura</small>
+                    <strong>{Math.round(currentProfile.baselineArea * currentProfile.baselineYield).toLocaleString()} t</strong>
+                    <small>from {currentProfile.baselineArea.toLocaleString()} ha in {selectedDistrict}</small>
                   </div>
                   <SliderField
                     label="Planted area"
                     value={area}
-                    min={1200}
-                    max={3000}
+                    min={Math.round(currentProfile.baselineArea * 0.4)}
+                    max={Math.round(currentProfile.baselineArea * 1.8)}
                     step={10}
                     unit="ha"
                     onChange={setArea}
-                    helper="Baseline 2,131"
+                    helper={`Baseline ${currentProfile.baselineArea.toLocaleString()} ha`}
                   />
                   <SliderField
                     label="Expected yield"
                     value={yieldValue}
-                    min={10}
-                    max={22}
-                    step={0.05}
+                    min={parseFloat((currentProfile.baselineYield * 0.4).toFixed(2))}
+                    max={parseFloat((currentProfile.baselineYield * 1.8).toFixed(2))}
+                    step={currentProfile.baselineYield > 5 ? 0.1 : 0.05}
                     unit="t/ha"
                     onChange={setYieldValue}
-                    helper="Baseline 16.45"
+                    helper={`Baseline ${currentProfile.baselineYield.toFixed(2)} t/ha`}
                   />
                   <div className="impact-card">
                     <div>
                       <span>Projected annual harvest</span>
                       <strong>
                         {Math.round(
-                          35051 * (area / 2131) * (yieldValue / 16.45),
+                          area * yieldValue,
                         ).toLocaleString()}{" "}
                         t
                       </strong>
@@ -506,8 +497,8 @@ export function OfficerScreen({
                     <span className={cx("delta", changed && "delta--changed")}>
                       {changed
                         ? `${
-                            area > 2131 ? "+" : ""
-                          }${Math.round(((area / 2131) * (yieldValue / 16.45) - 1) * 100)}%`
+                            (area * yieldValue) > (currentProfile.baselineArea * currentProfile.baselineYield) ? "+" : ""
+                          }${Math.round(((area * yieldValue) / (currentProfile.baselineArea * currentProfile.baselineYield) - 1) * 100)}%`
                         : "Baseline"}
                     </span>
                   </div>

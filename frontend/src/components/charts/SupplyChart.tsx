@@ -33,7 +33,7 @@ export function SupplyChart({
     })
   }, [area, yieldValue, profile])
 
-  const maxY = Math.max(...profile.supplyMonthly.map((s) => s * 1.3), ...profile.demandMonthly) * 1.1
+  const maxY = Math.max(...series.map((s) => s.high), ...series.map((s) => s.demand), 100) * 1.1
 
   const width = 820
   const height = 320
