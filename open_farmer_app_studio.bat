@@ -4,7 +4,7 @@ echo   Opening Farmer Mobile App in Android Studio...
 echo ========================================================
 
 set STUDIO_EXE=C:\Program Files\Android\Android Studio\bin\studio64.exe
-set PROJECT_DIR=%~dp0farmer_app\android
+set PROJECT_DIR=%~dp0mobile\android
 
 if not exist "%STUDIO_EXE%" (
     echo [ERROR] Android Studio not found at:

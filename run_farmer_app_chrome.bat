@@ -1,9 +1,9 @@
 @echo off
 echo ========================================================
-echo   Launching GoviSense Farmer Mobile App in Chrome...
+echo   Launching GoviSense Mobile App in Chrome...
 echo ========================================================
 
-cd /d "%~dp0farmer_app"
-"C:\src\flutter\bin\flutter.bat" run -d chrome
+cd /d "%~dp0mobile"
+"D:\flutter\bin\flutter.bat" run -d chrome
 pause
 

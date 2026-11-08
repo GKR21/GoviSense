@@ -9,6 +9,12 @@ __pycache__/
 .venv/
 node_modules/
 frontend/dist/
+**/build/
+**/android/app/build/
+**/.gradle/
+**/.dart_tool/
+*.apk
+*.so
 .DS_Store
 .vscode/
 *.egg-info/

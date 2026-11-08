@@ -1,0 +1,233 @@
+/* ================================================================
+   GOVISENSE – Design Tokens System (Light & Dark)
+   ================================================================ */
+:root {
+  /* 1. Primary Brand Identity (Deep Botanical Forest) */
+  --primary: #0a5c36;
+  --primary-hover: #08492b;
+  --primary-dark: #073b23;
+  --primary-tint: #eaf5ef;
+  --primary-border: #bde3ce;
+  --primary-glow: rgba(10, 92, 54, 0.2);
+
+  /* 2. Accent Identity (High-Visibility Fresh Lime) */
+  --accent: #e2f163;
+  --accent-contrast: #1c2600;
+  --accent-tint: #f5fbe0;
+
+  /* 3. Neutral Inks & Typographic Contrast */
+  --ink: #0e1c15;
+  --ink-secondary: #3b4e43;
+  --ink-muted: #6b7f73;
+  --neutral-700: #2c3e34;
+  --neutral-600: #42554a;
+  --neutral-500: #5c7064;
+  --neutral-400: #8ba093;
+  --neutral-300: #c2d1c8;
+  --neutral-200: #dfe7e2;
+  --neutral-100: #eff4f0;
+
+  /* 4. Surfaces & Anti-Glare Paper System */
+  --background: #f7f9f6;
+  --surface: #ffffff;
+  --surface-subtle: #f0f4ee;
+  --surface-card: #ffffff;
+  --surface-card-hover: #fafcf9;
+  --surface-glass: rgba(255, 255, 255, 0.92);
+  --border-subtle: rgba(20, 38, 28, 0.08);
+  --border-strong: rgba(20, 38, 28, 0.16);
+
+  /* 5. Perspective-Aware Semantic Risk Signals */
+  --shortage: #d44333;
+  --shortage-text: #8a1c10;
+  --shortage-tint: #fdf0ed;
+  --shortage-border: #f7c3bd;
+
+  --balanced: #168b52;
+  --balanced-text: #0a502e;
+  --balanced-tint: #e8f7ee;
+  --balanced-border: #a6e3bf;
+
+  --oversupply: #b87300;
+  --oversupply-bright: #e8a317;
+  --oversupply-text: #6b4300;
+  --oversupply-tint: #fff7e6;
+  --oversupply-border: #fce0a6;
+
+  --info: #1e65d6;
+  --info-text: #0d3c8a;
+  --info-tint: #eff5ff;
+  --info-border: #bbd5fc;
+
+  /* 6. Focus Ring & Elevation */
+  --focus: #0a5c36;
+  --focus-ring: rgba(10, 92, 54, 0.35);
+  --chart-low: #9db8a8;
+
+  --shadow-sm: 0 1px 3px rgba(14, 28, 21, 0.04), 0 1px 2px rgba(14, 28, 21, 0.02);
+  --shadow-md: 0 4px 16px -2px rgba(14, 28, 21, 0.07), 0 2px 6px -1px rgba(14, 28, 21, 0.04);
+  --shadow-lg: 0 12px 32px -4px rgba(14, 28, 21, 0.1), 0 4px 12px -2px rgba(14, 28, 21, 0.05);
+
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-full: 9999px;
+}
+
+[data-theme="dark"],
+.dark {
+  /* 1. Primary Brand Identity (Luminous Botanical Emerald for Dark Mode) */
+  --primary: #1eb96c;
+  --primary-hover: #27d47e;
+  --primary-dark: #14854c;
+  --primary-tint: rgba(30, 185, 108, 0.14);
+  --primary-border: rgba(30, 185, 108, 0.3);
+  --primary-glow: rgba(30, 185, 108, 0.3);
+
+  /* 2. Accent Identity */
+  --accent: #e2f163;
+  --accent-contrast: #101900;
+  --accent-tint: rgba(226, 241, 99, 0.15);
+
+  /* 3. Neutral Inks & Dark Typographic Contrast */
+  --ink: #f1f7f4;
+  --ink-secondary: #a3b8ad;
+  --ink-muted: #6e8477;
+  --neutral-700: #d6e2db;
+  --neutral-600: #a8bcaf;
+  --neutral-500: #7d9486;
+  --neutral-400: #546a5d;
+  --neutral-300: #33443a;
+  --neutral-200: #233229;
+  --neutral-100: #17231c;
+
+  /* 4. Surfaces (Deep Rich Obsidian Forest) */
+  --background: #0b130e;
+  --surface: #121c16;
+  --surface-subtle: #17241c;
+  --surface-card: #15221b;
+  --surface-card-hover: #192720;
+  --surface-glass: rgba(18, 28, 22, 0.92);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  /* 5. Perspective-Aware Semantic Signals (Vibrant on Dark) */
+  --shortage: #ff6b6b;
+  --shortage-text: #ffb8b8;
+  --shortage-tint: rgba(255, 107, 107, 0.15);
+  --shortage-border: rgba(255, 107, 107, 0.35);
+
+  --balanced: #2bd482;
+  --balanced-text: #96f0c2;
+  --balanced-tint: rgba(43, 212, 130, 0.15);
+  --balanced-border: rgba(43, 212, 130, 0.35);
+
+  --oversupply: #f5a623;
+  --oversupply-bright: #ffbe4a;
+  --oversupply-text: #ffdeb0;
+  --oversupply-tint: rgba(245, 166, 35, 0.15);
+  --oversupply-border: rgba(245, 166, 35, 0.35);
+
+  --info: #5995ff;
+  --info-text: #bdd6ff;
+  --info-tint: rgba(89, 149, 255, 0.15);
+  --info-border: rgba(89, 149, 255, 0.35);
+
+  /* 6. Focus Ring & Elevation */
+  --focus: #1eb96c;
+  --focus-ring: rgba(30, 185, 108, 0.45);
+  --chart-low: #3a5c48;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 16px -2px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 14px 36px -4px rgba(0, 0, 0, 0.7);
+}
+/* ================================================================
+   GOVISENSE – Premium Dark Mode Design System
+   Team DARKBITE · ModelX 2.0
+   ================================================================ */
+
+:root {
+  /* Core Palette – Emerald Dark */
+  --primary:          #10b981;
+  --primary-hover:    #059669;
+  --primary-dark:     #047857;
+  --primary-glow:     rgba(16, 185, 129, 0.25);
+  --primary-tint:     rgba(16, 185, 129, 0.1);
+
+  /* Ink & Surfaces */
+  --ink:              #f0fdf8;
+  --ink-muted:        #94a3b8;
+  --ink-faint:        #475569;
+
+  --bg-deep:          #070e14;
+  --bg-base:          #0c1422;
+  --bg-raised:        #111c2e;
+  --bg-card:          rgba(17, 28, 46, 0.80);
+  --bg-hover:         rgba(255, 255, 255, 0.04);
+  --surface:          rgba(15, 25, 40, 0.92);
+
+  /* Risk Colours */
+  --shortage:         #f87171;
+  --shortage-bright:  #ef4444;
+  --shortage-tint:    rgba(239, 68, 68, 0.12);
+  --shortage-border:  rgba(239, 68, 68, 0.35);
+  --shortage-glow:    rgba(239, 68, 68, 0.2);
+
+  --balanced:         #10b981;
+  --balanced-bright:  #34d399;
+  --balanced-tint:    rgba(16, 185, 129, 0.1);
+  --balanced-border:  rgba(16, 185, 129, 0.35);
+  --balanced-glow:    rgba(16, 185, 129, 0.2);
+
+  --oversupply:       #fbbf24;
+  --oversupply-bright:#f59e0b;
+  --oversupply-tint:  rgba(245, 158, 11, 0.1);
+  --oversupply-border:rgba(245, 158, 11, 0.35);
+  --oversupply-glow:  rgba(245, 158, 11, 0.2);
+
+  --info:             #60a5fa;
+  --info-tint:        rgba(96, 165, 250, 0.1);
+  --info-border:      rgba(96, 165, 250, 0.35);
+  --info-glow:        rgba(96, 165, 250, 0.2);
+
+  /* Neutrals */
+  --neutral-700:      #1e2d40;
+  --neutral-600:      #263547;
+  --neutral-500:      #3d5368;
+  --neutral-400:      #64748b;
+  --neutral-300:      rgba(255,255,255,0.12);
+  --neutral-200:      rgba(255,255,255,0.07);
+  --neutral-100:      rgba(255,255,255,0.04);
+
+  --background:       var(--bg-base);
+  --focus:            var(--primary);
+
+  /* Shadows */
+  --shadow-sm:        0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255,255,255,0.04);
+  --shadow-md:        0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.06);
+  --shadow-lg:        0 24px 64px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255,255,255,0.08);
+  --glow-primary:     0 0 20px rgba(16, 185, 129, 0.3);
+  --glow-shortage:    0 0 20px rgba(239, 68, 68, 0.3);
+  --glow-oversupply:  0 0 20px rgba(245, 158, 11, 0.3);
+
+  /* Radii */
+  --radius-sm:        8px;
+  --radius-md:        12px;
+  --radius-lg:        16px;
+  --radius-xl:        22px;
+
+  /* Glassmorphism */
+  --glass-bg:         rgba(15, 25, 40, 0.72);
+  --glass-border:     rgba(255, 255, 255, 0.09);
+  --glass-blur:       blur(16px);
+
+  /* Chart colours */
+  --chart-low:        rgba(16, 185, 129, 0.2);
+  --chart-band:       rgba(16, 185, 129, 0.12);
+  --chart-line:       #10b981;
+  --chart-demand:     #60a5fa;
+}
+
