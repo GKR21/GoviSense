@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/premium_confirm_dialog.dart';
 import '../../farmer/data/farmer_repository.dart';
 import '../data/officer_repository.dart';
 
@@ -367,31 +368,16 @@ class _OfficerPageState extends State<OfficerPage> {
   }
 
   void _confirmLogout(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text('Confirm Log Out'),
-        content: const Text('Are you sure you want to log out of the Agrarian Planning Workstation?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: AppTheme.neutral600)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.shortage,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              context.go('/login');
-            },
-            child: const Text('Log Out'),
-          ),
-        ],
-      ),
+    PremiumConfirmDialog.show(
+      context,
+      title: 'Sign Out of Workstation',
+      message: 'Are you sure you want to log out of the Agrarian Planning Workstation? All recorded policy directives are safely preserved in the ledger.',
+      accountInfo: 'Dr. K. M. Wickramasinghe · DOA-OFF-0084',
+      roleBadge: 'Officer',
+      confirmText: 'Log Out',
+      cancelText: 'Cancel',
+      icon: Icons.logout_rounded,
+      onConfirm: () => context.go('/login'),
     );
   }
 

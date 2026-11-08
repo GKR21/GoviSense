@@ -13,6 +13,7 @@ import 'widgets/why_advice_bottom_sheet.dart';
 import 'widgets/digital_farmer_card_widget.dart';
 import 'crop_detail_page.dart';
 import 'market_prices_page.dart';
+import '../../../shared/widgets/premium_confirm_dialog.dart';
 
 class FarmerPage extends StatefulWidget {
   const FarmerPage({super.key});
@@ -1935,30 +1936,40 @@ class _FarmerPageState extends State<FarmerPage> {
   }
 
   void _confirmLogout(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Confirm Log Out'),
-        content: const Text('Are you sure you want to log out of your GoviSense profile?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.shortage,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              context.go('/login');
-            },
-            child: const Text('Log Out'),
-          ),
-        ],
-      ),
+    final title = _language == AppLanguage.si
+        ? 'පද්ධතියෙන් ඉවත් වන්නද?'
+        : _language == AppLanguage.ta
+            ? 'வெளியேற விரும்புகிறீர்களா?'
+            : 'Confirm Log Out';
+
+    final message = _language == AppLanguage.si
+        ? 'ඔබගේ ගිණුමෙන් ඉවත් වීමට අවශ්‍යද? ඔබ වාර්තා කළ සියලු වගා දත්ත ආරක්ෂිතව පවතිනු ඇත.'
+        : _language == AppLanguage.ta
+            ? 'உங்கள் கணக்கிலிருந்து வெளியேற விரும்புகிறீர்களா? உங்கள் பதிவு செய்யப்பட்ட தரவு பாதுகாப்பாக இருக்கும்.'
+            : 'Are you sure you want to log out of your GoviSense profile? Your planting declarations will remain saved.';
+
+    final confirmText = _language == AppLanguage.si
+        ? 'ඉවත් වන්න'
+        : _language == AppLanguage.ta
+            ? 'வெளியேறு'
+            : 'Log Out';
+
+    final cancelText = _language == AppLanguage.si
+        ? 'අවලංගු කරන්න'
+        : _language == AppLanguage.ta
+            ? 'ரத்துசெய்'
+            : 'Cancel';
+
+    PremiumConfirmDialog.show(
+      context,
+      title: title,
+      message: message,
+      accountInfo: '${_repo.profile.name} · ${_repo.profile.farmerId}',
+      roleBadge: 'Farmer',
+      confirmText: confirmText,
+      cancelText: cancelText,
+      icon: Icons.logout_rounded,
+      onConfirm: () => context.go('/login'),
     );
   }
 
