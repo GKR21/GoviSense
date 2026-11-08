@@ -18,7 +18,7 @@ Usage:
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, Optional
-from govisense.config import settings
+from govisense.config import settings, HUB_SHARE as CONFIG_HUB_SHARE
 
 
 # Seasonal demand multipliers (month → factor).
@@ -43,22 +43,15 @@ NATIONAL_ANNUAL_DEMAND_MT: Dict[str, Optional[float]] = {
     "cowpea": 15_000.0,
     "sesame": 10_000.0,
     "mung_bean": 18_000.0,
+    "red_onion": 75_000.0,
+    "potato": 85_000.0,
 }
 
-# Anuradhapura/Dambulla trading-hub catchment fraction of national demand
-HUB_SHARE: Dict[str, float] = {
-    "big_onion": 0.25,   # 50% of Dambulla corridor ≈ 25% national
-    "chilli": 0.10,      # 40% of pilot corridor ≈ 10% national
-    "chilli_green": 0.10,
-    "tomato": 0.15,
-    "brinjal": 0.12,
-    "bitter_gourd": 0.10,
-    "snake_gourd": 0.10,
-    "long_bean": 0.10,
-    "cowpea": 0.08,
-    "sesame": 0.08,
-    "mung_bean": 0.08,
-}
+# Hub Share: Single Source of Truth imported directly from config.py (DOA CPP 2026 planned ratio)
+HUB_SHARE: Dict[str, float] = dict(CONFIG_HUB_SHARE)
+for _crop in ["tomato", "brinjal", "bitter_gourd", "snake_gourd", "long_bean", "cowpea", "sesame", "mung_bean"]:
+    if _crop not in HUB_SHARE:
+        HUB_SHARE[_crop] = 0.08
 
 # Demand scenario spread: ±10%
 SCENARIO_SPREAD = 0.10

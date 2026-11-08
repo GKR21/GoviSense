@@ -20,7 +20,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR / "src"))
 
-from govisense.config import settings, DEMO_DATA_DIR, PROCESSED_DATA_DIR
+from govisense.config import settings, DEMO_DATA_DIR, PROCESSED_DATA_DIR, HUB_SHARE
 
 
 def generate_counterfactual_simulation_dataset(
@@ -39,7 +39,7 @@ def generate_counterfactual_simulation_dataset(
     for crop in ["big_onion", "chilli"]:
         cfg = settings.crops[crop]
         national_demand = (settings.national_population * cfg.per_capita_monthly_kg) / 1000.0
-        hub_share = 0.50 if crop == "big_onion" else 0.40
+        hub_share = HUB_SHARE.get(crop, 0.1631)
         base_hub_demand = national_demand * hub_share
 
         prev_price = 85.0 if crop == "big_onion" else 220.0

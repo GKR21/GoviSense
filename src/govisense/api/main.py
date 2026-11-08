@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 import uuid
 import pandas as pd
 
-from govisense.config import settings
+from govisense.config import settings, HUB_SHARE
 from govisense.data.clean import load_monthly_dataset, engineer_features
 from govisense.models.a1_allocation import HarvestVolumeForecaster
 from govisense.models.a2_price_forecast import PriceForecaster
@@ -651,7 +651,7 @@ def log_officer_action(payload: DecisionLogPayload):
         "loss_pct": 0.15,
         "import_lead_time_weeks": 7,
         "spi_bands": [0.8, 1.2],
-        "pilot_district_share": 0.50 if payload.crop_id == "big_onion" else 0.40,
+        "pilot_district_share": HUB_SHARE.get(payload.crop_id, 0.1631),
         "notes": payload.notes,
     }
     record = DecisionRecord(

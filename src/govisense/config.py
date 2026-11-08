@@ -7,7 +7,7 @@ Pilot: Anuradhapura (Big Onion, Chilli)
 import os
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Dict, List
+from typing import Dict, List, Any
 
 try:
     from dotenv import load_dotenv
@@ -30,6 +30,42 @@ for folder in [RAW_DATA_DIR, INTERIM_DATA_DIR, PROCESSED_DATA_DIR, DEMO_DATA_DIR
     folder.mkdir(parents=True, exist_ok=True)
 
 
+# Canonical Seasons (defined once, used everywhere)
+SEASONS: Dict[str, Dict[str, Any]] = {
+    "Maha": {
+        "planting_months": [9, 10, 11, 12],
+        "harvest_months": [1, 2, 3, 4],
+        "description": "Northeast monsoon season",
+    },
+    "Yala": {
+        "planting_months": [4, 5, 6],
+        "harvest_months": [7, 8, 9, 10],
+        "description": "Southwest monsoon season",
+    },
+}
+
+# Single Source of Truth for Hub Share:
+# Computed strictly from official DOA CPP 2026 Planned Production:
+# Anuradhapura planned production / National planned production:
+# Big Onion: 35,051 t / 82,149 t = 0.4267
+# Chilli: 23,186 t / 142,116 t = 0.1631
+# Red Onion: 514 t / 76,374 t = 0.0067
+# Potato: National coverage
+HUB_SHARE: Dict[str, float] = {
+    "big_onion": round(35051.0 / 82149.0, 4),
+    "chilli": round(23186.0 / 142116.0, 4),
+    "chilli_green": round(23186.0 / 142116.0, 4),
+    "red_onion": round(514.0 / 76374.0, 4),
+    "potato": 0.05,
+}
+
+# Regional Secondary District Shares (Matale / Dambulla Hub)
+MATALE_HUB_SHARE: Dict[str, float] = {
+    "big_onion": round(44262.0 / 82149.0, 4),
+    "chilli": round(3292.0 / 142116.0, 4),
+}
+
+
 @dataclass(frozen=True)
 class CropConfig:
     crop_id: str
@@ -47,8 +83,10 @@ class CropConfig:
 @dataclass
 class GoviSenseSettings:
     pilot_district: str = "Anuradhapura"
+    secondary_district: str = "Matale"
     national_population: float = 22_200_000.0  # DCS Sri Lanka Census projection
     pilot_district_population: float = 940_000.0  # Anuradhapura district
+    matale_district_population: float = 515_000.0  # Matale district
     
     # SPI Thresholds
     spi_glut_threshold: float = 0.15
@@ -63,7 +101,7 @@ class GoviSenseSettings:
             planting_to_harvest_lag_months=3,
             base_yield_mt_per_ha=15.5,
             per_capita_monthly_kg=0.45,  # HIES 2019/2023 avg
-            pilot_district_demand_share=0.12,  # Anuradhapura/Dambulla regional hub demand
+            pilot_district_demand_share=HUB_SHARE["big_onion"],
             primary_season="Yala",  # Peak harvest July-Oct in Matale/Anuradhapura
             min_fair_farmgate_price=120.0,  # Rs/kg
             storage_loss_rate_monthly=0.08
@@ -75,10 +113,34 @@ class GoviSenseSettings:
             planting_to_harvest_lag_months=3,
             base_yield_mt_per_ha=5.2,
             per_capita_monthly_kg=0.25,
-            pilot_district_demand_share=0.10,
+            pilot_district_demand_share=HUB_SHARE["chilli"],
             primary_season="Both",  # Grown in both Maha and Yala
             min_fair_farmgate_price=350.0,  # Rs/kg
             storage_loss_rate_monthly=0.04
+        ),
+        "red_onion": CropConfig(
+            crop_id="red_onion",
+            name_en="Red Onion",
+            name_si="රතු ලූණු",
+            planting_to_harvest_lag_months=3,
+            base_yield_mt_per_ha=13.6,
+            per_capita_monthly_kg=0.30,
+            pilot_district_demand_share=HUB_SHARE["red_onion"],
+            primary_season="Both",
+            min_fair_farmgate_price=180.0,
+            storage_loss_rate_monthly=0.06
+        ),
+        "potato": CropConfig(
+            crop_id="potato",
+            name_en="Potato",
+            name_si="අර්තාපල්",
+            planting_to_harvest_lag_months=3,
+            base_yield_mt_per_ha=16.6,
+            per_capita_monthly_kg=0.40,
+            pilot_district_demand_share=HUB_SHARE["potato"],
+            primary_season="Both",
+            min_fair_farmgate_price=220.0,
+            storage_loss_rate_monthly=0.05
         )
     })
 

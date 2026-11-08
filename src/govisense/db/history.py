@@ -108,7 +108,7 @@ def evaluate_confidence_badge(
     # Decouple chilli if SPI unverified
     if crop_id == "chilli" and not spi_ok:
         badge = "low"
-    elif passed_rules >= 4:
+    elif passed_rules >= 4 and data_fresh:
         badge = "high"
     elif passed_rules >= 2:
         badge = "medium"

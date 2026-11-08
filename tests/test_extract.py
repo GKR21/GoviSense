@@ -160,24 +160,56 @@ def test_cpp_seasonal_disaggregation():
 
 
 def test_real_cpp_pdf_national_figures_validation():
-    """Validates real DOA CPP 2026 PDF fixture for national totals (Sri Lanka 4,867 ha, 82,149 t for Big Onion)."""
+    """Validates real DOA CPP 2026 PDF fixture for national and district totals per Proposal Table."""
     cpp_pdf = RAW_DATA_DIR / "cpp" / "doa_cpp_seasonal_2026.pdf"
     if not cpp_pdf.exists():
         pytest.skip("Real CPP PDF fixture not present in data/raw/cpp/")
 
-    extractor = CPPExtractor(target_district="Anuradhapura", include_national=True)
+    extractor = CPPExtractor(target_district="all", include_national=True)
     records = extractor.extract_from_pdf(cpp_pdf)
 
     # Must extract both national and district rows
     assert any(r["district"] == "Sri Lanka" for r in records)
     assert any(r["district"] == "Anuradhapura" for r in records)
+    assert any(r["district"] == "Matale" for r in records)
 
     validation = extractor.validate_national_figures(records)
+    
+    # 1. Big onion Sri Lanka 4,867 ha and 82,149 t
     assert "big_onion_national_2026" in validation
-    bo_val = validation["big_onion_national_2026"]
-    assert bo_val["is_valid"] is True
-    assert bo_val["planted_extent_ha"] == 4867.0
-    assert bo_val["harvest_volume_mt"] == 82149.0
+    assert validation["big_onion_national_2026"]["is_valid"] is True
+    assert validation["big_onion_national_2026"]["planted_extent_ha"] == 4867.0
+    assert validation["big_onion_national_2026"]["harvest_volume_mt"] == 82149.0
+
+    # 2. Big onion Matale 2,214 ha and 44,262 t
+    assert "big_onion_matale_2026" in validation
+    assert validation["big_onion_matale_2026"]["is_valid"] is True
+    assert validation["big_onion_matale_2026"]["planted_extent_ha"] == 2214.0
+    assert validation["big_onion_matale_2026"]["harvest_volume_mt"] == 44262.0
+
+    # 3. Big onion Anuradhapura 2,131 ha and 35,051 t
+    assert "big_onion_anuradhapura_2026" in validation
+    assert validation["big_onion_anuradhapura_2026"]["is_valid"] is True
+    assert validation["big_onion_anuradhapura_2026"]["planted_extent_ha"] == 2131.0
+    assert validation["big_onion_anuradhapura_2026"]["harvest_volume_mt"] == 35051.0
+
+    # 4. Chilli Sri Lanka 15,899 ha and 142,116 t
+    assert "chilli_national_2026" in validation
+    assert validation["chilli_national_2026"]["is_valid"] is True
+    assert validation["chilli_national_2026"]["planted_extent_ha"] == 15899.0
+    assert validation["chilli_national_2026"]["harvest_volume_mt"] == 142116.0
+
+    # 5. Chilli Anuradhapura 2,493 ha and 23,186 t
+    assert "chilli_anuradhapura_2026" in validation
+    assert validation["chilli_anuradhapura_2026"]["is_valid"] is True
+    assert validation["chilli_anuradhapura_2026"]["planted_extent_ha"] == 2493.0
+    assert validation["chilli_anuradhapura_2026"]["harvest_volume_mt"] == 23186.0
+
+    # 6. Red onion Sri Lanka 5,599 ha and 76,374 t
+    assert "red_onion_national_2026" in validation
+    assert validation["red_onion_national_2026"]["is_valid"] is True
+    assert validation["red_onion_national_2026"]["planted_extent_ha"] == 5599.0
+    assert validation["red_onion_national_2026"]["harvest_volume_mt"] == 76374.0
 
 
 def test_real_cbsl_pdf_extraction():

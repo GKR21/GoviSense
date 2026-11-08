@@ -4,6 +4,7 @@ Tests for Day 4 Item 1: Demand Estimator Module (WP1)
 
 import pytest
 from govisense.models.demand_estimator import DemandEstimator, SEASONAL_FACTORS, SCENARIO_SPREAD
+from govisense.config import HUB_SHARE
 from govisense.models.a3_supply_pressure import SupplyPressureEngine
 from govisense.data.crop_requirements import get_crop_requirements
 
@@ -11,12 +12,12 @@ from govisense.data.crop_requirements import get_crop_requirements
 def test_demand_estimator_big_onion_anchor():
     estimator = DemandEstimator()
     annual_hub = estimator.annual_hub_demand("big_onion")
-    # 320,000 MT national * 25% hub share = 80,000 MT/year
-    assert annual_hub == pytest.approx(80000.0, rel=1e-3)
+    expected_hub = 320000.0 * HUB_SHARE["big_onion"]
+    assert annual_hub == pytest.approx(expected_hub, rel=1e-3)
 
     jan_res = estimator.estimate("big_onion", month=1)
-    # 80,000 / 12 * 1.0 ≈ 6666.7 MT
-    assert jan_res.demand_mt == pytest.approx(6666.7, rel=1e-2)
+    expected_jan = (expected_hub / 12.0) * 1.0
+    assert jan_res.demand_mt == pytest.approx(expected_jan, rel=1e-2)
     assert "Commodity Board" in jan_res.source_note
 
 

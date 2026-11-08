@@ -108,7 +108,8 @@ class DataCatalogue:
         system_cols = {
             "year_month", "date", "year", "month", "district", "crop",
             "actual_spi", "spi_class", "is_interpolated", "data_source",
-            "is_simulation", "source"
+            "is_simulation", "source", "source_type",
+            "provenance_price", "provenance_area", "provenance_weather", "provenance_import"
         }
 
         unmapped = []

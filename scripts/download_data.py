@@ -167,11 +167,27 @@ def compile_empirical_monthly_master() -> pd.DataFrame:
                 df.at[i, "temp_celsius"] = round(float(w_dict[ym]["temp_celsius"]), 1)
                 df.at[i, "temp_anomaly_celsius"] = round(float(w_dict[ym]["temp_anomaly_celsius"]), 1)
 
-    # 2. Add source column: 'real' (96.4%) vs 'interpolated' (3.6% during lockdown freeze)
-    df["source"] = df["is_interpolated"].apply(lambda x: "interpolated" if bool(x) else "real")
-    df["data_source"] = df["is_interpolated"].apply(
-        lambda x: "CBSL/HARTI/DCS (Interpolated during freeze)" if bool(x) else "CBSL_Daily_CPP_DOA_NASA_POWER"
+    # 2. Add source_type column: (real | anchor | interpolated | synthetic) and per-column provenance
+    def determine_source_type(row):
+        if bool(row.get("is_interpolated", False)):
+            return "interpolated"
+        if str(row.get("year_month")) in HISTORICAL_ANCHORS:
+            return "anchor"
+        return "real"
+
+    df["source_type"] = df.apply(determine_source_type, axis=1)
+    df["source"] = df["source_type"].apply(lambda st: "interpolated" if st == "interpolated" else "real")
+    df["data_source"] = df["source_type"].apply(
+        lambda st: "CBSL_Daily_Price_Bulletin_Anchored" if st == "anchor" else (
+            "Linear_Spline_During_Lockdown_Freeze" if st == "interpolated" else "CBSL_Daily_CPP_DOA_NASA_POWER_Real"
+        )
     )
+
+    # Per-column provenance tracking (Proposal 5.2)
+    df["provenance_price"] = "CBSL_Daily_Price_Reports"
+    df["provenance_area"] = "DOA_CPP_Seasonal_Progress"
+    df["provenance_weather"] = "NASA_POWER_Anuradhapura"
+    df["provenance_import"] = "Sri_Lanka_Customs_CBSL"
 
     # Persist compiled master dataset
     df.to_csv(master_path, index=False)
@@ -179,6 +195,7 @@ def compile_empirical_monthly_master() -> pd.DataFrame:
     # For demo seed, explicitly mark as synthetic demo to keep it isolated from training
     demo_df = df.copy()
     demo_df["source"] = "synthetic"
+    demo_df["source_type"] = "synthetic"
     demo_df["is_simulation"] = True
     demo_df["data_source"] = "demo_seed_dataset"
     demo_df.to_csv(demo_path, index=False)
