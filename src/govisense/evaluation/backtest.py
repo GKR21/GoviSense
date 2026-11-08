@@ -18,6 +18,7 @@ from govisense.data.clean import load_monthly_dataset, engineer_features, get_wa
 from govisense.models.a1_allocation import HarvestVolumeForecaster
 from govisense.models.a2_price_forecast import PriceForecaster
 from govisense.models.a3_supply_pressure import SupplyPressureEngine
+from govisense.provenance import compute_data_version, compute_model_version, get_git_commit
 
 
 def _wape(y_true: np.ndarray, y_pred: np.ndarray) -> float:
@@ -44,7 +45,17 @@ def run_walk_forward_evaluation(crops: List[str] = ["big_onion", "chilli"]) -> D
     raw_df = load_monthly_dataset()
     df = engineer_features(raw_df)
 
-    overall_report = {}
+    d_ver = compute_data_version()
+    m_ver = compute_model_version()
+    g_commit = get_git_commit()
+
+    overall_report = {
+        "_metadata": {
+            "data_version": d_ver,
+            "model_version": m_ver,
+            "git_commit": g_commit,
+        }
+    }
 
     for crop in crops:
         a1_forecaster = HarvestVolumeForecaster(crop=crop)
@@ -152,6 +163,8 @@ def run_walk_forward_evaluation(crops: List[str] = ["big_onion", "chilli"]) -> D
         sim_res = sim.simulate(crop=crop)
 
         overall_report[crop] = {
+            "data_version": d_ver,
+            "model_version": m_ver,
             # Primary metrics — WAPE
             "a3_supply_forecast": {
                 "wape_model": round(a1_wape_m, 4) if a1_wape_m is not None else None,

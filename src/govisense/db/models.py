@@ -38,6 +38,12 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, relationship
 
+from govisense.provenance import (
+    compute_data_version,
+    compute_model_version,
+    get_git_commit,
+)
+
 Base = declarative_base()
 
 
@@ -61,10 +67,10 @@ class PipelineRunModel(Base):
     run_id = Column(String(36), primary_key=True, default=lambda: f"RUN-{uuid.uuid4().hex[:8].upper()}")
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
     trigger = Column(String(30), nullable=False, default="scheduled")  # scheduled, retrigger, officer
-    model_version = Column(String(100), nullable=False, default="GoviSense-v2.0-baseline")
-    data_version = Column(String(100), nullable=False, default="CBSL-HARTI-DOA-2024.12")
+    model_version = Column(String(100), nullable=False, default=lambda: compute_model_version())
+    data_version = Column(String(100), nullable=False, default=lambda: compute_data_version())
     assumptions = Column(JSON, nullable=False, default=dict)
-    git_commit = Column(String(40), nullable=True)
+    git_commit = Column(String(40), nullable=True, default=lambda: get_git_commit()[:40])
 
     # Relationships
     decisions = relationship("DecisionRecordModel", back_populates="run", cascade="all, delete-orphan")
