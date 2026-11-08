@@ -238,4 +238,93 @@ export async function simulateScenarioApi(payload: {
   }
 }
 
+export interface AdoptionScenarioItem {
+  adoption_rate_pct: number
+  total_supply_mt: number
+  projected_demand_mt: number
+  spi_score: number
+  spi_label: string
+  farmgate_price_rs_kg: number
+  fair_floor_price_rs_kg: number
+  price_crash_risk_pct: number
+  total_farmer_revenue_mil_rs: number
+  market_stability: string
+}
+
+export interface AdoptionSimulationResponse {
+  crop: string
+  season_demand_mt: number
+  fair_floor_price_rs_kg: number
+  scenarios: AdoptionScenarioItem[]
+  conclusion: string
+  isLive?: boolean
+}
+
+export const BASELINE_ADOPTION_SIMULATION: AdoptionSimulationResponse = {
+  crop: "big_onion",
+  season_demand_mt: 26667.0,
+  fair_floor_price_rs_kg: 120.0,
+  scenarios: [
+    {
+      adoption_rate_pct: 0,
+      total_supply_mt: 46000.0,
+      projected_demand_mt: 26667.0,
+      spi_score: 0.466,
+      spi_label: "Glut",
+      farmgate_price_rs_kg: 75.0,
+      fair_floor_price_rs_kg: 120.0,
+      price_crash_risk_pct: 85.0,
+      total_farmer_revenue_mil_rs: 3450.0,
+      market_stability: "Fragile (Farmgate crash risk)",
+    },
+    {
+      adoption_rate_pct: 30,
+      total_supply_mt: 34000.0,
+      projected_demand_mt: 26667.0,
+      spi_score: 0.14,
+      spi_label: "Balanced",
+      farmgate_price_rs_kg: 132.0,
+      fair_floor_price_rs_kg: 120.0,
+      price_crash_risk_pct: 14.0,
+      total_farmer_revenue_mil_rs: 4488.0,
+      market_stability: "Moderate Buffer (+14%)",
+    },
+    {
+      adoption_rate_pct: 60,
+      total_supply_mt: 26667.0,
+      projected_demand_mt: 26667.0,
+      spi_score: 0.02,
+      spi_label: "Balanced",
+      farmgate_price_rs_kg: 158.0,
+      fair_floor_price_rs_kg: 120.0,
+      price_crash_risk_pct: 3.0,
+      total_farmer_revenue_mil_rs: 4213.4,
+      market_stability: "Stable & Equilibrium",
+    },
+  ],
+  conclusion:
+    "At 60% farmer adoption, supply aligns with demand, SPI enters the balanced band (+/-0.15), and price crash risk drops below 5%, preserving farmer profitability.",
+  isLive: false,
+}
+
+export async function fetchAdoptionSimulation(
+  crop: string = "big_onion",
+  demandMt: number = 26667.0,
+  uncoordinatedSupplyMt: number = 46000.0,
+): Promise<AdoptionSimulationResponse> {
+  const normCrop = crop.toLowerCase().includes("chilli") ? "chilli" : "big_onion"
+  try {
+    const url = new URL(`${API_BASE_URL}/api/simulation/adoption`)
+    url.searchParams.set("crop_id", normCrop)
+    url.searchParams.set("season_demand_mt", String(demandMt))
+    url.searchParams.set("uncoordinated_supply_mt", String(uncoordinatedSupplyMt))
+    const res = await fetch(url.toString())
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = await res.json()
+    return { ...data, isLive: true }
+  } catch (err) {
+    return { ...BASELINE_ADOPTION_SIMULATION, isLive: false }
+  }
+}
+
 
