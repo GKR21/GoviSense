@@ -55,8 +55,11 @@ import {
   fetchDecisionHistory,
   logDecisionActionApi,
   mapApiRecordToPolicyDecision,
+  getStoredAuthUser,
+  clearAuthSession,
   type LatestForecastsWithMeta,
   type CropForecastData,
+  type AuthUser,
 } from "../../api"
 
 import { OverviewScreen } from "./OverviewScreen"
@@ -113,6 +116,7 @@ export function OfficerScreen({
   const [forecastData, setForecastData] = useState<LatestForecastsWithMeta | null>(null)
   const [isLiveApi, setIsLiveApi] = useState(false)
   const [forecastLoading, setForecastLoading] = useState(true)
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => getStoredAuthUser())
 
   useEffect(() => {
     let active = true
@@ -264,13 +268,31 @@ export function OfficerScreen({
           <button
             className="profile-card"
             type="button"
-            onClick={() => setPage("Login")}
-            title="Switch User / Role"
+            onClick={() => {
+              clearAuthSession()
+              setPage("Login")
+            }}
+            title="Click to Switch User or Sign Out"
           >
-            <span className="avatar">{currentRole === "Admin" ? "KP" : "DN"}</span>
+            <span className="avatar">
+              {currentUser
+                ? currentUser.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase()
+                : currentRole === "Admin"
+                  ? "KP"
+                  : "DN"}
+            </span>
             <span>
-              <strong>{currentRole === "Admin" ? "K. Perera" : "D. Nimal"}</strong>
-              <small>{currentRole === "Admin" ? "System Administrator" : "Planning Officer"}</small>
+              <strong>
+                {currentUser?.name || (currentRole === "Admin" ? "K. Perera" : "D. Nimal")}
+              </strong>
+              <small>
+                {currentUser?.designation || (currentRole === "Admin" ? "System Administrator" : "Planning Officer")}
+              </small>
             </span>
             <MoreHorizontal size={17} />
           </button>
@@ -380,7 +402,10 @@ export function OfficerScreen({
             />
           ) : page === "Login" ? (
             <LoginScreen
-              onLogin={(selectedRole) => {
+              onLogin={(selectedRole, user) => {
+                if (user) {
+                  setCurrentUser(user)
+                }
                 if (selectedRole === "Farmer") {
                   setView("farmer")
                 } else if (selectedRole === "Admin") {
