@@ -115,11 +115,11 @@ export function OverviewScreen({
                 borderRadius: "999px",
                 fontSize: "11px",
                 fontWeight: "800",
-                background: isLiveApi ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)",
-                color: isLiveApi ? "var(--primary)" : "var(--oversupply)",
-                border: `1px solid ${isLiveApi ? "var(--balanced-border)" : "var(--oversupply-border)"}`,
+                background: isLiveApi ? "rgba(16, 185, 129, 0.15)" : "rgba(59, 130, 246, 0.15)",
+                color: isLiveApi ? "var(--primary)" : "#60a5fa",
+                border: `1px solid ${isLiveApi ? "var(--balanced-border)" : "rgba(59, 130, 246, 0.35)"}`,
               }}>
-                {isLiveApi ? "● LIVE API" : "DEMO / BASELINE"}
+                {isLiveApi ? "● LIVE ML PIPELINE" : "🔵 DEMO · TRAINED BASELINE"}
               </span>
               <span style={{
                 padding: "4px 12px",
@@ -169,14 +169,32 @@ export function OverviewScreen({
         <KpiTile
           label={`National ${crop} balance`}
           value={`${spiLabel} (${spiScore > 0 ? "+" : ""}${spiScore.toFixed(2)})`}
-          meta={spiAction || `Confidence: ${priceConfidence}%`}
+          meta={
+            <span>
+              {spiAction || `Confidence: ${priceConfidence}%`}
+              {!isLiveApi && (
+                <span style={{ marginLeft: "6px", color: "#60a5fa", fontSize: "10px", fontWeight: "700" }}>
+                  (Demo)
+                </span>
+              )}
+            </span>
+          }
           icon={spiLabel === "Glut" ? ArrowUpCircle : ArrowDownCircle}
           tone={spiLabel === "Glut" ? "warning" : spiLabel === "Shortage" ? "danger" : "success"}
         />
         <KpiTile
           label="Market farmgate price"
           value={`Rs. ${wholesalePrice.toFixed(2)}`}
-          meta={`Fair floor: Rs. ${profile.fairFloorPrice} / kg (AI 2)`}
+          meta={
+            <span>
+              Fair floor: Rs. {profile.fairFloorPrice} / kg (AI 2)
+              {!isLiveApi && (
+                <span style={{ marginLeft: "6px", color: "#60a5fa", fontSize: "10px", fontWeight: "700" }}>
+                  (Demo)
+                </span>
+              )}
+            </span>
+          }
           icon={CircleDollarSign}
           tone={wholesalePrice < profile.fairFloorPrice ? "danger" : "success"}
         />
