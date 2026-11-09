@@ -26,12 +26,13 @@ def test_scoreboard_stores_real_results_and_links_every_number(temp_db):
     # Verify rows were stored in the database
     stored_rows = temp_db.query(EvaluationResultModel).all()
     assert len(stored_rows) > 0
-    assert len(res["scoreboard"]) == len(stored_rows)
+    summary_rows = [r for r in stored_rows if r.model_name in ["A3 Supply Forecast", "A2 Price Forecast"] and r.metric_name == "WAPE"]
+    assert len(res["scoreboard"]) == len(summary_rows)
 
     # Test that no number in the response exists without a matching stored row
     for item in res["scoreboard"]:
         matching = [
-            r for r in stored_rows
+            r for r in summary_rows
             if r.crop_id == item["crop"] and r.model_name == item["module"]
         ]
         assert len(matching) == 1

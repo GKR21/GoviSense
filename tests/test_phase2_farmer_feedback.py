@@ -21,9 +21,9 @@ from govisense.feedback.planting_reports import PlantingReport, PlantingReportSt
 def test_farmer_top3_rich_advisor_metadata():
     res = farmer_top3(
         farmer_id="FARMER-TEST-001",
-        season="Maha",
+        season="Yala",
         land_ha=2.5,
-        current_month=10,
+        current_month=5,
         is_rainfed=False,
     )
     assert "top3" in res

@@ -53,3 +53,4 @@ def test_fresh_data_yields_real_quality():
         assert po["data_quality"] != "outdated"
         assert po["data_age_days"] is not None
         assert po["data_age_days"] <= 60
+

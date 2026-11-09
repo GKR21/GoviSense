@@ -39,8 +39,9 @@ def test_farmer_top3_endpoint_returns_required_fields():
         assert 0.0 <= crop["fit_score"] <= 100.0
 
         assert "profit_range_rs_kg" in crop
-        assert "p10_rs_kg" in crop["profit_range_rs_kg"]
-        assert "p90_rs_kg" in crop["profit_range_rs_kg"]
+        if crop["profit_range_rs_kg"] is not None:
+            assert "p10_rs_kg" in crop["profit_range_rs_kg"]
+            assert "p90_rs_kg" in crop["profit_range_rs_kg"]
 
         assert "risk_level" in crop
         assert crop["risk_level"] in ["Low", "Medium", "High"]

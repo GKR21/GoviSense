@@ -69,3 +69,4 @@ def test_no_mock_multipliers_on_model_missing():
             assert crop_item.get("profit_range_rs_kg") is None
             assert crop_item.get("price_data_quality") == "no_price_data"
             assert crop_item.get("monthly_price_ranges_12m") is None
+

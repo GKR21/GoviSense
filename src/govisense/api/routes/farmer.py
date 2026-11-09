@@ -76,6 +76,7 @@ def farmer_top3_recommendations(
     avg_temp_c: Optional[float] = Query(None),
     zone: Optional[str] = Query(None),
     water_source: Optional[str] = Query(None),
+    as_of: Optional[str] = Query(None),
     db: Any = Depends(get_db),
     current_user: Optional[Dict[str, Any]] = Depends(get_optional_current_user),
     **kwargs: Any,
@@ -220,9 +221,14 @@ def farmer_top3_recommendations(
 
                     yield_kg_acre = yield_mid * 0.4047 * 1000.0
                     cost_acre = (req.cost_per_ha_rs if req else 150000.0) * 0.4047
+                    yield_low_kg_ha = (req.yield_low_mt_ha if req else yield_mid * 0.8) * 1000.0
+                    yield_high_kg_ha = (req.yield_high_mt_ha if req else yield_mid * 1.2) * 1000.0
+                    cost_ha = (req.cost_per_ha_rs if req else 150000.0)
                     expected_net_profit_per_acre = {
                         "p10_rs_per_acre": round(yield_kg_acre * p10 - cost_acre, 1),
                         "p90_rs_per_acre": round(yield_kg_acre * p90 - cost_acre, 1),
+                        "p10_total_profit_lkr": round(((yield_low_kg_ha * p10) - cost_ha) * rec_ha, 1),
+                        "p90_total_profit_lkr": round(((yield_high_kg_ha * p90) - cost_ha) * rec_ha, 1),
                     }
         except Exception as err:
             logger.warning("Failed to evaluate A1/A2 models for %s: %s", crop_id, err)
@@ -245,7 +251,7 @@ def farmer_top3_recommendations(
             spi_ratio = spi_res.spi_ratio
             supply_quality = "real"
         else:
-            spi_band = None
+            spi_band = "Unknown"
             spi_ratio = None
             supply_quality = "no_supply_data"
 
