@@ -201,88 +201,59 @@ def login(req: LoginRequest):
     try:
         with get_session() as session:
             db_user = session.query(UserModel).filter(UserModel.username == email_clean).first()
-            if db_user:
-                if not verify_password(req.password, db_user.password_hash):
-                    # Also permit test password
-                    if req.password not in ("prototype", "govisense2026", "officer123", "admin123", "farmer123"):
-                        raise HTTPException(
-                            status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail="Invalid credentials. Incorrect password for this account.",
-                        )
-                
-                db_user.last_login = datetime.now(timezone.utc)
-                session.commit()
-                
-                # Fetch profile details
-                off_name = None
-                district = "Anuradhapura"
-                if db_user.officer_profile:
-                    off_name = db_user.officer_profile.name
-                    district = db_user.officer_profile.district
+            if not db_user:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid credentials. User not found.",
+                )
+            if not verify_password(req.password, db_user.password_hash):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid credentials. Incorrect password for this account.",
+                )
+            
+            db_user.last_login = datetime.now(timezone.utc)
+            session.commit()
+            
+            # Fetch profile details
+            off_name = None
+            district = "Anuradhapura"
+            if db_user.officer_profile:
+                off_name = db_user.officer_profile.name
+                district = db_user.officer_profile.district
 
-                user_info = {
-                    "email": db_user.username,
-                    "role": db_user.role.title(),
-                    "name": off_name or db_user.username.split("@")[0].replace(".", " ").title(),
-                    "designation": f"Verified {db_user.role.title()}",
-                    "district": district,
-                    "officer_id": db_user.officer_id or db_user.pseudonymous_id or "USR-0001",
-                    "pseudonymous_id": db_user.pseudonymous_id,
-                }
+            user_info = {
+                "email": db_user.username,
+                "role": db_user.role.title(),
+                "name": off_name or db_user.username.split("@")[0].replace(".", " ").title(),
+                "designation": f"Verified {db_user.role.title()}",
+                "district": district,
+                "officer_id": db_user.officer_id or db_user.pseudonymous_id or "USR-0001",
+                "pseudonymous_id": db_user.pseudonymous_id,
+            }
 
-                token_payload = {
-                    "sub": db_user.username,
-                    "role": db_user.role.lower(),
-                    "name": user_info["name"],
-                    "officer_id": user_info["officer_id"],
-                    "pseudonymous_id": db_user.pseudonymous_id,
-                    "district": district,
-                }
-                token = create_jwt_token(token_payload)
+            token_payload = {
+                "sub": db_user.username,
+                "role": db_user.role.lower(),
+                "name": user_info["name"],
+                "officer_id": user_info["officer_id"],
+                "pseudonymous_id": db_user.pseudonymous_id,
+                "district": district,
+            }
+            token = create_jwt_token(token_payload)
 
-                return {
-                    "access_token": token,
-                    "token_type": "bearer",
-                    "user": user_info,
-                }
+            return {
+                "access_token": token,
+                "token_type": "bearer",
+                "user": user_info,
+            }
     except HTTPException:
         raise
-    except Exception:
-        pass
-
-    # Dynamic fallback for pilot registration if DB lookup encountered error
-    derived_role = "officer"
-    if "admin" in email_clean or (req.role and req.role.lower() == "admin"):
-        derived_role = "admin"
-    elif "farmer" in email_clean or (req.role and req.role.lower() == "farmer"):
-        derived_role = "farmer"
-
-    if req.password in ("prototype", "officer123", "admin123", "farmer123", "govisense2026"):
-        token_payload = {
-            "sub": email_clean,
-            "role": derived_role,
-            "name": email_clean.split("@")[0].replace(".", " ").title(),
-            "officer_id": f"USR-{abs(hash(email_clean)) % 10000:04d}",
-            "district": "Anuradhapura",
-        }
-        token = create_jwt_token(token_payload)
-        return {
-            "access_token": token,
-            "token_type": "bearer",
-            "user": {
-                "email": email_clean,
-                "role": derived_role.title(),
-                "name": token_payload["name"],
-                "designation": f"Verified {derived_role.title()}",
-                "district": "Anuradhapura",
-                "officer_id": token_payload["officer_id"],
-            },
-        }
-
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid credentials. Please verify your email and password.",
-    )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Authentication failed. Database lookup error: {str(e)}",
+        )
 
 
 @router.get("/api/auth/me")
