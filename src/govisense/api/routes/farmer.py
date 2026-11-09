@@ -153,8 +153,8 @@ def farmer_top3_recommendations(
         except Exception as e:
             logger.error("Demand estimator failed for %s in month %d: %s", crop_id, eff_month, e)
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Demand estimation failed for crop '{crop_id}': {e}",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Demand estimation service unavailable for crop '{crop_id}': {e}",
             )
 
         # Check cumulative reported acreage and oversupply stop rule

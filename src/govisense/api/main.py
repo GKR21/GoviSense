@@ -321,6 +321,8 @@ def get_latest_forecasts():
     run_id = f"RUN-{g_commit[:7]}"
 
     # Phase 3.2: Persist pipeline execution and forecast snapshots to database
+    db_down = False
+    db_error = None
     try:
         with get_session() as session:
             run_rec = session.query(PipelineRunModel).filter(PipelineRunModel.run_id == run_id).first()
@@ -394,15 +396,22 @@ def get_latest_forecasts():
             session.commit()
     except Exception as e:
         logger.warning("Could not persist forecast snapshots to database: %s", e)
+        db_down = True
+        db_error = str(e)
 
     prov_meta = compute_dataset_provenance(cached_df)
+    data_quality = "db_unavailable" if db_down else prov_meta["data_quality"]
+    db_fallback = True if db_down else prov_meta["db_fallback"]
+    notes = f"Database unavailable ({db_error}); forecast served from runtime cache." if db_down else None
+
     return {
         "run_id": run_id,
         "data_version": d_ver,
         "model_version": m_ver,
-        "data_quality": prov_meta["data_quality"],
+        "data_quality": data_quality,
         "is_demo": prov_meta["is_demo"],
-        "db_fallback": prov_meta["db_fallback"],
+        "db_fallback": db_fallback,
+        "notes": notes,
         "served_model": "LightGBM-v2.1",
         "assumptions_ref": "docs/assumptions.md",
         "as_of": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
