@@ -107,6 +107,8 @@ class DecisionHistoryRecord(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     decision_id = Column(String(32), unique=True, index=True, nullable=False)
+    run_id = Column(String(64), nullable=True, index=True)
+    hash = Column(String(64), nullable=True)
     crop_id = Column(String(64), index=True, nullable=False)
     season = Column(String(64), index=True, nullable=False)
     officer_id = Column(String(64), index=True, nullable=False)
@@ -117,11 +119,15 @@ class DecisionHistoryRecord(Base):
     model_version = Column(String(64), nullable=False, default="LightGBM-v2.1+HiGHS-LP")
     data_version = Column(String(64), nullable=False, default="CBSL-HARTI-DOA-2024.12")
     assumptions = Column(JSON, nullable=True)
+    is_demo = Column(Boolean, nullable=False, default=False)
+    data_available = Column(Boolean, nullable=False, default=True)
+    source_type = Column(String(64), nullable=False, default="officer_audit_log")
     timestamp = Column(String(64), nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     __table_args__ = (
         Index("idx_decision_crop_season", "crop_id", "season"),
+        Index("idx_decision_run_id", "run_id"),
     )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -133,6 +139,8 @@ class DecisionHistoryRecord(Base):
                 pass
         return {
             "decision_id": self.decision_id,
+            "run_id": self.run_id or "",
+            "hash": self.hash or "",
             "crop_id": self.crop_id,
             "season": self.season,
             "officer_id": self.officer_id,
@@ -143,6 +151,9 @@ class DecisionHistoryRecord(Base):
             "model_version": self.model_version,
             "data_version": self.data_version,
             "assumptions": assumptions_val or {},
+            "is_demo": bool(self.is_demo) if self.is_demo is not None else False,
+            "data_available": bool(self.data_available) if self.data_available is not None else True,
+            "source_type": self.source_type or "officer_audit_log",
             "timestamp": self.timestamp,
         }
 

@@ -248,6 +248,9 @@ def require_role(role: Union[List[str], str]) -> RoleChecker:
 # Predefined role dependencies for clean endpoint declarations
 require_farmer = RoleChecker("farmer")
 require_officer = RoleChecker("officer")
+require_admin = RoleChecker("admin")
+require_officer_or_admin = RoleChecker(["officer", "admin"])
+require_authenticated = RoleChecker(["farmer", "officer", "admin"])
 
 
 def get_current_farmer(user: User = Depends(require_farmer)) -> User:
@@ -257,6 +260,11 @@ def get_current_farmer(user: User = Depends(require_farmer)) -> User:
 
 def get_current_officer(user: User = Depends(require_officer)) -> User:
     """Dependency specifically returning an authorized officer User."""
+    return user
+
+
+def get_current_admin(user: User = Depends(require_admin)) -> User:
+    """Dependency specifically returning an authorized admin User."""
     return user
 
 

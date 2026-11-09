@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import uuid
+import hashlib
 from datetime import datetime, timezone
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
@@ -26,6 +27,23 @@ from typing import Dict, Any, List, Optional
 
 from govisense.db.models import DecisionHistoryRecord
 from govisense.db.session import get_db_session, sqlite_write_lock
+
+
+def get_running_model_version(crop_id: Optional[str] = None) -> str:
+    """
+    Dynamically binds model_version to the active running model pipeline
+    (LightGBM yield correction + winning PriceForecaster + HiGHS LP solver).
+    """
+    try:
+        from govisense.api import main as api_main
+        if hasattr(api_main, "a2_models") and api_main.a2_models:
+            crop_key = crop_id if crop_id in api_main.a2_models else next(iter(api_main.a2_models.keys()))
+            forecaster = api_main.a2_models[crop_key]
+            winner = getattr(forecaster, "winner", "lightgbm")
+            return f"GoviSense-v2.0+{winner.upper()}+HiGHS-LP"
+    except Exception:
+        pass
+    return "GoviSense-v2.0+LightGBM+HiGHS-LP"
 
 
 # ---------------------------------------------------------------------------
@@ -139,7 +157,7 @@ class DecisionRecord:
     quantity: float
     unit: str
     rationale: str
-    model_version: str = "GoviSense v2.0"
+    model_version: Optional[str] = None
     data_version: str = "Harti-DoA-2024.12"
     assumptions: Dict[str, Any] = field(default_factory=lambda: {
         "loss_pct": 0.15,
@@ -149,12 +167,28 @@ class DecisionRecord:
     })
     decision_id: str = ""
     timestamp: str = ""
+    run_id: str = ""
+    hash: str = ""
+    is_demo: bool = False
+    data_available: bool = True
+    source_type: str = "officer_audit_log"
 
     def __post_init__(self):
         if not self.decision_id:
             self.decision_id = f"DEC-{uuid.uuid4().hex[:8].upper()}"
         if not self.timestamp:
             self.timestamp = datetime.now(timezone.utc).isoformat()
+        if not self.model_version:
+            self.model_version = get_running_model_version(self.crop_id)
+        if not self.run_id:
+            self.run_id = f"RUN-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+        if not self.hash:
+            payload_str = (
+                f"{self.decision_id}|{self.crop_id}|{self.season}|{self.officer_id}|"
+                f"{self.action_type}|{self.quantity}|{self.unit}|{self.model_version}|"
+                f"{self.data_version}|{self.timestamp}|{self.run_id}"
+            )
+            self.hash = hashlib.sha256(payload_str.encode("utf-8")).hexdigest()
 
 
 class DecisionHistoryStore:
@@ -176,7 +210,10 @@ class DecisionHistoryStore:
             try:
                 with open(self.storage_path, "r", encoding="utf-8") as f:
                     raw_data = json.load(f)
-                    self._records = [DecisionRecord(**item) for item in raw_data]
+                    self._records = [
+                        DecisionRecord(**{k: v for k, v in item.items() if k in DecisionRecord.__dataclass_fields__})
+                        for item in raw_data
+                    ]
             except Exception:
                 self._records = []
 
@@ -187,12 +224,14 @@ class DecisionHistoryStore:
                 json.dump([asdict(r) for r in self._records], f, indent=2)
 
     def log_decision(self, record: DecisionRecord) -> Dict[str, Any]:
-        """Record an officer action with snapshot of model version and assumptions."""
+        """Record an officer action with snapshot of model version, run_id, hash, and assumptions."""
         with sqlite_write_lock:
             if self._use_db:
                 with get_db_session() as db:
                     rec = DecisionHistoryRecord(
                         decision_id=record.decision_id,
+                        run_id=record.run_id,
+                        hash=record.hash,
                         crop_id=record.crop_id,
                         season=record.season,
                         officer_id=record.officer_id,
@@ -203,6 +242,9 @@ class DecisionHistoryStore:
                         model_version=record.model_version,
                         data_version=record.data_version,
                         assumptions=record.assumptions or {},
+                        is_demo=record.is_demo,
+                        data_available=record.data_available,
+                        source_type=record.source_type,
                         timestamp=record.timestamp,
                     )
                     db.add(rec)
@@ -214,8 +256,15 @@ class DecisionHistoryStore:
         return {
             "status": "RECORDED",
             "decision_id": record.decision_id,
+            "run_id": record.run_id,
+            "hash": record.hash,
             "crop_id": record.crop_id,
             "action_type": record.action_type,
+            "model_version": record.model_version,
+            "data_version": record.data_version,
+            "is_demo": record.is_demo,
+            "data_available": record.data_available,
+            "source_type": record.source_type,
             "timestamp": record.timestamp,
         }
 
@@ -249,6 +298,11 @@ class DecisionHistoryStore:
                         assumptions=r.assumptions or {},
                         decision_id=r.decision_id,
                         timestamp=r.timestamp,
+                        run_id=r.run_id or "",
+                        hash=r.hash or "",
+                        is_demo=bool(r.is_demo) if r.is_demo is not None else False,
+                        data_available=bool(r.data_available) if r.data_available is not None else True,
+                        source_type=r.source_type or "officer_audit_log",
                     )
                     for r in records
                 ]

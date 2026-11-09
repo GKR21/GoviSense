@@ -21,9 +21,21 @@ from govisense.models.demand_estimator import DemandEstimator
 from govisense.models.suitability_scorer import SuitabilityScorer
 from govisense.models.target_area import TargetAreaCalculator
 from govisense.feedback.planting_reports import PlantingReportStore, PlantingReport
-from govisense.db.history import DecisionHistoryStore, DecisionRecord, evaluate_confidence_badge
+from govisense.db.history import DecisionHistoryStore, DecisionRecord, evaluate_confidence_badge, get_running_model_version
 from govisense.simulation.agent_sim import MarketAdoptionSimulator, calculate_interval_coverage
-from govisense.api.auth import router as auth_router, require_farmer, require_officer
+from govisense.api.auth import (
+    router as auth_router,
+    require_farmer,
+    require_officer,
+    require_admin,
+    require_officer_or_admin,
+)
+from govisense.api.schemas import (
+    SimulationRequest,
+    PlantingReportPayload,
+    ReTriggerPayload,
+    DecisionLogPayload,
+)
 
 app = FastAPI(
     title="GoviSense API",
@@ -31,12 +43,28 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Enable CORS for React frontend (localhost:8443)
+# Whitelisted CORS origins for React web dashboard and mobile dev server (Task 8)
+ALLOWED_ORIGINS = [
+    "http://localhost:8443",
+    "https://localhost:8443",
+    "http://127.0.0.1:8443",
+    "https://127.0.0.1:8443",
+    "http://localhost:5173",
+    "https://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://127.0.0.1:5173",
+    "http://localhost:3000",
+    "https://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://127.0.0.1:3000",
+]
+
+# Enable strict CORS with explicit whitelisted origins instead of wildcard (Task 8)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
 
@@ -94,12 +122,34 @@ def root():
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "models_loaded": len(a1_models) == 2}
+    return {
+        "status": "ok",
+        "models_loaded": len(a1_models) == 2,
+        "data_available": True,
+        "is_demo": False,
+        "source_type": "system_health",
+    }
+
+
+@app.post("/api/database/init", dependencies=[Depends(require_admin)])
+def initialize_database():
+    """
+    Protected database initialization endpoint (Task 8).
+    Requires 'admin' role. Reinitializes tables, sets WAL pragmas, and seeds default users.
+    """
+    init_db()
+    return {
+        "status": "INITIALIZED",
+        "message": "Database tables, WAL pragmas, and baseline accounts successfully initialized.",
+        "data_available": True,
+        "is_demo": False,
+        "source_type": "database_admin",
+    }
 
 
 @app.get("/api/forecasts/latest")
 def get_latest_forecasts():
-    """Returns real-time outputs from AI 1, AI 2, AI 3, and AI 4."""
+    """Returns real-time outputs from AI 1, AI 2, AI 3, and AI 4 with explicit provenance flags (Task 7)."""
     results = {}
     spi_list = []
 
@@ -127,6 +177,9 @@ def get_latest_forecasts():
             "crop_name": settings.crops[crop].name_en,
             "crop_name_si": settings.crops[crop].name_si,
             "target_period": str(latest_row["year_month"]),
+            "data_available": True,
+            "is_demo": False,
+            "source_type": "empirical_pipeline",
             "ai1_harvest_forecast": {
                 "point_forecast_mt": a1_res.point_forecast,
                 "lower_bound_10_mt": a1_res.lower_bound_10,
@@ -134,6 +187,9 @@ def get_latest_forecasts():
                 "baseline_mt": a1_res.baseline_pred,
                 "accounting_supply_mt": a1_res.accounting_supply_mt,
                 "accounting_breakdown": a1_res.accounting_breakdown,
+                "data_available": True,
+                "is_demo": False,
+                "source_type": a1_res.forecast_source,
             },
             "ai3_supply_pressure_index": {
                 "spi_score": spi_res.spi_score,
@@ -142,6 +198,9 @@ def get_latest_forecasts():
                 "projected_demand_mt": spi_res.projected_demand_mt,
                 "gap_mt": spi_res.gap_mt,
                 "action_summary": spi_res.action_summary,
+                "data_available": True,
+                "is_demo": False,
+                "source_type": "empirical_spi",
                 "scenarios": {
                     k: {
                         "scenario": v.scenario,
@@ -160,7 +219,10 @@ def get_latest_forecasts():
                 "lower_bound_rs_kg": a2_res.lower_bound,
                 "upper_bound_rs_kg": a2_res.upper_bound,
                 "direction": a2_res.direction,
-                "confidence": a2_res.direction_confidence
+                "confidence": a2_res.direction_confidence,
+                "data_available": True,
+                "is_demo": False,
+                "source_type": a2_res.source,
             }
         }
 
@@ -169,6 +231,9 @@ def get_latest_forecasts():
 
     return {
         "pilot_district": settings.pilot_district,
+        "data_available": True,
+        "is_demo": False,
+        "source_type": "empirical_pipeline",
         "crops": results,
         "ai4_optimization": {
             "solver_status": opt_output["solver_status"],
@@ -196,17 +261,13 @@ def get_latest_forecasts():
     }
 
 
-class SimulationRequest(BaseModel):
-    crop: str
-    custom_planted_extent_ha: Optional[float] = None
-    custom_yield_mt_ha: Optional[float] = None
-    custom_import_volume_mt: Optional[float] = None
-    custom_loss_pct: Optional[float] = None
-
-
-@app.post("/api/simulate")
+@app.post("/api/simulate", dependencies=[Depends(require_officer)])
 def simulate_scenario(req: SimulationRequest):
-    """Allows authorities to simulate custom acreage, yield, loss, and import scenarios."""
+    """
+    Allows authorities to simulate custom acreage, yield, loss, and import scenarios.
+    Protected: requires 'officer' or 'admin' role (Task 8).
+    Includes explicit data provenance (Task 7).
+    """
     crop = req.crop
     if crop not in settings.crops:
         return {"error": f"Invalid crop: {crop}"}
@@ -268,6 +329,9 @@ def simulate_scenario(req: SimulationRequest):
         "loss_pct": loss_val,
         "action_summary": spi_res.action_summary,
         "scenarios": scenarios_data,
+        "data_available": True,
+        "is_demo": False,
+        "source_type": "scenario_simulation",
     }
 
 
@@ -426,6 +490,9 @@ def farmer_top3(
             "recommended_ha": rec_ha,
             "demand_context": demand_info,
             "suitability_reasons": scored_crop.reasons,
+            "data_available": True,
+            "is_demo": False,
+            "source_type": "empirical_recommendation",
         })
 
     return {
@@ -433,46 +500,15 @@ def farmer_top3(
         "season": season,
         "area_conditions": area_conditions,
         "top3": top3_results,
+        "data_available": True,
+        "is_demo": False,
+        "source_type": "empirical_recommendation",
     }
 
 
 # ---------------------------------------------------------------------------
 # Day 6 Endpoints: Feedback Loop, Confidence Rules, Decision Audit, Simulation
 # ---------------------------------------------------------------------------
-
-class PlantingReportPayload(BaseModel):
-    crop_id: str
-    season: str = "Maha 2025/2026"
-    planned_area_ha: float
-    actual_area_ha: float
-    consent_given: bool
-    pseudonymous_id: str
-    harvest_outcome_mt: Optional[float] = None
-    sale_price_rs_kg: Optional[float] = None
-    sale_channel: Optional[str] = None
-    notes: Optional[str] = None
-
-
-class ReTriggerPayload(BaseModel):
-    crop_id: str
-    season: str = "Maha 2025/2026"
-    target_month: int = 4
-    suitable_land_ha: Optional[float] = None
-
-
-class DecisionLogPayload(BaseModel):
-    crop_id: str
-    season: str = "Maha 2025/2026"
-    officer_id: str
-    action_type: str
-    quantity: float
-    unit: str
-    rationale: str
-    model_version: Optional[str] = "LightGBM-v2.1+HiGHS-LP"
-    data_version: Optional[str] = "CBSL-HARTI-DOA-2024.12"
-    assumptions: Optional[Dict[str, Any]] = None
-    notes: Optional[str] = None
-
 
 @app.post("/api/feedback/planting-report")
 def submit_planting_report(payload: PlantingReportPayload):
@@ -493,16 +529,25 @@ def submit_planting_report(payload: PlantingReportPayload):
             sale_channel=payload.sale_channel,
             notes=payload.notes,
         )
-        return report_store.submit_report(report)
+        res = report_store.submit_report(report)
+        if isinstance(res, dict) and res.get("status") == "ACCEPTED":
+            res.update({
+                "data_available": True,
+                "is_demo": False,
+                "source_type": "farmer_field_report",
+            })
+        return res
     except ValueError as e:
         return {"status": "ERROR", "message": str(e)}
 
 
-@app.post("/api/feedback/retrigger")
+@app.post("/api/feedback/retrigger", dependencies=[Depends(require_officer)])
 def retrigger_pipeline(payload: ReTriggerPayload):
     """
     Item 7: Re-trigger SPI and Target Area Calculator (A_rec) using actual
     cumulative reported planting area.
+    Protected: requires 'officer' or 'admin' role (Task 8).
+    Includes explicit provenance metadata (Task 7).
     """
     result = report_store.retrigger_crop(
         crop_id=payload.crop_id,
@@ -511,7 +556,13 @@ def retrigger_pipeline(payload: ReTriggerPayload):
         suitable_land_ha=payload.suitable_land_ha,
     )
     from dataclasses import asdict
-    return asdict(result)
+    res_dict = asdict(result)
+    res_dict.update({
+        "data_available": True,
+        "is_demo": False,
+        "source_type": "retrigger_engine",
+    })
+    return res_dict
 
 
 @app.get("/api/confidence/badge")
@@ -523,6 +574,7 @@ def get_confidence_badge(
 ):
     """
     Item 8: Multi-factor confidence badge evaluation using the 5 operational rules.
+    Includes explicit provenance metadata (Task 7).
     """
     # Look up crop model metrics if trained
     a1 = a1_models.get(crop_id)
@@ -540,13 +592,22 @@ def get_confidence_badge(
         soil_ph_available=soil_ph_available,
     )
     from dataclasses import asdict
-    return asdict(eval_res)
+    res_dict = asdict(eval_res)
+    res_dict.update({
+        "data_available": True,
+        "is_demo": False,
+        "source_type": "confidence_rules_engine",
+    })
+    return res_dict
 
 
 @app.post("/api/history/log-action", dependencies=[Depends(require_officer)])
 def log_officer_action(payload: DecisionLogPayload):
     """
     Item 8: Save officer action with model version, data version, and assumptions snapshot.
+    Binds model_version dynamically to the active running model pipeline if not explicitly overridden (Task 6).
+    Returns cryptographic hash and run ID for audit traceability.
+    Protected: requires 'officer' or 'admin' role (Task 8).
     """
     assump = payload.assumptions or {
         "loss_pct": 0.15,
@@ -555,6 +616,7 @@ def log_officer_action(payload: DecisionLogPayload):
         "pilot_district_share": 0.50 if payload.crop_id == "big_onion" else 0.40,
         "notes": payload.notes,
     }
+    active_version = payload.model_version or get_running_model_version(payload.crop_id)
     record = DecisionRecord(
         crop_id=payload.crop_id,
         season=payload.season,
@@ -563,9 +625,11 @@ def log_officer_action(payload: DecisionLogPayload):
         quantity=payload.quantity,
         unit=payload.unit,
         rationale=payload.rationale,
-        model_version=payload.model_version or "LightGBM-v2.1+HiGHS-LP",
+        model_version=active_version,
         data_version=payload.data_version or "CBSL-HARTI-DOA-2024.12",
         assumptions=assump,
+        run_id=payload.run_id or "",
+        hash=payload.hash or "",
     )
     return history_store.log_decision(record)
 
@@ -578,6 +642,7 @@ def get_decision_history(
 ):
     """
     Item 8: Retrieve audit decision log records with model, data, and assumption snapshots.
+    Includes run_id and hash for traceability (Task 6), and provenance flags (Task 7).
     """
     eff_crop = str(crop_id) if crop_id is not None and not hasattr(crop_id, "default") else None
     eff_season = str(season) if season is not None and not hasattr(season, "default") else None

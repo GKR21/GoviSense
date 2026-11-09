@@ -20,7 +20,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator, Optional
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker, Session
 
 from govisense.config import PROCESSED_DATA_DIR
@@ -182,46 +182,81 @@ def migrate_legacy_json_files(db: Session) -> None:
 
 
 def seed_default_users(db: Session) -> None:
-    """Seeds demo officer and farmer accounts if the users table is empty."""
-    user_count = db.query(User).count()
-    if user_count == 0:
-        try:
-            from govisense.api.auth import get_password_hash
-            hash_func = get_password_hash
-        except Exception:
-            import hashlib
-            def hash_func(pw: str) -> str:
-                return hashlib.sha256(pw.encode()).hexdigest()
+    """Seeds demo officer, farmer, and admin accounts if not already present."""
+    try:
+        from govisense.api.auth import get_password_hash
+        hash_func = get_password_hash
+    except Exception:
+        import hashlib
+        def hash_func(pw: str) -> str:
+            return hashlib.sha256(pw.encode()).hexdigest()
 
-        demo_users = [
-            User(
-                username="officer_anuradhapura",
-                hashed_password=hash_func("Officer@123"),
-                role="officer",
-                full_name="Kavinda Perera (Agricultural Officer)",
-                phone_number="+94771234567",
-                district="Anuradhapura",
-                is_active=True,
-            ),
-            User(
-                username="farmer_kamal",
-                hashed_password=hash_func("Farmer@123"),
-                role="farmer",
-                full_name="Kamal Gunaratne",
-                phone_number="+94777654321",
-                district="Anuradhapura",
-                is_active=True,
-            ),
-        ]
-        db.bulk_save_objects(demo_users)
+    existing_usernames = {u.username for u in db.query(User.username).all()}
+
+    demo_users = [
+        User(
+            username="admin_govisense",
+            hashed_password=hash_func("Admin@123"),
+            role="admin",
+            full_name="System Administrator (National)",
+            phone_number="+94112345678",
+            district="National",
+            is_active=True,
+        ),
+        User(
+            username="officer_anuradhapura",
+            hashed_password=hash_func("Officer@123"),
+            role="officer",
+            full_name="Kavinda Perera (Agricultural Officer)",
+            phone_number="+94771234567",
+            district="Anuradhapura",
+            is_active=True,
+        ),
+        User(
+            username="farmer_kamal",
+            hashed_password=hash_func("Farmer@123"),
+            role="farmer",
+            full_name="Kamal Gunaratne",
+            phone_number="+94777654321",
+            district="Anuradhapura",
+            is_active=True,
+        ),
+    ]
+
+    users_to_add = [u for u in demo_users if u.username not in existing_usernames]
+    if users_to_add:
+        db.bulk_save_objects(users_to_add)
         db.commit()
-        logger.info("Seeded default demo users (officer_anuradhapura, farmer_kamal).")
+        logger.info(f"Seeded default users: {[u.username for u in users_to_add]}.")
+
+
+def migrate_db_columns() -> None:
+    """Migrates missing columns in existing SQLite tables (e.g. run_id, hash, is_demo)."""
+    try:
+        with engine.connect() as conn:
+            res = conn.execute(text("PRAGMA table_info(decision_history);")).fetchall()
+            existing_cols = {row[1] for row in res}
+            if existing_cols:
+                cols_to_add = [
+                    ("run_id", "VARCHAR(64)"),
+                    ("hash", "VARCHAR(64)"),
+                    ("is_demo", "BOOLEAN DEFAULT 0 NOT NULL"),
+                    ("data_available", "BOOLEAN DEFAULT 1 NOT NULL"),
+                    ("source_type", "VARCHAR(64) DEFAULT 'officer_audit_log' NOT NULL"),
+                ]
+                for col_name, col_type in cols_to_add:
+                    if col_name not in existing_cols:
+                        conn.execute(text(f"ALTER TABLE decision_history ADD COLUMN {col_name} {col_type};"))
+                conn.commit()
+    except Exception as e:
+        logger.warning(f"Column migration warning: {e}")
 
 
 def init_db() -> None:
     """Initializes tables, sets up WAL pragmas, and runs initial data migrations."""
     PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(bind=engine)
+    migrate_db_columns()
     with get_db_session() as db:
         migrate_legacy_json_files(db)
         seed_default_users(db)

@@ -9,10 +9,10 @@ This document tracks all tasks assigned to the software implementation role (Hes
 | Domain | Total Tasks | Completed | In Progress | Pending |
 | :--- | :---: | :---: | :---: | :---: |
 | **Data Pipeline** | 4 | 4 | 0 | 0 |
-| **Backend** | 8 | 2 | 3 | 3 |
+| **Backend** | 8 | 5 | 1 | 2 |
 | **Mobile App** | 5 | 0 | 1 | 4 |
 | **Quality & Infra** | 3 | 0 | 1 | 2 |
-| **Total** | **20** | **6** | **5** | **9** |
+| **Total** | **20** | **9** | **3** | **8** |
 
 ---
 
@@ -42,20 +42,17 @@ This document tracks all tasks assigned to the software implementation role (Hes
   - *Current Status*: Completed. Added `get_adoption_summary()` returning explicit `data_available: false`, null counts, and telemetry provenance notes. Implemented `GET /api/simulation/adoption-summary` and `GET /api/adoption/summary`, and updated `GET /api/simulation/adoption` with data availability flags.
   - *Files*: `src/govisense/api/main.py`, `src/govisense/simulation/agent_sim.py`, `tests/test_api.py`, `tests/test_day6_simulation_and_coverage.py`.
 
-- [ ] **Task 6 (P0)**: Make API return hash and run ID in decision history, and bind `model_version` dynamically.
-  - *Current Status*: `DecisionRecord` dataclass in `db/history.py` drops `run_id` and content `hash`, and defaults `model_version` to fixed string `"GoviSense v2.0"`.
-  - *Target*: Add `run_id` and cryptographic `hash` to `DecisionRecord` / `DecisionHistoryRecord`, and bind `model_version` to active model pipeline version.
-  - *Files*: `src/govisense/db/history.py`, `src/govisense/db/models.py`, `src/govisense/api/main.py`.
+- [x] **Task 6 (P0)**: Make API return hash and run ID in decision history, and bind `model_version` dynamically.
+  - *Current Status*: Completed. Updated `DecisionRecord` and `DecisionHistoryRecord` to automatically populate cryptographic SHA-256 `hash` and `run_id` (e.g. `RUN-20261109-XXXXXX`). Dynamically bound `model_version` to the active running pipeline model via `get_running_model_version(crop_id)`. `POST /api/history/log-action` and `GET /api/history/decisions` now return `hash` and `run_id` for audit traceability.
+  - *Files*: `src/govisense/db/history.py`, `src/govisense/db/models.py`, `src/govisense/api/main.py`, `src/govisense/api/schemas.py`.
 
-- [ ] **Task 7 (P0)**: Add `is_demo`, `data_available`, and `source_type` fields to API responses.
-  - *Current Status*: Forecast and simulation endpoints return metrics without standard provenance headers.
-  - *Target*: Include `is_demo: bool`, `data_available: bool`, and `source_type: str` in forecast, price, and allocation responses so frontend and mobile accurately display telemetry authenticity.
-  - *Files*: `src/govisense/api/main.py`, `src/govisense/api/schemas.py`.
+- [x] **Task 7 (P0)**: Add `is_demo`, `data_available`, and `source_type` fields to API responses.
+  - *Current Status*: Completed. Added standard provenance metadata (`is_demo`, `data_available`, `source_type`) to `/api/forecasts/latest` (top-level and sub-model levels), `/api/simulate`, `/api/farmer/top3`, `/api/confidence/badge`, `/api/feedback/planting-report`, `/api/feedback/retrigger`, and `/api/history/decisions`. Defined contracts in `src/govisense/api/schemas.py`.
+  - *Files*: `src/govisense/api/main.py`, `src/govisense/api/schemas.py`, `src/govisense/feedback/planting_reports.py`.
 
-- [ ] **Task 8 (P1)**: JWT login with `officer`, `farmer`, and `admin` roles, protect endpoints, and restrict CORS.
-  - *Current Status*: `auth.py` implemented with `farmer` and `officer` roles, password hashing with bcrypt, and login/refresh endpoints. Wildcard CORS currently enabled (`allow_origins=["*"]`).
-  - *Target*: Add `admin` role explicitly; protect `/api/database/init`, `/api/feedback/retrigger`, and `/api/simulate`; replace `allow_origins=["*"]` with explicit whitelist (`http://localhost:8443`, `http://localhost:5173`, `http://localhost:3000`).
-  - *Files*: `src/govisense/api/auth.py`, `src/govisense/api/main.py`.
+- [x] **Task 8 (P1)**: JWT login with `officer`, `farmer`, and `admin` roles, protect endpoints, and restrict CORS.
+  - *Current Status*: Completed. Added `admin` role and `require_admin` dependency; seeded default administrator `admin_govisense` with `Admin@123`. Enforced RBAC protection: `/api/database/init` (admin only), `/api/simulate` (officer/admin), `/api/feedback/retrigger` (officer/admin), and `/api/history/log-action` (officer/admin). Replaced wildcard CORS with strict whitelisted origins (`localhost:8443`, `localhost:5173`, `localhost:3000`).
+  - *Files*: `src/govisense/api/auth.py`, `src/govisense/api/main.py`, `src/govisense/db/session.py`.
 
 - [ ] **Task 9 (P1)**: Add missing endpoints for Rashmika (Catalogue, Adoption Summary, Decision List with Hash/Run ID, Run Info).
   - *Current Status*: Some endpoints exist in monolithic `main.py`; standalone catalogue query, run info, and enhanced decision history with hash/run ID are needed.
