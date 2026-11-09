@@ -175,29 +175,57 @@ def farmer_top3_recommendations(
         else:
             rec_ha = min(round(eff_land * 0.60, 2), remaining_target_ha)
 
-        # Expected price ranges
-        cfg = settings.crops.get(crop_id) or settings.crops.get("big_onion")
-        floor = cfg.min_fair_farmgate_price if cfg else 120.0
-        p10 = round(floor * 0.85, 0)
-        p90 = round(floor * 1.50, 0)
+        # Map crop identifier to model identifier (e.g. chilli_green -> chilli)
+        model_crop_id = "chilli" if crop_id in ("chilli", "chilli_green") else crop_id
 
-        # 12-month expected price ranges
-        monthly_price_ranges_12m = []
-        for m in range(1, 13):
-            s_factor = 1.0 + 0.15 * np.sin(2 * np.pi * m / 12.0)
-            monthly_price_ranges_12m.append({
-                "month": m,
-                "p10_rs_kg": round(p10 * s_factor, 1),
-                "p50_rs_kg": round(((p10 + p90) / 2.0) * s_factor, 1),
-                "p90_rs_kg": round(p90 * s_factor, 1),
-            })
+        # Real AI 1 forecast supply & AI 2 price forecast (No 1000.0 MT or static multipliers)
+        a1_forecast_supply_mt = None
+        profit_range = None
+        price_forecast = None
+        expected_net_profit_per_acre = None
+        monthly_price_ranges_12m = None
 
-        yield_kg_acre = yield_mid * 0.4047 * 1000.0
-        cost_acre = (req.cost_per_ha_rs if req else 150000.0) * 0.4047
-        expected_net_profit_per_acre = {
-            "p10_rs_per_acre": round(yield_kg_acre * p10 - cost_acre, 1),
-            "p90_rs_per_acre": round(yield_kg_acre * p90 - cost_acre, 1),
-        }
+        try:
+            import govisense.api.main as api_main
+            api_main._ensure_models_loaded()
+            cached_df = api_main.cached_df
+            if cached_df is not None and model_crop_id in api_main.a1_models:
+                crop_df = cached_df[cached_df["crop"] == model_crop_id].sort_values("date")
+                if not crop_df.empty:
+                    latest_row = crop_df.iloc[-1]
+                    a1_res = api_main.a1_models[model_crop_id].predict_row(latest_row)
+                    a1_forecast_supply_mt = float(a1_res.point_forecast)
+
+            if cached_df is not None and model_crop_id in api_main.a2_models:
+                crop_df = cached_df[cached_df["crop"] == model_crop_id].sort_values("date")
+                if not crop_df.empty:
+                    latest_row = crop_df.iloc[-1]
+                    a2_res = api_main.a2_models[model_crop_id].forecast_step(latest_row, horizon=1)
+                    p10 = round(float(a2_res.lower_bound), 1)
+                    p50 = round(float(a2_res.best_forecast), 1)
+                    p90 = round(float(a2_res.upper_bound), 1)
+                    profit_range = {"p10_rs_kg": p10, "p90_rs_kg": p90}
+                    price_forecast = {"p10_rs_kg": p10, "p50_rs_kg": p50, "p90_rs_kg": p90}
+
+                    # Conformal multi-month price intervals (horizons 1..12) directly from A2 model
+                    monthly_price_ranges_12m = []
+                    for m in range(1, 13):
+                        step_res = api_main.a2_models[model_crop_id].forecast_step(latest_row, horizon=m)
+                        monthly_price_ranges_12m.append({
+                            "month": m,
+                            "p10_rs_kg": round(float(step_res.lower_bound), 1),
+                            "p50_rs_kg": round(float(step_res.best_forecast), 1),
+                            "p90_rs_kg": round(float(step_res.upper_bound), 1),
+                        })
+
+                    yield_kg_acre = yield_mid * 0.4047 * 1000.0
+                    cost_acre = (req.cost_per_ha_rs if req else 150000.0) * 0.4047
+                    expected_net_profit_per_acre = {
+                        "p10_rs_per_acre": round(yield_kg_acre * p10 - cost_acre, 1),
+                        "p90_rs_per_acre": round(yield_kg_acre * p90 - cost_acre, 1),
+                    }
+        except Exception as err:
+            logger.warning("Failed to evaluate A1/A2 models for %s: %s", crop_id, err)
 
         dur = req.duration_months if req else 3
         harvest_month = ((eff_month + dur - 1) % 12) + 1
@@ -205,15 +233,21 @@ def farmer_top3_recommendations(
             f"Month {req.plant_start_month}–{req.plant_end_month}" if req else f"Month {eff_month}"
         )
         harvest_period = f"Month {harvest_month} (approx)"
-        try:
-            spi_res = spi_engine.calculate(
-                crop_id=crop_id,
+
+        if a1_forecast_supply_mt is not None:
+            spi_res = spi_engine.compute_spi(
+                crop=model_crop_id,
+                forecast_supply_mt=a1_forecast_supply_mt,
                 month=harvest_month,
                 target_date=f"Month {harvest_month}",
             )
             spi_band = spi_res.spi_label
-        except Exception:
-            spi_band = "Balanced"
+            spi_ratio = spi_res.spi_ratio
+            supply_quality = "real"
+        else:
+            spi_band = None
+            spi_ratio = None
+            supply_quality = "no_supply_data"
 
         exp_yield = round(rec_ha * yield_mid, 2)
         floor_price = settings.crops[crop_id].min_fair_farmgate_price if crop_id in settings.crops else 120.0
@@ -224,8 +258,11 @@ def farmer_top3_recommendations(
             "crop_name": scored_crop.crop_name,
             "fit_score": fit_score,
             "confidence_badge": confidence_badge,
-            "profit_range_rs_kg": {"p10_rs_kg": p10, "p90_rs_kg": p90},
-            "price_forecast": {"p10_rs_kg": p10, "p50_rs_kg": round((p10 + p90) / 2.0, 1), "p90_rs_kg": p90},
+            "supply_forecast_mt": a1_forecast_supply_mt,
+            "supply_data_quality": supply_quality,
+            "profit_range_rs_kg": profit_range,
+            "price_forecast": price_forecast,
+            "price_data_quality": "real" if price_forecast is not None else "no_price_data",
             "fair_floor_price_rs_kg": floor_price,
             "expected_net_profit_per_acre": expected_net_profit_per_acre,
             "monthly_price_ranges_12m": monthly_price_ranges_12m,
@@ -235,6 +272,7 @@ def farmer_top3_recommendations(
             "harvest_period": harvest_period,
             "duration_months": dur,
             "spi_band_at_harvest": spi_band,
+            "spi_ratio_at_harvest": spi_ratio,
             "growing_duration_days": (req.duration_months * 30) if req else 90,
             "primary_fertilizer": "NPK + Compost",
             "allocated_ha": rec_ha,

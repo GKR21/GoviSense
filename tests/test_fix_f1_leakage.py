@@ -69,3 +69,4 @@ def test_leakage_weather_and_actuals():
         f"A1 harvest forecast leaked target value! Base: {a1_base.point_forecast}, "
         f"Mutated: {a1_mutated.point_forecast}"
     )
+

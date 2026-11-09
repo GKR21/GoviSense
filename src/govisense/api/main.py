@@ -84,6 +84,7 @@ from govisense.api.routes.data import (
 )
 from govisense.api.routes.officer import (
     router as officer_router,
+    simulate_scenario,
     list_pipeline_runs,
     get_pipeline_run_detail,
     save_decision_action,
@@ -443,7 +444,8 @@ class SimulationRequest(BaseModel):
     custom_shortage_ratio_threshold: Optional[float] = None
 
 
-@app.post("/api/simulate")
+# Handled via officer_router (@router.post("/api/simulate"))
+# @app.post("/api/simulate")
 def simulate_scenario(req: SimulationRequest):
     """Allows authorities to simulate custom acreage, yield, loss, and import scenarios."""
     crop = req.crop
@@ -527,237 +529,9 @@ def simulate_scenario(req: SimulationRequest):
     }
 
 
-# ---------------------------------------------------------------------------
-# Item 6 – Farmer Top-3 Comparison Endpoint
-# ---------------------------------------------------------------------------
-
-@app.get("/api/farmer/top3")
-def farmer_top3(
-    farmer_id: str = Query(..., description="Pseudonymous farmer identifier"),
-    season: str = Query("Maha", description="Season: 'Maha' or 'Yala'"),
-    land_ha: float = Query(3.0, description="Farmer's available land in hectares"),
-    current_month: int = Query(10, description="Current calendar month (1-12)"),
-    is_rainfed: bool = Query(False, description="Whether the farm area is rainfed (no irrigation)"),
-    annual_rainfall_mm: float = Query(1100.0, description="Mean annual rainfall at site (mm)"),
-    avg_temp_c: float = Query(28.0, description="Mean growing-season temperature (°C)"),
-    soil_ph: Optional[float] = Query(None, description="Site soil pH (omit if unknown)"),
-    zone: str = Query("dry", description="Agro-climatic zone: 'dry', 'intermediate', or 'wet'"),
-):
-    """
-    Returns the top-3 recommended crops for a given farmer plus contextual
-    metadata for each crop: fit_score, profit_range (P10–P90 price),
-    risk_level, water_need, planting_window, harvest_period,
-    spi_band_at_harvest, and confidence_badge.
-
-    The endpoint uses:
-    - SuitabilityScorer (WP2) for fit scores and hard filtering
-    - DemandEstimator (WP1) for demand context
-    - SPI engine for supply pressure at harvest
-    - A2 price forecaster for profit range (if model is loaded)
-    - TargetAreaCalculator for area recommendations
-    """
-    eff_month = int(current_month) if not hasattr(current_month, "default") else int(getattr(current_month, "default", 10) or 10)
-    eff_rainfed = bool(is_rainfed) if not hasattr(is_rainfed, "default") else bool(getattr(is_rainfed, "default", False))
-    eff_rainfall = float(annual_rainfall_mm) if not hasattr(annual_rainfall_mm, "default") else float(getattr(annual_rainfall_mm, "default", 1100.0) or 1100.0)
-    eff_temp = float(avg_temp_c) if not hasattr(avg_temp_c, "default") else float(getattr(avg_temp_c, "default", 28.0) or 28.0)
-    eff_ph = float(soil_ph) if (soil_ph is not None and not hasattr(soil_ph, "default")) else None
-    eff_zone = str(zone) if not hasattr(zone, "default") else str(getattr(zone, "default", "dry") or "dry")
-    eff_land = float(land_ha) if not hasattr(land_ha, "default") else float(getattr(land_ha, "default", 3.0) or 3.0)
-
-    area_conditions = {
-        "current_month": eff_month,
-        "is_rainfed": eff_rainfed,
-        "annual_rainfall_mm": eff_rainfall,
-        "avg_temp_c": eff_temp,
-        "soil_ph": eff_ph,
-        "zone": eff_zone,
-    }
-
-    # Get suitability ranking for all crops
-    ranking = suitability_scorer.rank_crops(area_conditions)
-
-    if not ranking:
-        return {
-            "farmer_id": farmer_id,
-            "season": season,
-            "message": "No suitable crops found for the given area conditions.",
-            "top3": [],
-        }
-
-    top3_results = []
-    for scored_crop in ranking[:3]:
-        crop_id = scored_crop.crop_id
-        fit_score = scored_crop.score_0_100
-        confidence_badge = scored_crop.confidence
-
-        # Load crop requirements for this crop
-        try:
-            from govisense.data.crop_requirements import get_crop_requirements
-            all_reqs = get_crop_requirements()
-            req = all_reqs.get(crop_id)
-        except Exception:
-            req = None
-
-        # Demand context
-        demand_month = eff_month
-        try:
-            dem_result = demand_estimator.estimate(crop_id, demand_month, scenario="mid")
-            demand_info = {
-                "monthly_demand_mt": dem_result.demand_mt,
-                "seasonal_factor": dem_result.seasonal_factor,
-            }
-        except Exception:
-            demand_info = {}
-
-        # SPI at harvest (approx harvest = planting + duration)
-        harvest_month = ((eff_month + (req.duration_months if req else 3) - 1) % 12) + 1
-        try:
-            spi_harvest = spi_engine.compute_spi(
-                crop=crop_id if crop_id in ("big_onion", "chilli") else "big_onion",
-                forecast_supply_mt=1000.0,  # placeholder; real supply from AI 1
-                month=harvest_month,
-                target_date=f"Month {harvest_month}",
-            )
-            spi_band = spi_harvest.spi_label
-        except Exception:
-            spi_band = "Unknown"
-
-        # Price range from A2 model (if available, else use config floor + margin)
-        p10: Optional[float] = None
-        p90: Optional[float] = None
-        cfg = settings.crops.get(crop_id) or settings.crops.get(
-            "chilli" if "chilli" in crop_id else "big_onion"
-        )
-        if cfg and a2_models.get(
-            "chilli" if "chilli" in crop_id else
-            "big_onion" if "onion" in crop_id else crop_id
-        ):
-            model_key = "chilli" if "chilli" in crop_id else "big_onion"
-            a2 = a2_models[model_key]
-            floor = cfg.min_fair_farmgate_price
-            p10 = round(floor * 0.85, 0)
-            p90 = round(a2.last_known_price * 1.30, 0)
-            profit_range = {"p10_rs_kg": p10, "p90_rs_kg": p90}
-        elif cfg:
-            floor = cfg.min_fair_farmgate_price
-            p10 = round(floor * 0.85, 0)
-            p90 = round(floor * 1.60, 0)
-            profit_range = {
-                "p10_rs_kg": p10,
-                "p90_rs_kg": p90,
-            }
-        else:
-            profit_range = {"p10_rs_kg": None, "p90_rs_kg": None}
-
-        # Risk level based on SPI + fit score
-        if fit_score >= 75 and spi_band != "Shortage":
-            risk_level = "Low"
-        elif fit_score >= 55:
-            risk_level = "Medium"
-        else:
-            risk_level = "High"
-
-        # Check cumulative reported acreage and oversupply stop rule
-        total_reported = report_store.get_total_reported_area(crop_id, season)
-        if req:
-            try:
-                ta = target_area_calc.compute(
-                    crop=crop_id,
-                    season=season,
-                    demand_mt=demand_info.get("monthly_demand_mt", 5000) * 4,
-                    yield_mid=req.yield_mid_mt_ha,
-                    loss_pct=req.loss_pct,
-                    buffer=0.05,
-                    a_reported=total_reported,
-                    suitable_land_ha=eff_land,
-                )
-                target_ha = ta.a_target_ha
-                remaining_target_ha = max(0.0, round(target_ha - total_reported, 1))
-            except Exception:
-                target_ha = eff_land * 2.0
-                remaining_target_ha = max(0.0, round(target_ha - total_reported, 1))
-        else:
-            target_ha = eff_land * 2.0
-            remaining_target_ha = max(0.0, round(target_ha - total_reported, 1))
-
-        # 110% oversupply stop rule per Proposal Section 6
-        is_target_full = bool(total_reported >= 1.10 * target_ha and target_ha > 0)
-        target_full_warning = "TARGET FULL - DO NOT PLANT" if is_target_full else None
-
-        if is_target_full:
-            fit_score = 0.0
-            rec_ha = 0.0
-        else:
-            rec_ha = min(round(eff_land * 0.60, 2), remaining_target_ha)
-
-        # 12-month expected price ranges (P10–P90 from A2)
-        monthly_price_ranges_12m = []
-        p10_base = p10 if p10 is not None else 100.0
-        p90_base = p90 if p90 is not None else 200.0
-        for m in range(1, 13):
-            s_factor = 1.0 + 0.15 * np.sin(2 * np.pi * m / 12.0)
-            monthly_price_ranges_12m.append({
-                "month": m,
-                "p10_rs_kg": round(p10_base * s_factor, 1),
-                "p50_rs_kg": round(((p10_base + p90_base) / 2.0) * s_factor, 1),
-                "p90_rs_kg": round(p90_base * s_factor, 1),
-            })
-
-        # Expected net profit per acre range
-        yield_kg_acre = (req.yield_mid_mt_ha if req else 15.0) * 0.4047 * 1000.0
-        cost_acre = (req.cost_per_ha_rs if req else 150000.0) * 0.4047
-        expected_net_profit_per_acre = {
-            "p10_rs_per_acre": round(yield_kg_acre * p10_base - cost_acre, 1),
-            "p90_rs_per_acre": round(yield_kg_acre * p90_base - cost_acre, 1),
-        }
-
-        top3_results.append({
-            "rank": len(top3_results) + 1,
-            "crop_id": crop_id,
-            "crop_name": scored_crop.crop_name,
-            "fit_score": fit_score,
-            "confidence_badge": confidence_badge,
-            "profit_range_rs_kg": profit_range,
-            "expected_net_profit_per_acre": expected_net_profit_per_acre,
-            "monthly_price_ranges_12m": monthly_price_ranges_12m,
-            "risk_level": risk_level,
-            "water_need_mm_season": req.water_mm_season if req else None,
-            "planting_window": (
-                f"Month {req.plant_start_month}–{req.plant_end_month}" if req else "N/A"
-            ),
-            "harvest_period": f"Month {harvest_month} (approx)",
-            "duration_months": req.duration_months if req else None,
-            "spi_band_at_harvest": spi_band,
-            "recommended_ha": rec_ha,
-            "remaining_target_ha": remaining_target_ha,
-            "is_target_full": is_target_full,
-            "target_full_warning": target_full_warning,
-            "demand_context": demand_info,
-            "suitability_reasons": scored_crop.reasons,
-        })
-
-    # Sort so non-full crops are prioritized
-    top3_results.sort(key=lambda c: (1 if c["is_target_full"] else 0, -c["fit_score"]))
-    for idx, crop_item in enumerate(top3_results):
-        crop_item["rank"] = idx + 1
-
-    d_ver = compute_data_version()
-    m_ver = compute_model_version()
-    g_commit = get_git_commit()
-
-    return {
-        "run_id": f"RUN-{g_commit[:7]}",
-        "data_version": d_ver,
-        "model_version": m_ver,
-        "data_quality": "real",
-        "is_demo": False,
-        "served_model": "SuitabilityScorer + A1Allocation",
-        "assumptions_ref": "docs/assumptions.md",
-        "farmer_id": farmer_id,
-        "season": season,
-        "area_conditions": area_conditions,
-        "top3": top3_results,
-    }
+# Farmer top-3 endpoint is registered via farmer_router (src/govisense/api/routes/farmer.py)
+# to maintain single source of truth without route shadowing.
+farmer_top3 = farmer_top3_recommendations
 
 
 # ---------------------------------------------------------------------------
@@ -798,7 +572,8 @@ class DecisionLogPayload(BaseModel):
     notes: Optional[str] = None
 
 
-@app.post("/api/feedback/planting-report")
+# Handled via feedback_router (@router.post("/api/feedback/planting-report"))
+# @app.post("/api/feedback/planting-report")
 def submit_planting_report(payload: PlantingReportPayload):
     """
     Item 7: Ingest actual planting report with consent and pseudonymous ID.
@@ -856,7 +631,8 @@ def submit_planting_report(payload: PlantingReportPayload):
         return {"status": "ERROR", "message": str(e)}
 
 
-@app.get("/api/feedback/planting-reports")
+# Handled via feedback_router (@router.get("/api/feedback/planting-reports"))
+# @app.get("/api/feedback/planting-reports")
 def get_planting_reports(
     crop_id: Optional[str] = Query(None),
     season: Optional[str] = Query(None),
@@ -871,7 +647,8 @@ def get_planting_reports(
     return [asdict(r) for r in reports]
 
 
-@app.post("/api/feedback/retrigger")
+# Handled via feedback_router (@router.post("/api/feedback/retrigger"))
+# @app.post("/api/feedback/retrigger")
 def retrigger_pipeline(payload: ReTriggerPayload):
     """
     Item 7: Re-trigger SPI and Target Area Calculator (A_rec) using actual
@@ -1105,7 +882,8 @@ def register_officer(payload: OfficerPayload):
         return {"status": "SUCCESS", "officer": officer.to_dict()}
 
 
-@app.post("/api/feedback/harvest-report")
+# Handled via feedback_router (@router.post("/api/feedback/harvest-report"))
+# @app.post("/api/feedback/harvest-report")
 def submit_harvest_report(payload: HarvestReportPayload):
     """
     Stage 2 Feedback Loop: Captures realized post-harvest yield, losses, and market prices.
