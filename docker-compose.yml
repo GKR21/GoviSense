@@ -53,4 +53,26 @@ networks:
 volumes:
   govisense-data:
   govisense-models:
+  db:
+    image: postgres:16-alpine
+    container_name: govisense_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-govisense}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - govisense_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d govisense"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  govisense_pgdata:
+    driver: local
 

@@ -20,9 +20,16 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
-from govisense.config import settings
-from govisense.db.models import PlantingReportRecord
-from govisense.db.session import get_db_session, sqlite_write_lock
+from govisense.config import PROCESSED_DATA_DIR, settings
+from govisense.db.session import get_session, init_db
+from govisense.db.models import PlantingReportModel
+from govisense.models.target_area import TargetAreaCalculator, TargetAreaResult
+from govisense.models.a3_supply_pressure import SupplyPressureEngine, SPIResult
+from govisense.models.demand_estimator import DemandEstimator
+from govisense.data.crop_requirements import get_crop_requirements
+
+
+_DEFAULT_STORE_PATH = PROCESSED_DATA_DIR / "planting_reports.json"
 
 
 @dataclass
@@ -74,96 +81,99 @@ REGISTRY_VERIFICATION_NOTE = (
 
 class PlantingReportStore:
     """
-    Database-backed storage for planting reports with concurrent-write safety.
-    Provides aggregation, rate-limiting, duplicate prevention, and automatic pipeline re-triggering.
-
-    Registry Verification Note (Task 12):
-      Live verification against the Agrarian Services Department national farmer registry
-      is future work. In this pilot, farmer authentication is enforced via pseudonymous IDs,
-      sliding-window rate limits, and duplicate submission rejection.
+    Persistent storage for planting reports in PostgreSQL (or SQLite fallback),
+    with synced JSON snapshot and pipeline re-triggering.
     """
 
-    def __init__(self, storage_path: Optional[Path] = None):
-        self.storage_path = storage_path
-        self._use_db = storage_path is None
-        self._records: List[PlantingReport] = []
-        self._rate_limits: Dict[str, List[float]] = {}
+    def __init__(self, storage_path: Optional[Path] = None, sync_db: Optional[bool] = None):
+        self.storage_path = storage_path or _DEFAULT_STORE_PATH
+        self.sync_db = sync_db if sync_db is not None else (storage_path is None)
+        self._reports: List[PlantingReport] = []
+        if self.sync_db:
+            try:
+                init_db()
+            except Exception:
+                pass
+        self._load()
 
-        if not self._use_db:
-            self._load_json()
+    def _load(self) -> None:
+        # 1. Try loading from PostgreSQL database if sync_db is enabled
+        loaded_from_db = False
+        if self.sync_db:
+            try:
+                with get_session() as session:
+                    db_reports = session.query(PlantingReportModel).order_by(PlantingReportModel.timestamp.desc()).all()
+                    if db_reports:
+                        self._reports = [
+                            PlantingReport(
+                                crop_id=r.crop_id,
+                                season=r.season,
+                                planned_area_ha=float(r.planned_area_ha),
+                                actual_area_ha=float(r.actual_area_ha),
+                                consent_given=bool(r.consent_given),
+                                pseudonymous_id=r.pseudonymous_id,
+                                harvest_outcome_mt=float(r.harvest_outcome_mt) if r.harvest_outcome_mt is not None else None,
+                                sale_price_rs_kg=float(r.sale_price_rs_kg) if r.sale_price_rs_kg is not None else None,
+                                sale_channel=r.sale_channel,
+                                notes=r.notes,
+                                report_id=r.report_id,
+                                timestamp=r.timestamp.isoformat() if hasattr(r.timestamp, "isoformat") else str(r.timestamp),
+                            )
+                            for r in db_reports
+                        ]
+                        loaded_from_db = True
+            except Exception:
+                loaded_from_db = False
 
-    def check_rate_limit(
-        self,
-        pseudonymous_id: str,
-        max_requests: int = 5,
-        window_seconds: float = 60.0,
-    ) -> None:
-        """
-        Enforces local sliding-window rate limiting per farmer ID (Task 12).
-        Raises ValueError if farmer exceeds max_requests within window_seconds.
-        """
-        now = datetime.now(timezone.utc).timestamp()
-        timestamps = self._rate_limits.setdefault(pseudonymous_id, [])
-        valid_timestamps = [t for t in timestamps if now - t < window_seconds]
-        if len(valid_timestamps) >= max_requests:
-            raise ValueError(
-                f"Rate limit exceeded for farmer '{pseudonymous_id}': "
-                f"maximum {max_requests} planting reports allowed per {int(window_seconds)} seconds. "
-                f"Please wait before submitting another report."
-            )
-        valid_timestamps.append(now)
-        self._rate_limits[pseudonymous_id] = valid_timestamps
-
-    def check_duplicate(self, report: PlantingReport) -> None:
-        """
-        Rejects duplicate planting reports for the same farmer, crop, season, and area (Task 12).
-        """
-        if self._use_db:
-            with get_db_session() as db:
-                existing = (
-                    db.query(PlantingReportRecord)
-                    .filter(
-                        PlantingReportRecord.pseudonymous_id == report.pseudonymous_id,
-                        PlantingReportRecord.crop_id == report.crop_id,
-                        PlantingReportRecord.season == report.season,
-                        PlantingReportRecord.actual_area_ha == report.actual_area_ha,
-                    )
-                    .first()
-                )
-                if existing:
-                    raise ValueError(
-                        f"Duplicate planting report detected: an identical report for farmer '{report.pseudonymous_id}', "
-                        f"crop '{report.crop_id}', and season '{report.season}' with {report.actual_area_ha} ha "
-                        f"already exists (Report ID: {existing.report_id})."
-                    )
-        else:
-            for r in self._records:
-                if (
-                    r.pseudonymous_id == report.pseudonymous_id
-                    and r.crop_id == report.crop_id
-                    and r.season == report.season
-                    and abs(r.actual_area_ha - report.actual_area_ha) < 1e-4
-                ):
-                    raise ValueError(
-                        f"Duplicate planting report detected: an identical report for farmer '{report.pseudonymous_id}', "
-                        f"crop '{report.crop_id}', and season '{report.season}' with {report.actual_area_ha} ha "
-                        f"already exists (Report ID: {r.report_id})."
-                    )
-
-    def _load_json(self) -> None:
-        if self.storage_path and self.storage_path.exists():
+        # 2. If DB is empty, load from JSON file and sync to DB
+        if not loaded_from_db and self.storage_path.exists():
             try:
                 with open(self.storage_path, "r", encoding="utf-8") as f:
                     raw_data = json.load(f)
-                    self._records = [PlantingReport(**item) for item in raw_data]
+                    self._reports = [PlantingReport(**item) for item in raw_data]
+                    if self.sync_db:
+                        self._sync_to_db()
             except Exception:
                 self._records = []
 
-    def _save_json(self) -> None:
-        if self.storage_path:
-            self.storage_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.storage_path, "w", encoding="utf-8") as f:
-                json.dump([asdict(r) for r in self._records], f, indent=2)
+    def _sync_to_db(self) -> None:
+        """Seed DB from in-memory reports."""
+        if not self.sync_db:
+            return
+        try:
+            with get_session() as session:
+                for r in self._reports:
+                    ts = None
+                    if r.timestamp:
+                        try:
+                            ts = datetime.fromisoformat(r.timestamp.replace("Z", "+00:00"))
+                        except Exception:
+                            ts = datetime.now(timezone.utc)
+                    else:
+                        ts = datetime.now(timezone.utc)
+                    model = PlantingReportModel(
+                        report_id=r.report_id,
+                        crop_id=r.crop_id,
+                        season=r.season,
+                        planned_area_ha=r.planned_area_ha,
+                        actual_area_ha=r.actual_area_ha,
+                        consent_given=r.consent_given,
+                        pseudonymous_id=r.pseudonymous_id,
+                        harvest_outcome_mt=r.harvest_outcome_mt,
+                        sale_price_rs_kg=r.sale_price_rs_kg,
+                        sale_channel=r.sale_channel,
+                        notes=r.notes,
+                        timestamp=ts,
+                    )
+                    session.merge(model)
+                session.commit()
+        except Exception:
+            pass
+
+    def _save(self) -> None:
+        self.storage_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.storage_path, "w", encoding="utf-8") as f:
+            json.dump([asdict(r) for r in self._reports], f, indent=2)
 
     def submit_report(self, report: PlantingReport) -> Dict[str, Any]:
         """
@@ -210,6 +220,37 @@ class PlantingReportStore:
                 self._records.append(report)
                 self._save_json()
 
+        # Persist to PostgreSQL database
+        if self.sync_db:
+            try:
+                with get_session() as session:
+                    ts = None
+                    if report.timestamp:
+                        try:
+                            ts = datetime.fromisoformat(report.timestamp.replace("Z", "+00:00"))
+                        except Exception:
+                            ts = datetime.now(timezone.utc)
+                    else:
+                        ts = datetime.now(timezone.utc)
+                    model = PlantingReportModel(
+                        report_id=report.report_id,
+                        crop_id=report.crop_id,
+                        season=report.season,
+                        planned_area_ha=report.planned_area_ha,
+                        actual_area_ha=report.actual_area_ha,
+                        consent_given=report.consent_given,
+                        pseudonymous_id=report.pseudonymous_id,
+                        harvest_outcome_mt=report.harvest_outcome_mt,
+                        sale_price_rs_kg=report.sale_price_rs_kg,
+                        sale_channel=report.sale_channel,
+                        notes=report.notes,
+                        timestamp=ts,
+                    )
+                    session.merge(model)
+                    session.commit()
+            except Exception:
+                pass
+
         total_actual = self.get_total_reported_area(report.crop_id, report.season)
         return {
             "status": "ACCEPTED",
@@ -231,38 +272,43 @@ class PlantingReportStore:
         season: Optional[str] = None,
     ) -> List[PlantingReport]:
         """Retrieve stored reports, optionally filtered by crop and season."""
-        if self._use_db:
-            with get_db_session() as db:
-                query = db.query(PlantingReportRecord)
-                if crop_id:
-                    query = query.filter(PlantingReportRecord.crop_id == crop_id)
-                if season:
-                    query = query.filter(PlantingReportRecord.season == season)
-                records = query.order_by(PlantingReportRecord.id.desc()).all()
-                return [
-                    PlantingReport(
-                        crop_id=r.crop_id,
-                        season=r.season,
-                        planned_area_ha=r.planned_area_ha,
-                        actual_area_ha=r.actual_area_ha,
-                        consent_given=r.consent_given,
-                        pseudonymous_id=r.pseudonymous_id,
-                        harvest_outcome_mt=r.harvest_outcome_mt,
-                        sale_price_rs_kg=r.sale_price_rs_kg,
-                        sale_channel=r.sale_channel,
-                        notes=r.notes,
-                        report_id=r.report_id,
-                        timestamp=r.timestamp,
-                    )
-                    for r in records
-                ]
-        else:
-            results = self._records
-            if crop_id:
-                results = [r for r in results if r.crop_id == crop_id]
-            if season:
-                results = [r for r in results if r.season == season]
-            return results
+        # Query PostgreSQL database
+        if self.sync_db:
+            try:
+                with get_session() as session:
+                    q = session.query(PlantingReportModel)
+                    if crop_id:
+                        q = q.filter(PlantingReportModel.crop_id == crop_id)
+                    if season:
+                        q = q.filter(PlantingReportModel.season == season)
+                    db_rows = q.order_by(PlantingReportModel.timestamp.desc()).all()
+                    if db_rows:
+                        return [
+                            PlantingReport(
+                                crop_id=r.crop_id,
+                                season=r.season,
+                                planned_area_ha=float(r.planned_area_ha),
+                                actual_area_ha=float(r.actual_area_ha),
+                                consent_given=bool(r.consent_given),
+                                pseudonymous_id=r.pseudonymous_id,
+                                harvest_outcome_mt=float(r.harvest_outcome_mt) if r.harvest_outcome_mt is not None else None,
+                                sale_price_rs_kg=float(r.sale_price_rs_kg) if r.sale_price_rs_kg is not None else None,
+                                sale_channel=r.sale_channel,
+                                notes=r.notes,
+                                report_id=r.report_id,
+                                timestamp=r.timestamp.isoformat() if hasattr(r.timestamp, "isoformat") else str(r.timestamp),
+                            )
+                            for r in db_rows
+                        ]
+            except Exception:
+                pass
+
+        results = self._reports
+        if crop_id:
+            results = [r for r in results if r.crop_id == crop_id]
+        if season:
+            results = [r for r in results if r.season == season]
+        return results
 
     def get_total_reported_area(self, crop_id: str, season: str) -> float:
         """

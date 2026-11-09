@@ -1,38 +1,60 @@
-"""Database package for GoviSense."""
+"""
+GoviSense Database Package
+Team DARKBITE · ModelX 2.0 Proposal Specification
+"""
 
 from govisense.db.models import (
     Base,
-    User,
-    PlantingReportRecord,
-    DecisionHistoryRecord,
-    Alert,
-    AlertInteraction,
-    MarketPriceRecord,
+    compute_sha256_hash,
+    PipelineRunModel,
+    DecisionRecordModel,
+    FarmerProfileModel,
+    OfficerModel,
+    UserModel,
+    PlantingReportModel,
+    HarvestReportModel,
+    ForecastSnapshotModel,
+    DataCatalogueModel,
+    MonthlyDataModel,
+    AlertModel,
+    AlertStatusModel,
 )
 from govisense.db.session import (
-    engine,
-    SessionLocal,
+    get_engine,
+    get_session,
     get_db,
-    get_db_session,
     init_db,
-    sqlite_write_lock,
-    DATABASE_URL,
+    get_active_dialect,
+)
+from govisense.db.history import (
+    DecisionHistoryStore,
+    DecisionRecord,
+    ConfidenceBadgeEvaluation,
+    evaluate_confidence_badge,
 )
 
 __all__ = [
     "Base",
-    "User",
-    "PlantingReportRecord",
-    "DecisionHistoryRecord",
-    "Alert",
-    "AlertInteraction",
-    "MarketPriceRecord",
-    "engine",
-    "SessionLocal",
+    "compute_sha256_hash",
+    "PipelineRunModel",
+    "DecisionRecordModel",
+    "FarmerProfileModel",
+    "OfficerModel",
+    "UserModel",
+    "PlantingReportModel",
+    "HarvestReportModel",
+    "ForecastSnapshotModel",
+    "DataCatalogueModel",
+    "MonthlyDataModel",
+    "AlertModel",
+    "AlertStatusModel",
+    "get_engine",
+    "get_session",
     "get_db",
-    "get_db_session",
     "init_db",
-    "sqlite_write_lock",
-    "DATABASE_URL",
+    "get_active_dialect",
+    "DecisionHistoryStore",
+    "DecisionRecord",
+    "ConfidenceBadgeEvaluation",
+    "evaluate_confidence_badge",
 ]
-

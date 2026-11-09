@@ -4,9 +4,16 @@ Team DARKBITE · ModelX 2.0 Phase 1
 Pilot: Anuradhapura (Big Onion, Chilli)
 """
 
+import os
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Dict, List
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 # Workspace Root & Directories
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -15,10 +22,11 @@ RAW_DATA_DIR = DATA_DIR / "raw"
 INTERIM_DATA_DIR = DATA_DIR / "interim"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 DEMO_DATA_DIR = DATA_DIR / "demo"
+DATABASE_DIR = DATA_DIR / "database"
 MODELS_STORE_DIR = BASE_DIR / "models_store"
 
 # Ensure runtime directories exist
-for folder in [RAW_DATA_DIR, INTERIM_DATA_DIR, PROCESSED_DATA_DIR, DEMO_DATA_DIR, MODELS_STORE_DIR]:
+for folder in [RAW_DATA_DIR, INTERIM_DATA_DIR, PROCESSED_DATA_DIR, DEMO_DATA_DIR, DATABASE_DIR, MODELS_STORE_DIR]:
     folder.mkdir(parents=True, exist_ok=True)
 
 
@@ -76,6 +84,23 @@ class GoviSenseSettings:
 
     # Available land constraint for pilot area (hectares)
     max_arable_land_ha: float = 12_500.0
+
+    # PostgreSQL Database persistence configuration
+    database_url: str = field(
+        default_factory=lambda: os.getenv(
+            "DATABASE_URL",
+            "postgresql+psycopg2://postgres:postgres@localhost:5432/govisense",
+        )
+    )
+    fallback_sqlite_url: str = field(
+        default_factory=lambda: os.getenv(
+            "FALLBACK_DATABASE_URL",
+            f"sqlite:///{DATABASE_DIR / 'govisense.db'}",
+        )
+    )
+    db_echo: bool = field(
+        default_factory=lambda: os.getenv("DB_ECHO", "false").lower() in ("true", "1", "yes")
+    )
 
 
 settings = GoviSenseSettings()

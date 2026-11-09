@@ -1,4 +1,4 @@
-export type View = "officer" | "admin" | "farmer" | "system"
+export type View = "officer" | "admin" | "farmer"
 export type Language = "en" | "si" | "ta"
 export type Risk = "shortage" | "balanced" | "oversupply"
 export type Confidence = "High" | "Medium" | "Low" | "Outdated"
@@ -15,8 +15,9 @@ export interface GroundReport {
   date: string
   district: string
   timestamp: string
-  status: "Verified" | "Pending"
+  status: "Verified" | "Pending" | "Independent choice"
   farmer: string
+  pseudonymousId?: string
 }
 
 export interface PolicyDecision {
@@ -30,7 +31,7 @@ export interface PolicyDecision {
   assumptions: string
   leadTime: number
   action: string
-  category: "Import quota" | "Storage buffer" | "Tariff adjustment" | "Price alert"
+  category: "Import quota" | "Storage buffer" | "Tariff adjustment" | "Price alert" | "Planting advisory"
   officer: string
   designation: string
   status: "Active" | "Executed" | "Superseded"
@@ -58,6 +59,9 @@ export interface CropDataProfile {
   spiMonthly: number[]
   harvestSchedule: { stage: string; period: string; pct: number }[]
   keyDistricts: { name: string; share: number; trend: "up" | "down" | "flat" }[]
+  spiLabel?: string
+  spiAnnualScore?: number
+  ai4Action?: string
 }
 
 export const OFFICER_NAV_ITEMS = [

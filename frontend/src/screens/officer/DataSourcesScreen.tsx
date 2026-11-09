@@ -1,27 +1,71 @@
-import React, { useState } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import {
+  Activity,
+  Check,
   CheckCircle2,
   Clock3,
+  Cpu,
   Database,
   ExternalLink,
   Info,
+  Layers,
   LockKeyhole,
+  Radio,
   RefreshCw,
   Server,
+  Shield,
+  ShieldAlert,
   ShieldCheck,
+  Sprout,
   TriangleAlert,
+  XCircle,
   Zap,
 } from "lucide-react"
 import { Button, ConfidenceBadge, PageHeading } from "../../components/common"
+import { cx } from "../../types"
+import { fetchConfidenceBadge, type ConfidenceBadgeEvaluation } from "../../api"
 
-export function DataSourcesScreen() {
+export interface DataSourcesScreenProps {
+  crop?: string
+  isLiveApi?: boolean
+}
+
+export function DataSourcesScreen({
+  crop = "Big onion",
+  isLiveApi = false,
+}: DataSourcesScreenProps) {
+  const [selectedCrop, setSelectedCrop] = useState<string>(
+    crop.toLowerCase().includes("chilli") ? "chilli" : "big_onion"
+  )
+  const [confidenceData, setConfidenceData] = useState<ConfidenceBadgeEvaluation | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [hasLiveEvaluator, setHasLiveEvaluator] = useState(false)
+
   const [pingingId, setPingingId] = useState<string | null>(null)
   const [pingResults, setPingResults] = useState<Record<string, { latency: number; time: string }>>({})
   const [syncingAll, setSyncingAll] = useState(false)
   const [syncStep, setSyncStep] = useState(0)
   const [lastRefreshedTimes, setLastRefreshedTimes] = useState<Record<string, string>>({})
-  const [inspectModalSource, setInspectModalSource] = useState<any | null>(null)
 
+  // Fetch 5-factor confidence badge evaluation from backend API
+  const loadConfidenceBadge = useCallback(async (targetCrop: string) => {
+    setIsLoading(true)
+    try {
+      const res = await fetchConfidenceBadge(targetCrop, 15, 0.35, true)
+      setConfidenceData(res)
+      setHasLiveEvaluator(Boolean(res.isLive))
+    } catch {
+      // offline fallback handled by fetchConfidenceBadge
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadConfidenceBadge(selectedCrop)
+  }, [selectedCrop, loadConfidenceBadge])
+
+  // Catalog of first-party and external data feeds
   const sourcesList = [
     {
       id: "SRC-001",
@@ -31,15 +75,18 @@ export function DataSourcesScreen() {
       frequency: "Continuous WebSocket Stream",
       coverage: "Anuradhapura & Kurunegala Pilots",
       status: "Active (Streaming)",
-      confidence: "High",
+      confidence: confidenceData?.area_reported_share_adequate ? "High" : "Medium",
       confidenceScore: "99%",
       latency: "0.4s",
       recordsCount: "2,418 submissions today",
       licence: "First-Party Encrypted (LK-DoA)",
       isAlert: false,
+      dataFresh: true,
+      ageDays: 1,
       lastSync: "4 mins ago",
       nextSync: "Real-time",
-      description: "Direct cryptographically signed ground planting declarations from registered smallholder farmers. Provides empirical acreage updates before market arrival.",
+      description:
+        "Direct cryptographically signed ground planting declarations from registered smallholder farmers. Provides empirical acreage updates before market arrival.",
       apiEndpoint: "wss://api.govisense.agr.gov.lk/v1/telemetry/ground-stream",
     },
     {
@@ -50,15 +97,18 @@ export function DataSourcesScreen() {
       frequency: "Daily at 06:30 LKST",
       coverage: "Dambulla, Pettah, Meegoda, Keppetipola DECs",
       status: "Current",
-      confidence: "High",
+      confidence: confidenceData?.model_beats_baseline ? "High" : "Medium",
       confidenceScore: "98%",
       latency: "112ms",
       recordsCount: "38 market series",
       licence: "Government Attribution",
       isAlert: false,
+      dataFresh: true,
+      ageDays: 1,
       lastSync: "Today 06:30",
       nextSync: "Tomorrow 06:30",
-      description: "Official wholesale spot prices, daily arrival volumes, and retail market price spreads collected across major Dedicated Economic Centres.",
+      description:
+        "Official wholesale spot prices, daily arrival volumes, and retail market price spreads collected across major Dedicated Economic Centres.",
       apiEndpoint: "https://data.harti.gov.lk/api/v2/prices/daily.json",
     },
     {
@@ -75,9 +125,12 @@ export function DataSourcesScreen() {
       recordsCount: "12 macro series",
       licence: "Open Publication",
       isAlert: false,
+      dataFresh: true,
+      ageDays: 1,
       lastSync: "Today 09:00",
       nextSync: "Tomorrow 09:00",
-      description: "Daily macroeconomic indicators, Special Commodity Levy rates, exchange rates (USD/LKR, INR/LKR), and headline food inflation metrics.",
+      description:
+        "Daily macroeconomic indicators, Special Commodity Levy rates, exchange rates (USD/LKR, INR/LKR), and headline food inflation metrics.",
       apiEndpoint: "https://cbsl.gov.lk/api/economic-indicators/prices",
     },
     {
@@ -94,9 +147,12 @@ export function DataSourcesScreen() {
       recordsCount: "148 district-crop targets",
       licence: "Government Open Data",
       isAlert: false,
+      dataFresh: true,
+      ageDays: 20,
       lastSync: "01 Apr 2026",
       nextSync: "15 Oct 2026",
-      description: "Official pre-season national food security targets establishing baseline cultivating quotas, seed allocation, and target yields.",
+      description:
+        "Official pre-season national food security targets establishing baseline cultivating quotas, seed allocation, and target yields.",
       apiEndpoint: "https://doa.gov.lk/opendata/cpp/2026-yala.json",
     },
     {
@@ -113,9 +169,12 @@ export function DataSourcesScreen() {
       recordsCount: "1,240 grid points",
       licence: "Public Domain (US Gov)",
       isAlert: false,
+      dataFresh: true,
+      ageDays: 5,
       lastSync: "28 Mar 2026",
       nextSync: "In 6 hours",
-      description: "Daily precipitation anomaly, topsoil moisture index, and solar radiation estimations powering the Yield Stress AI module.",
+      description:
+        "Daily precipitation anomaly, topsoil moisture index, and solar radiation estimations powering the Yield Stress AI module.",
       apiEndpoint: "https://power.larc.nasa.gov/api/temporal/daily/point",
     },
     {
@@ -132,9 +191,12 @@ export function DataSourcesScreen() {
       recordsCount: "220 commodity tracks",
       licence: "CC BY 4.0",
       isAlert: false,
+      dataFresh: true,
+      ageDays: 14,
       lastSync: "12 Mar 2026",
       nextSync: "In 4 days",
-      description: "Regional border commodity prices (Tuticorin, Mumbai, Chittagong) used for import parity price benchmarking and tariff sensitivity modeling.",
+      description:
+        "Regional border commodity prices (Tuticorin, Mumbai, Chittagong) used for import parity price benchmarking and tariff sensitivity modeling.",
       apiEndpoint: "https://data.humdata.org/api/3/action/package_show",
     },
     {
@@ -151,9 +213,12 @@ export function DataSourcesScreen() {
       recordsCount: "14 certified cold rooms",
       licence: "Internal Government Register",
       isAlert: true,
+      dataFresh: false,
+      ageDays: 78,
       lastSync: "14 Jan 2026 (78 days ago)",
       nextSync: "Overdue by 18 days",
-      description: "Audited warehouse and cold-storage capacity listings. Currently 18 days past freshness SLA; requires provincial survey verification.",
+      description:
+        "Audited warehouse and cold-storage capacity listings. Currently 18 days past freshness SLA; requires provincial survey verification.",
       apiEndpoint: "https://agrarian.gov.lk/internal/storage/v1/capacity",
     },
   ]
@@ -176,7 +241,7 @@ export function DataSourcesScreen() {
       setPingingId(null)
       setLastRefreshedTimes((prev) => ({
         ...prev,
-        [id]: "Just synced",
+        [id]: "Just synced (Fresh)",
       }))
       const lat = Math.floor(65 + Math.random() * 60)
       setPingResults((prev) => ({
@@ -201,6 +266,7 @@ export function DataSourcesScreen() {
             updated[s.id] = "Just synced"
           })
           setLastRefreshedTimes(updated)
+          loadConfidenceBadge(selectedCrop)
         }, 1000)
       }, 1000)
     }, 1000)
@@ -209,40 +275,342 @@ export function DataSourcesScreen() {
   return (
     <>
       <PageHeading
-        eyebrow="Data Governance & Pipeline Telemetry"
+        eyebrow="Data Governance & Multi-Factor Confidence Telemetry"
         icon={Database}
         title="Data Sources & Health Telemetry"
-        description="Freshness SLA, cryptographic provenance, license compliance, and live ping telemetry across all model feeds."
+        description="Freshness SLA, cryptographic provenance, license compliance, and live 5-rule confidence evaluation across all model feeds."
         actions={
-          <Button
-            icon={RefreshCw}
-            disabled={syncingAll}
-            onClick={handleTriggerGlobalSync}
-          >
-            {syncingAll ? "Syncing Feeds..." : "Ingest All Feeds"}
-          </Button>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <span
+              style={{
+                padding: "3px 10px",
+                borderRadius: "999px",
+                fontSize: "11px",
+                fontWeight: "800",
+                background: hasLiveEvaluator
+                  ? "rgba(16, 185, 129, 0.15)"
+                  : "rgba(245, 158, 11, 0.15)",
+                color: hasLiveEvaluator ? "var(--primary)" : "var(--oversupply)",
+                border: `1px solid ${
+                  hasLiveEvaluator ? "var(--balanced-border)" : "var(--oversupply-border)"
+                }`,
+              }}
+            >
+              {hasLiveEvaluator
+                ? "● LIVE 5-RULE CONFIDENCE EVALUATOR"
+                : "DEMO DATA EVALUATOR"}
+            </span>
+
+            <select
+              value={selectedCrop}
+              onChange={(e) => setSelectedCrop(e.target.value)}
+              style={{
+                background: "var(--bg-surface)",
+                color: "var(--ink)",
+                border: "1px solid var(--border)",
+                borderRadius: "6px",
+                padding: "5px 10px",
+                fontSize: "12px",
+                cursor: "pointer",
+              }}
+            >
+              <option value="big_onion">Crop: Big Onion</option>
+              <option value="chilli">Crop: Chilli</option>
+            </select>
+
+            <Button
+              icon={RefreshCw}
+              disabled={syncingAll || isLoading}
+              onClick={handleTriggerGlobalSync}
+            >
+              {syncingAll ? "Syncing Feeds..." : "Ingest All Feeds"}
+            </Button>
+          </div>
         }
       />
+
+      {/* Item 8: Multi-factor Confidence Rule Evaluation Card */}
+      {confidenceData && (
+        <section className="confidence-rules-panel">
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "10px",
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  marginBottom: "4px",
+                }}
+              >
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: "16px",
+                    fontWeight: "800",
+                    color: "var(--ink)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  <ShieldCheck size={20} color="var(--primary)" />
+                  Multi-Factor Confidence Evaluation:{" "}
+                  {selectedCrop === "big_onion" ? "Big Onion" : "Chilli"}
+                </h3>
+                <span
+                  style={{
+                    padding: "3px 12px",
+                    borderRadius: "999px",
+                    fontSize: "12px",
+                    fontWeight: "800",
+                    textTransform: "uppercase",
+                    background:
+                      confidenceData.badge === "high"
+                        ? "rgba(16, 185, 129, 0.2)"
+                        : confidenceData.badge === "medium"
+                          ? "rgba(56, 189, 248, 0.2)"
+                          : "rgba(239, 68, 68, 0.2)",
+                    color:
+                      confidenceData.badge === "high"
+                        ? "#34d399"
+                        : confidenceData.badge === "medium"
+                          ? "#38bdf8"
+                          : "#f87171",
+                    border: `1px solid ${
+                      confidenceData.badge === "high"
+                        ? "rgba(16, 185, 129, 0.4)"
+                        : confidenceData.badge === "medium"
+                          ? "rgba(56, 189, 248, 0.4)"
+                          : "rgba(239, 68, 68, 0.4)"
+                    }`,
+                  }}
+                >
+                  {confidenceData.badge} Confidence ({confidenceData.score_pct}%)
+                </span>
+              </div>
+              <p style={{ margin: 0, fontSize: "12px", color: "var(--ink-muted)" }}>
+                Evaluated against the 5 production governance rules: data recency, ground acreage
+                reporting, model superiority, SPI price validation, and soil suitability.
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              icon={RefreshCw}
+              onClick={() => loadConfidenceBadge(selectedCrop)}
+              disabled={isLoading}
+            >
+              Re-evaluate Rules
+            </Button>
+          </div>
+
+          <div className="confidence-rules-grid">
+            <div
+              className={cx(
+                "confidence-rule-card",
+                confidenceData.data_fresh
+                  ? "confidence-rule-card--pass"
+                  : "confidence-rule-card--fail"
+              )}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <strong style={{ fontSize: "12px", color: "var(--ink)" }}>1. Data Recency</strong>
+                {confidenceData.data_fresh ? (
+                  <CheckCircle2 size={15} color="#10b981" />
+                ) : (
+                  <XCircle size={15} color="#ef4444" />
+                )}
+              </div>
+              <span style={{ fontSize: "11px", color: "var(--ink-muted)" }}>
+                {confidenceData.data_fresh
+                  ? "Fresh (<= 45 days)"
+                  : "Aging / Outdated (> 45 days)"}
+              </span>
+            </div>
+
+            <div
+              className={cx(
+                "confidence-rule-card",
+                confidenceData.area_reported_share_adequate
+                  ? "confidence-rule-card--pass"
+                  : "confidence-rule-card--fail"
+              )}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <strong style={{ fontSize: "12px", color: "var(--ink)" }}>
+                  2. Area Reporting Share
+                </strong>
+                {confidenceData.area_reported_share_adequate ? (
+                  <CheckCircle2 size={15} color="#10b981" />
+                ) : (
+                  <XCircle size={15} color="#ef4444" />
+                )}
+              </div>
+              <span style={{ fontSize: "11px", color: "var(--ink-muted)" }}>
+                {confidenceData.area_reported_share_adequate
+                  ? "Coverage adequate (>= 20%)"
+                  : "Low ground coverage (< 20%)"}
+              </span>
+            </div>
+
+            <div
+              className={cx(
+                "confidence-rule-card",
+                confidenceData.model_beats_baseline
+                  ? "confidence-rule-card--pass"
+                  : "confidence-rule-card--fail"
+              )}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <strong style={{ fontSize: "12px", color: "var(--ink)" }}>
+                  3. Model vs Baseline
+                </strong>
+                {confidenceData.model_beats_baseline ? (
+                  <CheckCircle2 size={15} color="#10b981" />
+                ) : (
+                  <XCircle size={15} color="#ef4444" />
+                )}
+              </div>
+              <span style={{ fontSize: "11px", color: "var(--ink-muted)" }}>
+                {confidenceData.model_beats_baseline
+                  ? "Model beats baseline on WAPE"
+                  : "Serving baseline"}
+              </span>
+            </div>
+
+            <div
+              className={cx(
+                "confidence-rule-card",
+                confidenceData.spi_validation_passed
+                  ? "confidence-rule-card--pass"
+                  : "confidence-rule-card--fail"
+              )}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <strong style={{ fontSize: "12px", color: "var(--ink)" }}>
+                  4. SPI Economic Validation
+                </strong>
+                {confidenceData.spi_validation_passed ? (
+                  <CheckCircle2 size={15} color="#10b981" />
+                ) : (
+                  <TriangleAlert size={15} color="#f59e0b" />
+                )}
+              </div>
+              <span style={{ fontSize: "11px", color: "var(--ink-muted)" }}>
+                {confidenceData.spi_validation_passed
+                  ? "Price inverse correlation verified"
+                  : "Unverified for Chilli (Decoupled)"}
+              </span>
+            </div>
+
+            <div
+              className={cx(
+                "confidence-rule-card",
+                confidenceData.soil_data_present
+                  ? "confidence-rule-card--pass"
+                  : "confidence-rule-card--fail"
+              )}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <strong style={{ fontSize: "12px", color: "var(--ink)" }}>
+                  5. Soil Data Present
+                </strong>
+                {confidenceData.soil_data_present ? (
+                  <CheckCircle2 size={15} color="#10b981" />
+                ) : (
+                  <XCircle size={15} color="#ef4444" />
+                )}
+              </div>
+              <span style={{ fontSize: "11px", color: "var(--ink-muted)" }}>
+                {confidenceData.soil_data_present
+                  ? "Verified agronomic pH input"
+                  : "Soil data estimated"}
+              </span>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Global Ingestion Orchestration Banner */}
       <div className="pipeline-trigger-banner">
         <div>
-          <strong style={{ fontSize: "15px", color: "var(--ink)", display: "flex", alignItems: "center", gap: "8px" }}>
+          <strong
+            style={{
+              fontSize: "15px",
+              color: "var(--ink)",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
             <Server size={18} color="var(--primary)" />
             Automated Ingestion Pipeline Status
           </strong>
           <p style={{ margin: "3px 0 0", fontSize: "12px", color: "var(--ink-muted)" }}>
-            Aggregating wholesale price bulletins, satellite weather, and first-party farmer ground telemetry.
+            Aggregating wholesale price bulletins, satellite weather, and first-party farmer ground
+            telemetry.
           </p>
           {syncingAll && (
             <div className="pipeline-sync-steps">
-              <span className={cx("pipeline-step-item", syncStep >= 1 && "pipeline-step-item--done")}>
+              <span
+                className={cx(
+                  "pipeline-step-item",
+                  syncStep >= 1 && "pipeline-step-item--done"
+                )}
+              >
                 <Radio size={14} /> 1. Ingesting HARTI & CBSL
               </span>
-              <span className={cx("pipeline-step-item", syncStep >= 2 && "pipeline-step-item--done")}>
+              <span
+                className={cx(
+                  "pipeline-step-item",
+                  syncStep >= 2 && "pipeline-step-item--done"
+                )}
+              >
                 <Radio size={14} /> 2. Aggregating Farmer Telemetry
               </span>
-              <span className={cx("pipeline-step-item", syncStep >= 3 && "pipeline-step-item--done")}>
+              <span
+                className={cx(
+                  "pipeline-step-item",
+                  syncStep >= 3 && "pipeline-step-item--done"
+                )}
+              >
                 <Radio size={14} /> 3. Recomputing SPI Matrix
               </span>
             </div>
@@ -265,7 +633,7 @@ export function DataSourcesScreen() {
         <div className="data-kpi-tile">
           <small>CONNECTED FEEDS</small>
           <strong style={{ color: "var(--primary)" }}>7 Active Feeds</strong>
-          <p>6 verified healthy · 1 pending review</p>
+          <p>6 verified healthy · 1 outdated alert</p>
         </div>
 
         <div className="data-kpi-tile">
@@ -281,20 +649,21 @@ export function DataSourcesScreen() {
         </div>
 
         <div className="data-kpi-tile">
-          <small>GOVERNANCE ATTENTION</small>
-          <strong style={{ color: "#fcd34d" }}>1 Stale Alert</strong>
-          <p>District storage capacity &gt; 60 days</p>
+          <small>STALE FEED ATTENTION</small>
+          <strong style={{ color: "#f87171" }}>1 Outdated Feed</strong>
+          <p>District storage capacity &gt; 45 days limit</p>
         </div>
       </div>
 
-      {/* Attention Banner */}
+      {/* Attention Banner for Outdated Storage Feed */}
       <div className="alert-banner alert-banner--warning" style={{ marginBottom: "22px" }}>
         <TriangleAlert size={18} />
         <div style={{ flex: 1 }}>
-          <strong>Attention: District Storage Capacity Registry Stale (78 Days)</strong>
+          <strong>Attention: District Storage Capacity Registry Outdated (78 Days Old)</strong>
           <p>
-            The storage capacity register for Anuradhapura has exceeded the 60-day freshness SLA.
-            Buffer allocations currently rely on fallback conservative limits (1,200 MT ceiling).
+            The storage capacity register has exceeded the 45-day fresh data SLA (last verified 78
+            days ago). Cold storage allocations currently rely on conservative 1,200 MT safety
+            caps.
           </p>
         </div>
         <Button variant="secondary" onClick={() => handleForceSync("SRC-007")}>
@@ -308,11 +677,12 @@ export function DataSourcesScreen() {
           const ping = pingResults[feed.id]
           const isPinging = pingingId === feed.id
           const customLastSync = lastRefreshedTimes[feed.id] || feed.lastSync
+          const isOutdated = feed.isAlert || !feed.dataFresh
 
           return (
             <div
               key={feed.id}
-              className={cx("gov-feed-card", feed.isAlert && "gov-feed-card--alert")}
+              className={cx("gov-feed-card", isOutdated && "gov-feed-card--alert")}
             >
               <div className="feed-header">
                 <div className="feed-header-left">
@@ -326,21 +696,37 @@ export function DataSourcesScreen() {
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span className={cx("feed-live-dot", feed.isAlert && "feed-live-dot--alert")} style={feed.isAlert ? { background: "#f59e0b", boxShadow: "0 0 8px #f59e0b" } : {}} />
-                  <span style={{ fontSize: "11px", fontWeight: "700", color: feed.isAlert ? "#fcd34d" : "#6ee7b7" }}>
-                    {feed.status}
-                  </span>
+                  {isOutdated ? (
+                    <span className="chip-outdated">
+                      <TriangleAlert size={12} /> ⚠ Outdated — {feed.ageDays} days
+                    </span>
+                  ) : (
+                    <span className="chip-fresh">
+                      <CheckCircle2 size={12} /> Fresh ({feed.ageDays}d)
+                    </span>
+                  )}
                 </div>
               </div>
 
               <div className="feed-metrics-grid">
                 <div className="feed-metric-col">
-                  <small>Freshness</small>
-                  <strong>{customLastSync}</strong>
+                  <small>Last Sync Date</small>
+                  <strong style={{ color: isOutdated ? "#fca5a5" : "var(--ink)" }}>
+                    {customLastSync}
+                  </strong>
                 </div>
                 <div className="feed-metric-col">
-                  <small>Reliability</small>
-                  <strong style={{ color: feed.confidence === "High" ? "var(--primary)" : feed.confidence === "Low" ? "#fca5a5" : "#38bdf8" }}>
+                  <small>Confidence Status</small>
+                  <strong
+                    style={{
+                      color:
+                        feed.confidence === "High"
+                          ? "var(--primary)"
+                          : feed.confidence === "Low"
+                            ? "#fca5a5"
+                            : "#38bdf8",
+                    }}
+                  >
                     {feed.confidence} ({feed.confidenceScore})
                   </strong>
                 </div>
@@ -351,26 +737,40 @@ export function DataSourcesScreen() {
               </div>
 
               <div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--ink-muted)" }}>
-                  <span>SLA Freshness Window</span>
-                  <span>{feed.nextSync}</span>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: "11px",
+                    color: "var(--ink-muted)",
+                  }}
+                >
+                  <span>SLA Freshness Window (Limit: 45 days)</span>
+                  <span style={{ color: isOutdated ? "#f87171" : "inherit" }}>
+                    {isOutdated ? `Overdue by ${feed.ageDays - 45} days` : feed.nextSync}
+                  </span>
                 </div>
                 <div className="sla-progress-track">
                   <div
-                    className={cx("sla-progress-bar", feed.isAlert && "sla-progress-bar--alert")}
-                    style={{ width: feed.isAlert ? "35%" : "88%" }}
+                    className={cx("sla-progress-bar", isOutdated && "sla-progress-bar--alert")}
+                    style={{ width: isOutdated ? "25%" : "88%" }}
                   />
                 </div>
               </div>
 
-              <p style={{ margin: 0, fontSize: "12px", color: "var(--ink-muted)", lineHeight: 1.4 }}>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "12px",
+                  color: "var(--ink-muted)",
+                  lineHeight: 1.4,
+                }}
+              >
                 {feed.description}
               </p>
 
               <div className="feed-footer">
-                <span className="license-pill">
-                  {feed.licence}
-                </span>
+                <span className="license-pill">{feed.licence}</span>
 
                 <div className="feed-buttons">
                   {ping && (
@@ -404,9 +804,19 @@ export function DataSourcesScreen() {
 
       {/* Governance SLA Stewardship Matrix */}
       <section className="panel" style={{ padding: "22px 24px" }}>
-        <h3 style={{ fontSize: "15px", fontWeight: "800", color: "var(--ink)", margin: "0 0 14px", display: "flex", alignItems: "center", gap: "8px" }}>
+        <h3
+          style={{
+            fontSize: "15px",
+            fontWeight: "800",
+            color: "var(--ink)",
+            margin: "0 0 14px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
+        >
           <ShieldCheck size={18} color="var(--primary)" />
-          Data Governance & Stewardship Protocols
+          Data Governance & Stewardship Protocols (5-Rule Architecture)
         </h3>
         <div style={{ overflowX: "auto" }}>
           <table className="audit-table">
@@ -415,36 +825,51 @@ export function DataSourcesScreen() {
                 <th>Data Feed Domain</th>
                 <th>Primary Custodian</th>
                 <th>SLA Refresh Frequency</th>
+                <th>Freshness Threshold</th>
                 <th>Fallback Policy</th>
                 <th>Encryption & Integrity</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td><strong>Ground Truth Telemetry</strong></td>
+                <td>
+                  <strong>Ground Truth Telemetry</strong>
+                </td>
                 <td>DoA Extension Division (Peradeniya)</td>
                 <td>Real-time streaming (sub-second)</td>
+                <td>&lt;= 45 Days</td>
                 <td>Pre-season target baseline interpolation</td>
                 <td>TLS 1.3 · SHA-256 Signature</td>
               </tr>
               <tr>
-                <td><strong>Wholesale Market Prices</strong></td>
+                <td>
+                  <strong>Wholesale Market Prices</strong>
+                </td>
                 <td>HARTI Data Analytics Unit</td>
                 <td>Daily 06:30 LKST</td>
+                <td>&lt;= 45 Days</td>
                 <td>7-day moving median imputation</td>
                 <td>HTTPS · REST JSON API</td>
               </tr>
               <tr>
-                <td><strong>Macro & Tariff Indicators</strong></td>
+                <td>
+                  <strong>Macro & Tariff Indicators</strong>
+                </td>
                 <td>Central Bank of Sri Lanka (ERD)</td>
                 <td>Daily 09:00 LKST</td>
+                <td>&lt;= 45 Days</td>
                 <td>Prior business day official gazette</td>
                 <td>HTTPS · Public Open Data</td>
               </tr>
               <tr>
-                <td><strong>Cold Storage Registry</strong></td>
+                <td>
+                  <strong>Cold Storage Registry</strong>
+                </td>
                 <td>Provincial Agrarian Services Dept</td>
-                <td>Quarterly (60-day threshold)</td>
+                <td>Quarterly survey</td>
+                <td>
+                  <span style={{ color: "#f87171", fontWeight: "700" }}>&gt; 45 Days (Outdated)</span>
+                </td>
                 <td>Conservative 1,200 MT cap rule</td>
                 <td>Internal Secure VPN</td>
               </tr>
@@ -455,4 +880,3 @@ export function DataSourcesScreen() {
     </>
   )
 }
-
