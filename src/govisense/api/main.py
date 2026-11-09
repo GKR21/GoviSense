@@ -1098,7 +1098,11 @@ def get_price_outlook(crop_id: Optional[str] = Query(None)):
             {
                 "date": str(r["year_month"]),
                 "farmgate": float(r["farmgate_price_rs_kg"]),
-                "retail": float(r.get("retail_price_rs_kg", r["farmgate_price_rs_kg"] * 1.3)),
+                "retail": float(
+                    r.get("retail_price_rs_kg")
+                    if pd.notna(r.get("retail_price_rs_kg"))
+                    else compute_modeled_retail_price(float(r["farmgate_price_rs_kg"]), crop=crop)
+                ),
             }
             for _, r in past_6.iterrows()
         ]
@@ -1113,9 +1117,9 @@ def get_price_outlook(crop_id: Optional[str] = Query(None)):
                 "p90": p90,
             },
             "retail_price": {
-                "p10": round(p10 * 1.3, 1),
+                "p10": compute_modeled_retail_price(p10, crop=crop),
                 "p50": retail_p50,
-                "p90": round(p90 * 1.4, 1),
+                "p90": compute_modeled_retail_price(p90, crop=crop),
             },
             "fair_floor_price_rs_kg": req.min_fair_farmgate_price,
             "direction": a2_res.direction,

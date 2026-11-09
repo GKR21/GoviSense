@@ -21,15 +21,13 @@ def prepared_df():
 
 def test_modeled_retail_price_not_fixed_multiplier():
     # Wholesale 200 Rs/kg
-    # For big onion: 200 + 12 (transport) + 200 * 0.18 (margin) = 248.0 Rs/kg
-    # (If it were 1.35x, it would be 270.0)
+    # Calibrated to real CBSL median retail/wholesale ratios (1.22 for big onion, 1.19 for chilli)
     p_onion = compute_modeled_retail_price(200.0, crop="big_onion")
-    assert p_onion == 248.0
+    assert p_onion == round(200.0 * 1.22, 1)  # 244.0 Rs/kg
     assert p_onion != round(200.0 * 1.35, 1)
 
-    # For chilli: 200 + 12 + 200 * 0.22 = 256.0 Rs/kg
     p_chilli = compute_modeled_retail_price(200.0, crop="chilli")
-    assert p_chilli == 256.0
+    assert p_chilli == round(200.0 * 1.19, 1)  # 238.0 Rs/kg
     assert p_chilli != round(200.0 * 1.35, 1)
 
 

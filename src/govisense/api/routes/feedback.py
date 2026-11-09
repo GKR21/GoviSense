@@ -6,6 +6,7 @@ validation flags, and automatic forecast pipeline re-triggering.
 """
 
 from __future__ import annotations
+from govisense.models.a2_price_forecast import compute_modeled_retail_price
 
 import logging
 import re
@@ -451,7 +452,7 @@ def retrigger_pipeline(payload: ReTriggerPayload, db: Any = Depends(get_db)):
             forecast_for_month=datetime.now(timezone.utc).strftime("%Y-%m"),
             horizon_months=3,
             price_p50=updated_price,
-            retail_price_rs_kg=round(updated_price * 1.30, 1),
+            retail_price_rs_kg=compute_modeled_retail_price(updated_price, crop=payload.crop_id),
             supply_mid_mt=eff_supply,
             demand_mt=eff_demand,
             spi_ratio_mid=spi_ratio,
