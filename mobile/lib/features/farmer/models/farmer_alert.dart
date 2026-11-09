@@ -14,6 +14,9 @@ class FarmerAlert {
     required this.messageTa,
     required this.timestamp,
     this.isRead = false,
+    this.isAcknowledged = false,
+    this.questionAsked,
+    this.officerResponse,
     this.officerName,
     this.officerPhone,
   });
@@ -28,10 +31,18 @@ class FarmerAlert {
   final String messageTa;
   final String timestamp;
   final bool isRead;
+  final bool isAcknowledged;
+  final String? questionAsked;
+  final String? officerResponse;
   final String? officerName;
   final String? officerPhone;
 
-  FarmerAlert copyWith({bool? isRead}) {
+  FarmerAlert copyWith({
+    bool? isRead,
+    bool? isAcknowledged,
+    String? questionAsked,
+    String? officerResponse,
+  }) {
     return FarmerAlert(
       id: id,
       type: type,
@@ -43,6 +54,9 @@ class FarmerAlert {
       messageTa: messageTa,
       timestamp: timestamp,
       isRead: isRead ?? this.isRead,
+      isAcknowledged: isAcknowledged ?? this.isAcknowledged,
+      questionAsked: questionAsked ?? this.questionAsked,
+      officerResponse: officerResponse ?? this.officerResponse,
       officerName: officerName,
       officerPhone: officerPhone,
     );

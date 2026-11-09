@@ -17,16 +17,13 @@ Output: price point forecast, prediction interval, direction (UP/DOWN/FLAT), sou
 """
 
 import warnings
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+import lightgbm as lgb
 import numpy as np
 import pandas as pd
-import lightgbm as lgb
-from typing import Dict, Any, List, Optional
-from dataclasses import dataclass
-
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore")
-    from statsmodels.tsa.statespace.sarimax import SARIMAX
-    from statsmodels.tsa.holtwinters import ExponentialSmoothing, SimpleExpSmoothing
+from statsmodels.tsa.holtwinters import ExponentialSmoothing, SimpleExpSmoothing
+from statsmodels.tsa.statespace.sarimax import SARIMAX
 
 
 @dataclass
@@ -111,7 +108,7 @@ class PriceForecaster:
         """
         crop_train_raw = train_df[train_df["crop"] == self.crop]
         if "source" in crop_train_raw.columns:
-            crop_train_raw = crop_train_raw[crop_train_raw["source"] == "real"]
+            crop_train_raw = crop_train_raw[crop_train_raw["source"].isin(["real", "anchor"])]
         crop_train = (
             crop_train_raw
             .dropna(subset=self.features + [self.target_col])
@@ -203,8 +200,11 @@ class PriceForecaster:
             denom = np.sum(np.maximum(np.abs(y_val), 1e-4))
 
             # LightGBM WAPE
-            lgb_preds = self.lgb_model.predict(X_val)
-            val_metrics["lgb_wape"] = float(np.sum(np.abs(y_val - lgb_preds)) / denom)
+            if self.lgb_model is not None:
+                lgb_preds = self.lgb_model.predict(X_val)
+                val_metrics["lgb_wape"] = float(np.sum(np.abs(y_val - lgb_preds)) / denom)
+            else:
+                val_metrics["lgb_wape"] = 999.0
 
             # SARIMAX WAPE
             if self.sarimax_res is not None:
@@ -254,7 +254,7 @@ class PriceForecaster:
                 "ets": val_metrics["ets_wape"],
                 "seasonal_naive": val_metrics["seasonal_naive_wape"],
             }
-            self.best_baseline = min(baselines, key=baselines.get)
+            self.best_baseline = min(baselines, key=lambda k: baselines[k])
             best_baseline_wape = baselines[self.best_baseline]
 
             # Pick winner on held-out WAPE
@@ -288,18 +288,22 @@ class PriceForecaster:
     def forecast_step(self, row: pd.Series, horizon: int = 1) -> PriceForecastResult:
         """Forecast price for a given horizon (1, 2, or 3 months ahead)."""
         # 1. LightGBM forecast
-        X_row = pd.DataFrame([row[self.features]])
-        lgb_pred = float(self.lgb_model.predict(X_row)[0])
+        X_row = pd.DataFrame([row[self.features].to_dict()])
+        if self.lgb_model is not None:
+            lgb_pred = float(np.asarray(self.lgb_model.predict(X_row))[0])
+        else:
+            lgb_pred = self.last_known_price
 
         # 2. SARIMAX forecast
         if self.sarimax_res is not None:
             try:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
-                    exog_step = np.array([[row["actual_spi_lag1"], row["import_volume_lag1"]]])
-                    sar_pred_scaled = float(
-                        self.sarimax_res.forecast(steps=1, exog=exog_step)[0]
-                    )
+                    spi_lag = float(row.get("actual_spi_lag1", 0.0)) if pd.notna(row.get("actual_spi_lag1")) else 0.0
+                    imp_lag = float(row.get("import_volume_lag1", 0.0)) if pd.notna(row.get("import_volume_lag1")) else 0.0
+                    exog_step = np.array([[spi_lag, imp_lag]])
+                    raw_fc = self.sarimax_res.forecast(steps=1, exog=exog_step)
+                    sar_pred_scaled = float(np.asarray(raw_fc)[0])
                 sarimax_pred = sar_pred_scaled * self._price_scale
             except Exception:
                 sarimax_pred = self.last_known_price

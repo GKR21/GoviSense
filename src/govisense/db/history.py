@@ -1,6 +1,6 @@
 """
 Confidence Badge & Decision History Audit Module (Item 8)
-Team DARKBITE · ModelX 2.0 Phase 1
+Team DARKBITE · ModelX 2.0 Phase 2
 Pilot: Anuradhapura (Big Onion, Chilli)
 
 Provides:
@@ -11,6 +11,7 @@ Provides:
      - SPI validation pass
      - Soil data present
   2. Audit Decision History Store:
+     - Database-backed (SQLite with WAL or PostgreSQL) with concurrent-write safety
      - Saves model version, data version, key assumptions, officer actions per run.
 """
 
@@ -18,6 +19,7 @@ from __future__ import annotations
 
 import json
 import uuid
+import hashlib
 from datetime import datetime, timezone
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
@@ -28,7 +30,21 @@ from govisense.db.session import get_session, init_db
 from govisense.db.models import DecisionRecordModel
 
 
-_DEFAULT_HISTORY_PATH = PROCESSED_DATA_DIR / "decision_history.json"
+def get_running_model_version(crop_id: Optional[str] = None) -> str:
+    """
+    Dynamically binds model_version to the active running model pipeline
+    (LightGBM yield correction + winning PriceForecaster + HiGHS LP solver).
+    """
+    try:
+        from govisense.api import main as api_main
+        if hasattr(api_main, "a2_models") and api_main.a2_models:
+            crop_key = crop_id if crop_id in api_main.a2_models else next(iter(api_main.a2_models.keys()))
+            forecaster = api_main.a2_models[crop_key]
+            winner = getattr(forecaster, "winner", "lightgbm")
+            return f"GoviSense-v2.0+{winner.upper()}+HiGHS-LP"
+    except Exception:
+        pass
+    return "GoviSense-v2.0+LightGBM+HiGHS-LP"
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +158,7 @@ class DecisionRecord:
     quantity: float
     unit: str
     rationale: str
-    model_version: str = "GoviSense v2.0"
+    model_version: Optional[str] = None
     data_version: str = "Harti-DoA-2024.12"
     assumptions: Dict[str, Any] = field(default_factory=lambda: {
         "loss_pct": 0.15,
@@ -152,12 +168,28 @@ class DecisionRecord:
     })
     decision_id: str = ""
     timestamp: str = ""
+    run_id: str = ""
+    hash: str = ""
+    is_demo: bool = False
+    data_available: bool = True
+    source_type: str = "officer_audit_log"
 
     def __post_init__(self):
         if not self.decision_id:
             self.decision_id = f"DEC-{uuid.uuid4().hex[:8].upper()}"
         if not self.timestamp:
             self.timestamp = datetime.now(timezone.utc).isoformat()
+        if not self.model_version:
+            self.model_version = get_running_model_version(self.crop_id)
+        if not self.run_id:
+            self.run_id = f"RUN-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+        if not self.hash:
+            payload_str = (
+                f"{self.decision_id}|{self.crop_id}|{self.season}|{self.officer_id}|"
+                f"{self.action_type}|{self.quantity}|{self.unit}|{self.model_version}|"
+                f"{self.data_version}|{self.timestamp}|{self.run_id}"
+            )
+            self.hash = hashlib.sha256(payload_str.encode("utf-8")).hexdigest()
 
 
 class DecisionHistoryStore:
@@ -296,8 +328,15 @@ class DecisionHistoryStore:
         return {
             "status": "RECORDED",
             "decision_id": record.decision_id,
+            "run_id": record.run_id,
+            "hash": record.hash,
             "crop_id": record.crop_id,
             "action_type": record.action_type,
+            "model_version": record.model_version,
+            "data_version": record.data_version,
+            "is_demo": record.is_demo,
+            "data_available": record.data_available,
+            "source_type": record.source_type,
             "timestamp": record.timestamp,
         }
 
@@ -345,5 +384,41 @@ class DecisionHistoryStore:
             records = [r for r in records if r.season == season]
         records = sorted(records, key=lambda r: r.timestamp, reverse=True)
         lim = int(limit) if isinstance(limit, int) else 50
-        return records[:lim]
-
+        if self._use_db:
+            with get_db_session() as db:
+                query = db.query(DecisionHistoryRecord)
+                if crop_id:
+                    query = query.filter(DecisionHistoryRecord.crop_id == crop_id)
+                if season:
+                    query = query.filter(DecisionHistoryRecord.season == season)
+                records = query.order_by(DecisionHistoryRecord.timestamp.desc()).limit(lim).all()
+                return [
+                    DecisionRecord(
+                        crop_id=r.crop_id,
+                        season=r.season,
+                        officer_id=r.officer_id,
+                        action_type=r.action_type,
+                        quantity=r.quantity,
+                        unit=r.unit,
+                        rationale=r.rationale,
+                        model_version=r.model_version,
+                        data_version=r.data_version,
+                        assumptions=r.assumptions or {},
+                        decision_id=r.decision_id,
+                        timestamp=r.timestamp,
+                        run_id=r.run_id or "",
+                        hash=r.hash or "",
+                        is_demo=bool(r.is_demo) if r.is_demo is not None else False,
+                        data_available=bool(r.data_available) if r.data_available is not None else True,
+                        source_type=r.source_type or "officer_audit_log",
+                    )
+                    for r in records
+                ]
+        else:
+            records = self._records
+            if crop_id:
+                records = [r for r in records if r.crop_id == crop_id]
+            if season:
+                records = [r for r in records if r.season == season]
+            records = sorted(records, key=lambda r: r.timestamp, reverse=True)
+            return records[:lim]

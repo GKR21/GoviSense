@@ -20,5 +20,6 @@ frontend/dist/
 .vscode/
 *.egg-info/
 *.db
+*.sqlite3
 *.sqlite*
 govisense_pgdata/
