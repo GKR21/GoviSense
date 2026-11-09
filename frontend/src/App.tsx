@@ -63,8 +63,39 @@ export default function App() {
     })
   }
 
+  const [isOnline, setIsOnline] = useState<boolean>(() => {
+    return typeof navigator !== "undefined" ? navigator.onLine : true
+  })
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+    window.addEventListener("online", handleOnline)
+    window.addEventListener("offline", handleOffline)
+    return () => {
+      window.removeEventListener("online", handleOnline)
+      window.removeEventListener("offline", handleOffline)
+    }
+  }, [])
+
   return (
     <div className="app-shell">
+      {!isOnline && (
+        <div
+          id="offline-banner"
+          role="status"
+          aria-live="polite"
+          className="bg-amber-600/95 text-white text-xs md:text-sm font-medium px-4 py-2 flex items-center justify-between border-b border-amber-500 shadow-sm z-50 sticky top-0"
+        >
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-200 animate-pulse" />
+            <span>
+              <strong>Offline Mode Active</strong> — Operating with cached advisory and field data. New reports will sync once connectivity resumes.
+            </span>
+          </div>
+          <span className="text-[11px] opacity-85 uppercase tracking-wider font-semibold">PWA Field Mode</span>
+        </div>
+      )}
       {view === "officer" && (
         <OfficerScreen
           view={view}
