@@ -108,12 +108,16 @@ class DataCatalogue:
         system_cols = {
             "year_month", "date", "year", "month", "district", "crop",
             "actual_spi", "spi_class", "is_interpolated", "data_source",
-            "is_simulation", "source", "source_type",
-            "provenance_price", "provenance_area", "provenance_weather", "provenance_import"
+            "is_simulation", "source", "source_type", "price_trading_days",
+            "provenance_price", "provenance_area", "provenance_weather", "provenance_import",
+            "prov_price", "prov_weather", "prov_area", "prov_yield", "prov_harvest",
+            "prov_import", "prov_demand", "prov_spi"
         }
 
         unmapped = []
         for col in df.columns:
+            if col.startswith("syn_") or col.startswith("prov_"):
+                continue
             if col not in system_cols and col not in all_catalogued_vars:
                 unmapped.append(col)
 
