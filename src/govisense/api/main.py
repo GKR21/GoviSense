@@ -291,6 +291,9 @@ def get_latest_forecasts():
                 "baseline_mt": a1_res.baseline_pred,
                 "accounting_supply_mt": a1_res.accounting_supply_mt,
                 "accounting_breakdown": a1_res.accounting_breakdown,
+                "model_classification": getattr(a1_res, "model_classification", "agreement with CPP plan"),
+                "data_quality": getattr(a1_res, "data_quality", "partial"),
+                "method": getattr(a1_res, "method", "plan-based agronomic accounting"),
             },
             "ai3_supply_pressure_index": {
                 "spi_score": spi_res.spi_score,

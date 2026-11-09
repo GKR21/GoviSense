@@ -22,7 +22,7 @@ import pandas as pd
 import lightgbm as lgb
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
-from govisense.config import settings
+from govisense.config import settings, HARVEST_WINDOW_WEIGHTS
 
 
 @dataclass
@@ -42,6 +42,9 @@ class ForecastResult:
     wape_model: float = 0.0
     wape_baseline: float = 0.0
     wape_clamped: bool = False
+    model_classification: str = "agreement with CPP plan"
+    data_quality: str = "partial"
+    method: str = "plan-based agronomic accounting"
 
 
 def compute_transparent_accounting_supply(
@@ -59,23 +62,18 @@ def compute_transparent_accounting_supply(
                        x (1 - Post_Harvest_Loss)
                        x Harvest Window Spread Factor
     """
+    window_weights = HARVEST_WINDOW_WEIGHTS.get(crop, {})
+    spread_factor = window_weights.get(month, window_weights.get("default", 0.15))
     if crop == "big_onion":
-        window_weights = {8: 0.40, 9: 0.45, 10: 0.15}
-        spread_factor = window_weights.get(month, 0.08)
         harvest_window_desc = "Yala Peak (Aug-Oct)" if month in [8, 9, 10] else "Off-season lean"
-        planting_month = ((month - crop_duration_months - 1) % 12) + 1
     elif crop == "chilli":
-        window_weights = {1: 0.35, 2: 0.45, 3: 0.20, 7: 0.35, 8: 0.45, 9: 0.20}
-        spread_factor = window_weights.get(month, 0.10)
         harvest_window_desc = (
             "Maha Peak (Jan-Mar)" if month in [1, 2, 3]
             else ("Yala Peak (Jul-Sep)" if month in [7, 8, 9] else "Inter-monsoon")
         )
-        planting_month = ((month - crop_duration_months - 1) % 12) + 1
     else:
-        spread_factor = 0.25
         harvest_window_desc = "General Harvest Window"
-        planting_month = ((month - crop_duration_months - 1) % 12) + 1
+    planting_month = ((month - crop_duration_months - 1) % 12) + 1
 
     net_yield = max(yield_mt_ha, 0.1)
     net_loss = float(np.clip(loss_pct, 0.0, 0.50))
@@ -92,8 +90,13 @@ def compute_transparent_accounting_supply(
         "planting_month": planting_month,
         "crop_duration_months": crop_duration_months,
         "spread_factor": round(float(spread_factor), 3),
+        "harvest_spread_factor": round(float(spread_factor), 3),
         "harvest_window": harvest_window_desc,
         "formula": "Supply = Planted Area (at month - duration) x Yield x (1 - Loss) x Harvest Window Weight",
+        "model_classification": "agreement with CPP plan",
+        "data_quality": "partial",
+        "method": "plan-based agronomic accounting",
+        "window_weights_source": "config.HARVEST_WINDOW_WEIGHTS",
     }
 
 
@@ -280,6 +283,9 @@ class HarvestVolumeForecaster:
             wape_model=round(self.wape_model, 4),
             wape_baseline=round(self.wape_baseline, 4),
             wape_clamped=self.wape_clamped,
+            model_classification="agreement with CPP plan",
+            data_quality="partial",
+            method="plan-based agronomic accounting",
         )
 
     def evaluate_test_set(self, test_df: pd.DataFrame) -> Dict[str, Any]:

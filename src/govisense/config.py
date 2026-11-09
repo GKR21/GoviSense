@@ -80,6 +80,27 @@ class CropConfig:
     storage_loss_rate_monthly: float  # Post-harvest loss rate
 
 
+# Agronomic Harvest Window Weights (A1 Accounting)
+# Source: Department of Agriculture Crop Planting Plans (CPP) & empirical disaggregation rules.
+# Onion Yala peak distribution: Aug (0.40), Sep (0.65), Oct (0.88); Chilli seasonal factor: 0.75.
+HARVEST_WINDOW_WEIGHTS: Dict[str, Any] = {
+    "big_onion": {
+        8: 0.40,
+        9: 0.65,
+        10: 0.88,
+        "default": 0.08,
+    },
+    "chilli": {
+        1: 0.75,
+        2: 0.75,
+        3: 0.75,
+        7: 0.75,
+        8: 0.75,
+        9: 0.75,
+        "default": 0.10,
+    },
+}
+
 @dataclass
 class GoviSenseSettings:
     pilot_district: str = "Anuradhapura"
@@ -151,6 +172,7 @@ class GoviSenseSettings:
     # Source: CBSL Weekly Economic Indicators & HARTI retail-to-wholesale margins; docs/assumptions.md
     transport_markup_rs_kg: float = 12.0
     retail_margin_ratio: float = 0.18
+    harvest_window_weights: Dict[str, Any] = field(default_factory=lambda: HARVEST_WINDOW_WEIGHTS)
     
     # Crop Definitions
     crops: Dict[str, CropConfig] = field(default_factory=lambda: {

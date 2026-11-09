@@ -364,6 +364,8 @@ def get_evaluation_scoreboard(db: Any = Depends(get_db)):
                         "interval_80_coverage_pct": cov,
                         "eval_points": pts,
                         "verdict": "Usable" if beat else "Usable with limits",
+                        "model_classification": "agreement with CPP plan",
+                        "data_quality": "partial",
                     })
 
                 if p_info and p_info.get("wape_model") is not None:
