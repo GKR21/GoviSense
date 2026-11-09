@@ -314,7 +314,7 @@ def get_evaluation_scoreboard(db: Any = Depends(get_db)):
     scoreboard = []
     if results:
         for r in results:
-            scoreboard.append({
+            entry = {
                 "crop": r.crop_id,
                 "module": r.model_name,
                 "model_wape": r.metric_value if "wape" in r.metric_name.lower() else None,
@@ -324,7 +324,11 @@ def get_evaluation_scoreboard(db: Any = Depends(get_db)):
                 "interval_80_coverage_pct": r.details.get("coverage_80", 82.5) if r.details else None,
                 "eval_points": r.details.get("eval_points", 48) if r.details else 48,
                 "verdict": "Usable" if r.beat_baseline else "Usable with limits",
-            })
+            }
+            if "supply" in r.model_name.lower() or "harvest" in r.model_name.lower():
+                entry["model_classification"] = "agreement with CPP plan"
+                entry["data_quality"] = "partial"
+            scoreboard.append(entry)
     else:
         # Run real walk-forward backtest when evaluation_results is empty
         try:

@@ -38,3 +38,38 @@ Per Proposal Section 5.2 and Item 1.5, a 5% random sample of extracted values fr
   5. The CI test in `tests/test_extract.py` computes the exact error rate:
      $$\text{Error Rate} = \frac{\sum |\text{extracted} - \text{verified}|}{\sum \text{verified}} \times 100\%$$
 
+---
+
+## 3. Retrieval Guides for Missing Official Primary Sources
+
+The Phase 0 audit confirmed that historical planted area (2018-2023), yield (2018-2023), and import volume series were derived via simulation rather than observed records. To replace simulated series with official ground-truth observations, follow the step-by-step procedures below:
+
+### 3.1 Sri Lanka Customs & Department of Commerce Import Volumes
+* **Missing Series**: Monthly import volume (MT) for Big Onion (HS Code: 0703.10) and Green/Dry Chilli (HS Code: 0709.60 / 0710.80) from 2018-01 through 2024-12.
+* **Official Publisher**: Sri Lanka Customs, Trade Information Portal & Central Bank of Sri Lanka External Sector Statistics.
+* **Retrieval Steps**:
+  1. Access the Sri Lanka Customs Trade Data Portal: `https://customs.gov.lk` or CBSL External Sector Monthly Trade Tables: `https://www.cbsl.gov.lk/en/statistics/economic-indicators/external-sector`.
+  2. Request/Download External Trade Performance reports for major agricultural import items (Section 2 - Vegetable Products).
+  3. Extract monthly aggregated net mass (metric tons) and CIF value for Anuradhapura/Colombo ports of entry.
+  4. Save raw CSV to `data/raw/customs/sri_lanka_customs_imports_2018_2024.csv`.
+  5. Run `python scripts/ingest_customs.py` to update `data/processed/monthly_master.csv` provenance column `prov_import` from `synthetic` to `real`.
+
+### 3.2 Department of Agriculture AgStat Progress Reports (2018–2023 Realized Area & Yield)
+* **Missing Series**: District-level realized planted area (ha) and realized harvest yield (MT/ha) for Maha and Yala seasons 2018–2023 (Pilot district: Anuradhapura; Secondary: Matale).
+* **Official Publisher**: Socio Economics and Planning Centre (SEPC), Department of Agriculture, Peradeniya.
+* **Publication Title**: *AgStat: Agricultural Statistics of Sri Lanka* (Annual Volumes XV through XXI) and *Seasonal Performance Reports of Other Field Crops (OFC)*.
+* **Retrieval Steps**:
+  1. Visit the DOA SEPC Publications repository: `https://www.doa.gov.lk/sepc-publications/`.
+  2. Download PDF annual volumes for years 2018, 2019, 2020, 2021, 2022, and 2023.
+  3. Locate Table 2.4 (*Cultivated Extent and Production of OFC by District*) for Anuradhapura and Matale.
+  4. Save PDF files to `data/raw/cpp/agstat_2018_2023/`.
+  5. Run `python scripts/extract_agstat.py` to disaggregate seasonal achievements into monthly realized extent and yield.
+
+### 3.3 CBSL Historical Commodity Prices Bulk Export Procedure
+* **Existing File**: `data/raw/cbsl/cbsl_daily_prices_historical.csv` (2,455 daily market records from Macro Lab / Pettah market).
+* **Retrieval Procedure**:
+  1. Navigate to the CBSL Data Library: `https://www.cbsl.gov.lk/en/statistics/statistical-data-library`.
+  2. Select *Prices and Wages* -> *Daily Wholesale and Retail Prices of Selected Agricultural Commodities*.
+  3. Select date range `2018-01-01` to `2024-12-31`, commodities `Big Onion`, `Green Chilli`, `Red Onion`, `Potato`, markets `Pettah` and `Dambulla DEC`.
+  4. Export CSV with daily price range (`wholesale_price_rs_kg`, `retail_price_rs_kg`).
+  5. Validate SHA-256 and confirm record count aligns with calendar trading days.
