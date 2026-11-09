@@ -150,8 +150,12 @@ def farmer_top3_recommendations(
         try:
             dem_result = demand_estimator.estimate(crop_id, eff_month, scenario="mid")
             monthly_demand = dem_result.demand_mt
-        except Exception:
-            monthly_demand = 5000.0
+        except Exception as e:
+            logger.error("Demand estimator failed for %s in month %d: %s", crop_id, eff_month, e)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Demand estimation failed for crop '{crop_id}': {e}",
+            )
 
         # Check cumulative reported acreage and oversupply stop rule
         total_reported = report_store.get_total_reported_area(crop_id, eff_season)

@@ -13,11 +13,14 @@ On report ingestion:
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Dict, Any, List, Optional
+
+logger = logging.getLogger("govisense.feedback")
 
 from govisense.config import PROCESSED_DATA_DIR, settings
 from govisense.db.session import get_session, init_db
@@ -243,26 +246,26 @@ class PlantingReportStore:
                     if season:
                         q = q.filter(PlantingReportModel.season == season)
                     db_rows = q.order_by(PlantingReportModel.timestamp.desc()).all()
-                    if db_rows:
-                        return [
-                            PlantingReport(
-                                crop_id=r.crop_id,
-                                season=r.season,
-                                planned_area_ha=float(r.planned_area_ha),
-                                actual_area_ha=float(r.actual_area_ha),
-                                consent_given=bool(r.consent_given),
-                                pseudonymous_id=r.pseudonymous_id,
-                                harvest_outcome_mt=float(r.harvest_outcome_mt) if r.harvest_outcome_mt is not None else None,
-                                sale_price_rs_kg=float(r.sale_price_rs_kg) if r.sale_price_rs_kg is not None else None,
-                                sale_channel=r.sale_channel,
-                                notes=r.notes,
-                                report_id=r.report_id,
-                                timestamp=r.timestamp.isoformat() if hasattr(r.timestamp, "isoformat") else str(r.timestamp),
-                            )
-                            for r in db_rows
-                        ]
-            except Exception:
-                pass
+                    return [
+                        PlantingReport(
+                            crop_id=r.crop_id,
+                            season=r.season,
+                            planned_area_ha=float(r.planned_area_ha),
+                            actual_area_ha=float(r.actual_area_ha),
+                            consent_given=bool(r.consent_given),
+                            pseudonymous_id=r.pseudonymous_id,
+                            harvest_outcome_mt=float(r.harvest_outcome_mt) if r.harvest_outcome_mt is not None else None,
+                            sale_price_rs_kg=float(r.sale_price_rs_kg) if r.sale_price_rs_kg is not None else None,
+                            sale_channel=r.sale_channel,
+                            notes=r.notes,
+                            report_id=r.report_id,
+                            timestamp=r.timestamp.isoformat() if hasattr(r.timestamp, "isoformat") else str(r.timestamp),
+                        )
+                        for r in db_rows
+                    ]
+            except Exception as e:
+                logger.error("Failed to query planting reports from database: %s", e)
+                raise RuntimeError(f"Database error querying planting reports: {e}")
 
         results = self._reports
         if crop_id:
