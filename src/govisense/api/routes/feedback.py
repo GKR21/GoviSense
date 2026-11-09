@@ -465,12 +465,14 @@ def retrigger_pipeline(payload: ReTriggerPayload, db: Any = Depends(get_db)):
         logger.warning("Could not persist retrigger snapshot: %s", e)
 
     from dataclasses import asdict
+    res_dict = asdict(result)
     return {
         "retrained": True,
         "run_id": new_run_id,
         "crop_id": payload.crop_id,
         "season": payload.season,
-        "retrigger": asdict(result),
+        **res_dict,
+        "retrigger": res_dict,
         "refit_inputs": {
             "reported_area_ha": result.total_reported_ha,
             "effective_supply_mt": eff_supply,

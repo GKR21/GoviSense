@@ -48,3 +48,4 @@ def isolate_test_database():
     settings.database_url = orig_db_url
     settings.fallback_sqlite_url = orig_fallback_url
     shutil.rmtree(temp_dir, ignore_errors=True)
+

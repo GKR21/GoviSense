@@ -177,6 +177,45 @@ def bootstrap_metric_ci(
     }
 
 
+def evaluate_price_crash_correlation(
+    prices: np.ndarray,
+    spi_scores: np.ndarray,
+    crash_threshold_pct: float = 0.10,
+) -> Dict[str, float]:
+    """
+    Evaluates correlation between SPI scores and subsequent monthly price changes.
+    Verifies the economic thesis: high positive SPI (glut) precedes farmgate price collapse.
+    """
+    if len(prices) < 2 or len(spi_scores) < 2:
+        return {
+            "correlation_spi_vs_subsequent_price_change": 0.0,
+            "glut_crash_hit_rate": 0.0,
+        }
+
+    n = min(len(prices) - 1, len(spi_scores) - 1)
+    prec_spi = spi_scores[:n]
+    price_pct_changes = (prices[1 : n + 1] - prices[:n]) / np.maximum(prices[:n], 1e-6)
+
+    # Pearson correlation
+    if np.std(prec_spi) > 1e-6 and np.std(price_pct_changes) > 1e-6:
+        corr = float(np.corrcoef(prec_spi, price_pct_changes)[0, 1])
+    else:
+        corr = 0.0
+
+    # Glut crash hit rate: when SPI >= 0.15, did prices drop by at least crash_threshold_pct?
+    glut_mask = prec_spi >= 0.15
+    if np.sum(glut_mask) > 0:
+        crashes = price_pct_changes[glut_mask] <= -crash_threshold_pct
+        hit_rate = float(np.mean(crashes))
+    else:
+        hit_rate = 0.0
+
+    return {
+        "correlation_spi_vs_subsequent_price_change": round(corr, 3),
+        "glut_crash_hit_rate": round(hit_rate, 3),
+    }
+
+
 def evaluate_spi_against_price_ground_truth(
     prices: np.ndarray,
     predicted_spi_labels: List[str],

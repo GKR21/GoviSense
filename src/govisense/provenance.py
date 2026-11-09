@@ -150,6 +150,15 @@ def compute_dataset_provenance(df: Optional[pd.DataFrame] = None) -> Dict[str, A
     except Exception:
         is_db_fallback = False
 
+    if df is None:
+        try:
+            from govisense.config import PROCESSED_DATA_DIR
+            m_path = PROCESSED_DATA_DIR / "monthly_master.csv"
+            if m_path.exists():
+                df = pd.read_csv(m_path)
+        except Exception:
+            pass
+
     if df is None or len(df) == 0:
         return {
             "data_quality": "no_data",

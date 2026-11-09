@@ -70,3 +70,4 @@ def test_failed_db_lookup_returns_401():
             login(req)
         assert exc_info.value.status_code == 401
         assert "Database lookup error" in exc_info.value.detail
+

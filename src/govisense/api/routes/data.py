@@ -103,7 +103,7 @@ def get_sources_summary(db: Any = Depends(get_db)):
     if not isinstance(db, Session):
         db = get_session()
     total = db.query(MonthlyDataModel).count()
-    real = db.query(MonthlyDataModel).filter(MonthlyDataModel.source_type == "real").count()
+    real = db.query(MonthlyDataModel).filter(MonthlyDataModel.source_type.in_(["real", "anchor"])).count()
     interpolated = db.query(MonthlyDataModel).filter(MonthlyDataModel.source_type == "interpolated").count()
     synthetic = db.query(MonthlyDataModel).filter(MonthlyDataModel.source_type == "synthetic").count()
 

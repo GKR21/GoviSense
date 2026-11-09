@@ -28,3 +28,4 @@ def test_master_provenance_labels():
     assert len(master_df[master_df["source_type"] == "real"]) == 140
     assert len(master_df[master_df["source_type"] == "anchor"]) == 22
     assert len(master_df[master_df["source_type"] == "interpolated"]) == 6
+

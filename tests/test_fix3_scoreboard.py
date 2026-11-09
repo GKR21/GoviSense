@@ -48,3 +48,4 @@ def test_scoreboard_returns_no_data_when_backtest_fails(temp_db):
         res = get_evaluation_scoreboard(db=temp_db)
         assert res["data_quality"] == "no_data"
         assert res["scoreboard"] == []
+

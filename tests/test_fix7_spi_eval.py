@@ -45,3 +45,4 @@ def test_real_dataset_spi_warning_evaluation():
         assert "always_balanced_baseline" in eval_res
         assert "random_baseline" in eval_res
         assert eval_res["sample_size"] == len(prices)
+

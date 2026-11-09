@@ -95,6 +95,7 @@ def generate_counterfactual_simulation_dataset(
                 "spi_class": "Glut" if spi > 0.15 else ("Shortage" if spi < -0.15 else "Balanced"),
                 "is_interpolated": False,
                 "source": "synthetic",  # EXPLICITLY LABELED AS SYNTHETIC SIMULATION
+                "source_type": "synthetic",
                 "is_simulation": True,
                 "simulation_scenario": scenario_name,
                 "data_source": "demo_synthetic_only",

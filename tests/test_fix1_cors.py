@@ -65,3 +65,4 @@ async def test_cors_allowed_and_disallowed_origins():
     header_dict_disallowed = {k.decode().lower(): v.decode() for k, v in response_headers_disallowed}
     # For disallowed origin, CORS middleware either returns 400 or does not include allow-origin header
     assert header_dict_disallowed.get("access-control-allow-origin") is None or status_code_disallowed[0] == 400
+

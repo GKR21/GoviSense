@@ -25,7 +25,7 @@ class ModelOutputProvenance(BaseModel):
     run_id: str = Field(..., description="Execution identifier in database runs table")
     data_version: str = Field(..., description="Cryptographic SHA-256 (first 8 hex) of training tables + row counts")
     model_version: str = Field(..., description="Git commit prefix + hash of fitted model parameters")
-    data_quality: Literal["real", "partial", "demo_estimate", "no_data"] = Field(
+    data_quality: Literal["real", "partial", "demo_estimate", "no_data", "synthetic", "interpolated"] = Field(
         "real", description="Data provenance classification"
     )
     is_demo: bool = Field(False, description="True if synthetic/demo data is served")

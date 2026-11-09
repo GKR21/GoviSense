@@ -58,7 +58,7 @@ def validate_master_dataset(df: pd.DataFrame) -> Dict[str, Any]:
 
     # Validate source column values
     if "source" in df.columns:
-        invalid_sources = set(df["source"].unique()) - {"real", "interpolated", "synthetic"}
+        invalid_sources = set(df["source"].unique()) - {"real", "interpolated", "synthetic", "anchor"}
         if invalid_sources:
             issues.append(f"Invalid values in 'source' column: {invalid_sources}")
 
