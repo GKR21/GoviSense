@@ -106,34 +106,128 @@ def evaluate_interval_coverage(
     }
 
 
-def evaluate_price_crash_correlation(
+def derive_ground_truth_from_prices(
     price_series: np.ndarray,
-    spi_scores: np.ndarray,
-    crash_threshold_pct: float = 0.15,
+    threshold_pct: float = 0.15,
+) -> List[str]:
+    """
+    Derives economic ground-truth market states directly from observed price movement:
+    - Price drop > threshold_pct in following month -> 'Glut'
+    - Price increase > threshold_pct in following month -> 'Shortage'
+    - Price change within +/- threshold_pct -> 'Balanced'
+    """
+    prices = np.asarray(price_series, dtype=float)
+    if len(prices) < 2:
+        return ["Balanced"] * len(prices)
+
+    pct_change = np.diff(prices) / np.maximum(prices[:-1], 1.0)
+    labels = []
+    for change in pct_change:
+        if change < -threshold_pct:
+            labels.append("Glut")
+        elif change > threshold_pct:
+            labels.append("Shortage")
+        else:
+            labels.append("Balanced")
+    # For the last observation without a future step, assume Balanced
+    labels.append("Balanced")
+    return labels
+
+
+def bootstrap_metric_ci(
+    y_true: List[str],
+    y_pred: List[str],
+    target_class: str = "Glut",
+    n_bootstraps: int = 500,
+    confidence_level: float = 0.95,
+    random_seed: int = 42,
+) -> Dict[str, Tuple[float, float]]:
+    """
+    Computes bootstrap confidence intervals for precision, recall, and F1.
+    """
+    np.random.seed(random_seed)
+    n = len(y_true)
+    if n == 0:
+        return {"precision_ci": (0.0, 0.0), "recall_ci": (0.0, 0.0), "f1_ci": (0.0, 0.0)}
+
+    precisions, recalls, f1s = [], [], []
+    for _ in range(n_bootstraps):
+        indices = np.random.choice(n, size=n, replace=True)
+        bt_true = [y_true[i] for i in indices]
+        bt_pred = [y_pred[i] for i in indices]
+        res = evaluate_directional_warnings(bt_true, bt_pred, target_class=target_class)
+        precisions.append(res["precision"])
+        recalls.append(res["recall"])
+        f1s.append(res["f1_score"])
+
+    alpha = (1.0 - confidence_level) / 2.0
+    return {
+        "precision_ci": (
+            round(float(np.percentile(precisions, 100 * alpha)), 3),
+            round(float(np.percentile(precisions, 100 * (1 - alpha))), 3),
+        ),
+        "recall_ci": (
+            round(float(np.percentile(recalls, 100 * alpha)), 3),
+            round(float(np.percentile(recalls, 100 * (1 - alpha))), 3),
+        ),
+        "f1_ci": (
+            round(float(np.percentile(f1s, 100 * alpha)), 3),
+            round(float(np.percentile(f1s, 100 * (1 - alpha))), 3),
+        ),
+    }
+
+
+def evaluate_spi_against_price_ground_truth(
+    prices: np.ndarray,
+    predicted_spi_labels: List[str],
+    target_class: str = "Glut",
 ) -> Dict[str, Any]:
     """
-    Verifies the economic thesis: High positive SPI signals (glut) lead to price crashes.
+    Rebuilds ground truth from CBSL wholesale price movements and evaluates model
+    against Random Baseline and Always-Balanced Baseline.
+    Detects degenerate distributions and marks them 'not evaluable'.
     """
-    if len(price_series) < 2 or len(spi_scores) < 2:
-        return {"correlation": 0.0, "crash_hit_rate": 0.0}
+    actual_labels = derive_ground_truth_from_prices(prices)
+    if len(actual_labels) != len(predicted_spi_labels):
+        min_len = min(len(actual_labels), len(predicted_spi_labels))
+        actual_labels = actual_labels[:min_len]
+        predicted_spi_labels = predicted_spi_labels[:min_len]
 
-    # Percent price change in next period
-    price_pct_changes = np.diff(price_series) / np.maximum(price_series[:-1], 1.0)
-    lagged_spi = spi_scores[:-1]
+    sample_size = len(actual_labels)
+    unique_actual = set(actual_labels)
+    unique_pred = set(predicted_spi_labels)
 
-    # Hit rate: when SPI > 0.15, did price drop by > crash_threshold_pct?
-    glut_mask = lagged_spi > 0.15
-    if np.any(glut_mask):
-        crashes_predicted = price_pct_changes[glut_mask] < -crash_threshold_pct
-        hit_rate = float(np.mean(crashes_predicted))
-    else:
-        hit_rate = 1.0
+    # Degenerate case detection: e.g. all months identical class or no target class present
+    if len(unique_actual) <= 1 or target_class not in unique_actual or len(unique_pred) <= 1:
+        return {
+            "status": "not evaluable",
+            "reason": f"Degenerate label distribution (Actual classes: {unique_actual}, Pred classes: {unique_pred})",
+            "sample_size": sample_size,
+            "target_class": target_class,
+        }
 
-    corr = float(np.corrcoef(lagged_spi, price_pct_changes)[0, 1]) if len(lagged_spi) > 2 else -0.5
+    # Model evaluation
+    model_metrics = evaluate_directional_warnings(actual_labels, predicted_spi_labels, target_class=target_class)
+    cis = bootstrap_metric_ci(actual_labels, predicted_spi_labels, target_class=target_class)
+
+    # Always-Balanced Baseline
+    balanced_preds = ["Balanced"] * sample_size
+    balanced_metrics = evaluate_directional_warnings(actual_labels, balanced_preds, target_class=target_class)
+
+    # Random Baseline (proportional random guess)
+    class_probs = [actual_labels.count(c) / sample_size for c in ["Glut", "Balanced", "Shortage"]]
+    np.random.seed(42)
+    random_preds = np.random.choice(["Glut", "Balanced", "Shortage"], size=sample_size, p=class_probs).tolist()
+    random_metrics = evaluate_directional_warnings(actual_labels, random_preds, target_class=target_class)
 
     return {
-        "correlation_spi_vs_subsequent_price_change": round(corr, 3),
-        "glut_crash_hit_rate": round(hit_rate, 3),
-        "verified_economic_thesis": corr < 0,  # Negative correlation expected (high SPI -> negative price change)
+        "status": "evaluable",
+        "sample_size": sample_size,
+        "target_class": target_class,
+        "model": {**model_metrics, **cis},
+        "always_balanced_baseline": balanced_metrics,
+        "random_baseline": random_metrics,
+        "beats_always_balanced": model_metrics["f1_score"] > balanced_metrics["f1_score"],
+        "beats_random": model_metrics["f1_score"] > random_metrics["f1_score"],
     }
 
