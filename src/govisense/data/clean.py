@@ -51,9 +51,9 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
         g["planted_extent_lag2"] = g["planted_extent_ha"].shift(2)
         g["planted_extent_lag1"] = g["planted_extent_ha"].shift(1)
         
-        # 3. Weather Anomalies during growing season (rolling 3-month mean)
-        g["rainfall_anomaly_3m_mean"] = g["rainfall_anomaly_mm"].rolling(window=3, min_periods=1).mean()
-        g["temp_anomaly_3m_mean"] = g["temp_anomaly_celsius"].rolling(window=3, min_periods=1).mean()
+        # 3. Weather Anomalies during growing season (rolling 3-month mean strictly shifted to forecast origin)
+        g["rainfall_anomaly_3m_mean"] = g["rainfall_anomaly_mm"].shift(1).rolling(window=3, min_periods=1).mean()
+        g["temp_anomaly_3m_mean"] = g["temp_anomaly_celsius"].shift(1).rolling(window=3, min_periods=1).mean()
         
         # 4. Harvest Volume & Yield Lags
         g["harvest_volume_lag1"] = g["harvest_volume_mt"].shift(1)

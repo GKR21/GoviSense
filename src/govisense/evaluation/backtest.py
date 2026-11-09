@@ -229,6 +229,8 @@ if __name__ == "__main__":
     report = run_walk_forward_evaluation()
     print("\n--- GoviSense Walk-Forward Validation Results (WAPE) ---")
     for crop, metrics in report.items():
+        if crop.startswith("_"):
+            continue
         print(f"\n[Crop: {crop.upper()}]")
         a3 = metrics["a3_supply_forecast"]
         print(
