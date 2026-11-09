@@ -325,39 +325,101 @@ def get_evaluation_scoreboard(db: Any = Depends(get_db)):
                 "verdict": "Usable" if r.beat_baseline else "Usable with limits",
             })
     else:
-        # Default verified evaluations from proposal backtests
-        defaults = [
-            ("big_onion", "A3 Supply Forecast", 0.142, 0.228, True, 84.2),
-            ("big_onion", "A2 Price Forecast", 0.165, 0.284, True, 81.0),
-            ("chilli", "A3 Supply Forecast", 0.210, 0.245, True, 78.5),
-            ("chilli", "A2 Price Forecast", 0.188, 0.295, True, 80.5),
-        ]
-        for crop, mod, mw, bw, beat, cov in defaults:
-            rec = EvaluationResultModel(
-                run_id=run_id,
-                crop_id=crop,
-                model_name=mod,
-                metric_name="WAPE",
-                metric_value=mw,
-                baseline_name="seasonal_naive",
-                baseline_value=bw,
-                beat_baseline=beat,
-                evaluation_period="2020-2024",
-                details={"coverage_80": cov, "eval_points": 48},
-            )
-            db.add(rec)
-            scoreboard.append({
-                "crop": crop,
-                "module": mod,
-                "model_wape": mw,
-                "baseline_wape": bw,
-                "served_model": "LightGBM" if beat else "seasonal_naive",
-                "beat_baseline": beat,
-                "interval_80_coverage_pct": cov,
-                "eval_points": 48,
-                "verdict": "Usable" if beat else "Usable with limits",
-            })
-        db.commit()
+        # Run real walk-forward backtest when evaluation_results is empty
+        try:
+            from govisense.evaluation.backtest import run_walk_forward_evaluation
+            backtest_res = run_walk_forward_evaluation(crops=["big_onion", "chilli"])
+            for crop in ["big_onion", "chilli"]:
+                c_data = backtest_res.get(crop, {})
+                s_info = c_data.get("a3_supply_forecast", {})
+                p_info = c_data.get("a2_price_forecast", {})
+
+                if s_info and s_info.get("wape_model") is not None:
+                    mw = s_info.get("wape_model")
+                    bw = s_info.get("wape_baseline")
+                    beat = bool(mw < bw) if (mw is not None and bw is not None) else False
+                    cov = float(s_info.get("interval_80_coverage_pct", 80.0))
+                    pts = int(s_info.get("eval_points", 0))
+                    rec = EvaluationResultModel(
+                        run_id=run_id,
+                        crop_id=crop,
+                        model_name="A3 Supply Forecast",
+                        metric_name="WAPE",
+                        metric_value=mw,
+                        baseline_name="seasonal_naive",
+                        baseline_value=bw,
+                        beat_baseline=beat,
+                        evaluation_period="walk-forward",
+                        details={"coverage_80": cov, "eval_points": pts, "data_version": d_ver},
+                    )
+                    db.add(rec)
+                    scoreboard.append({
+                        "crop": crop,
+                        "module": "A3 Supply Forecast",
+                        "model_wape": mw,
+                        "baseline_wape": bw,
+                        "served_model": "LightGBM" if beat else "seasonal_naive",
+                        "beat_baseline": beat,
+                        "interval_80_coverage_pct": cov,
+                        "eval_points": pts,
+                        "verdict": "Usable" if beat else "Usable with limits",
+                    })
+
+                if p_info and p_info.get("wape_model") is not None:
+                    mw = p_info.get("wape_model")
+                    bw = p_info.get("wape_baseline")
+                    beat = bool(mw < bw) if (mw is not None and bw is not None) else False
+                    cov = float(p_info.get("interval_80_coverage_pct", 80.0)) if "interval_80_coverage_pct" in p_info else 80.0
+                    pts = int(p_info.get("eval_points", 0))
+                    rec = EvaluationResultModel(
+                        run_id=run_id,
+                        crop_id=crop,
+                        model_name="A2 Price Forecast",
+                        metric_name="WAPE",
+                        metric_value=mw,
+                        baseline_name="SARIMAX",
+                        baseline_value=bw,
+                        beat_baseline=beat,
+                        evaluation_period="walk-forward",
+                        details={"coverage_80": cov, "eval_points": pts, "data_version": d_ver},
+                    )
+                    db.add(rec)
+                    scoreboard.append({
+                        "crop": crop,
+                        "module": "A2 Price Forecast",
+                        "model_wape": mw,
+                        "baseline_wape": bw,
+                        "served_model": "LightGBM" if beat else "SARIMAX",
+                        "beat_baseline": beat,
+                        "interval_80_coverage_pct": cov,
+                        "eval_points": pts,
+                        "verdict": "Usable" if beat else "Usable with limits",
+                    })
+            db.commit()
+        except Exception as e:
+            logger.warning(f"Walk-forward evaluation failed: {e}")
+            return {
+                "run_id": run_id,
+                "data_version": d_ver,
+                "model_version": m_ver,
+                "data_quality": "no_data",
+                "is_demo": False,
+                "served_model": "None",
+                "assumptions_ref": "docs/assumptions.md",
+                "scoreboard": [],
+            }
+
+    if not scoreboard:
+        return {
+            "run_id": run_id,
+            "data_version": d_ver,
+            "model_version": m_ver,
+            "data_quality": "no_data",
+            "is_demo": False,
+            "served_model": "None",
+            "assumptions_ref": "docs/assumptions.md",
+            "scoreboard": [],
+        }
 
     return {
         "run_id": run_id,
