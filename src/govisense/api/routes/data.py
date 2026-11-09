@@ -396,6 +396,22 @@ def get_evaluation_scoreboard(db: Any = Depends(get_db)):
                         "eval_points": pts,
                         "verdict": "Usable" if beat else "Usable with limits",
                     })
+
+                # Persist multi-horizon rows (t+1, t+2, t+3 against seasonal_naive, last_value, sarimax)
+                for mh_row in c_data.get("multi_horizon_rows", []):
+                    rec_mh = EvaluationResultModel(
+                        run_id=run_id,
+                        crop_id=mh_row["crop_id"],
+                        model_name=mh_row["model_name"],
+                        metric_name=mh_row["metric_name"],
+                        metric_value=mh_row["metric_value"],
+                        baseline_name=mh_row["baseline_name"],
+                        baseline_value=mh_row["baseline_value"],
+                        beat_baseline=mh_row["beat_baseline"],
+                        evaluation_period=mh_row["evaluation_period"],
+                        details=mh_row["details"],
+                    )
+                    db.add(rec_mh)
             db.commit()
         except Exception as e:
             logger.warning(f"Walk-forward evaluation failed: {e}")
