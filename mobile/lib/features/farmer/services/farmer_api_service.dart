@@ -4,6 +4,7 @@ import '../../../core/network/api_client.dart';
 import '../models/crop_item.dart';
 import '../models/farmer_profile.dart';
 import '../models/planting_report.dart';
+import '../models/market_price_item.dart';
 
 class FarmerApiService {
   FarmerApiService({ApiClient? apiClient}) : _client = apiClient ?? ApiClient();
@@ -66,6 +67,34 @@ class FarmerApiService {
       debugPrint('Planting report network submission: $e');
       return false;
     }
+  }
+
+  /// Fetches live wholesale & retail market price bulletin from FastAPI backend (/api/market-prices)
+  /// Falls back to null if unreachable, allowing UI to gracefully use calibrated offline data.
+  Future<List<MarketPriceItem>?> getMarketPrices({String? category}) async {
+    try {
+      final Map<String, dynamic> query = {};
+      if (category != null && category.isNotEmpty && category != 'all') {
+        query['category'] = category;
+      }
+      final response = await _client.get(
+        '/api/market-prices',
+        queryParameters: query.isNotEmpty ? query : null,
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data is String ? jsonDecode(response.data) : response.data;
+        final list = data['prices'] as List<dynamic>?;
+        if (list != null && list.isNotEmpty) {
+          return list
+              .map((item) => MarketPriceItem.fromJson(item as Map<String, dynamic>))
+              .toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('Market prices API connection fallback: $e');
+    }
+    return null;
   }
 
   CropItem _mapJsonToCropItem(Map<String, dynamic> json) {

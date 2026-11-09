@@ -10,9 +10,9 @@ This document tracks all tasks assigned to the software implementation role (Hes
 | :--- | :---: | :---: | :---: | :---: |
 | **Data Pipeline** | 4 | 4 | 0 | 0 |
 | **Backend** | 8 | 8 | 0 | 0 |
-| **Mobile App** | 5 | 0 | 1 | 4 |
+| **Mobile App** | 5 | 3 | 1 | 1 |
 | **Quality & Infra** | 3 | 0 | 1 | 2 |
-| **Total** | **20** | **12** | **2** | **6** |
+| **Total** | **20** | **15** | **2** | **3** |
 
 ---
 
@@ -74,20 +74,17 @@ This document tracks all tasks assigned to the software implementation role (Hes
 
 ## 3. Mobile App (Flutter / Dart)
 
-- [ ] **Task 13 (P0)**: Remove fake success receipt (`farmer_repository.dart:346-373`).
-  - *Current Status*: App optimistically inserts a "Planting Declaration Logged" confirmation alert into the inbox before the API confirms success.
-  - *Target*: Remove optimistic fake receipt; on failure, mark report as `pending_sync`, display retry state, and notify the farmer.
-  - *Files*: `mobile/lib/features/farmer/data/farmer_repository.dart`.
+- [x] **Task 13 (P0)**: Remove fake success receipt (`farmer_repository.dart:346-373`).
+  - *Current Status*: Completed. Removed optimistic fake success receipt. Planting declarations initially create a `pending` report, attempt live FastAPI sync, mark `verified` upon confirmation, and if transmission fails or device is offline, persist locally with `status: 'pending'`, queue automatic background retries via `retryPendingReports()`, notify the farmer transparently via multilingual warning alert, and display a "Pending Sync" receipt with a manual "Retry Sync Now" trigger.
+  - *Files*: `mobile/lib/features/farmer/data/farmer_repository.dart`, `mobile/lib/features/farmer/models/planting_report.dart`, `mobile/lib/features/farmer/presentation/farmer_page.dart`.
 
-- [ ] **Task 14 (P1)**: Show clear banner when recommendations come from offline `_initialCrops`.
-  - *Current Status*: Fallback to hardcoded `_initialCrops` happens silently when API is unreachable.
-  - *Target*: Display persistent offline/cached warning banner in the farmer crop recommendation view.
-  - *Files*: `mobile/lib/features/farmer/screens/` or provider/bloc layer.
+- [x] **Task 14 (P1)**: Show clear banner when recommendations come from offline `_initialCrops`.
+  - *Current Status*: Completed. Added `isUsingOfflineFallback` state tracking to `FarmerRepository`. Implemented `_buildOfflineRecommendationsBanner()` rendered prominently in both the Home tab (under Top 3 recommendations) and Compare tab (under comparison overview) whenever live connection is unavailable, displaying explicit amber warning, `_initialCrops` identifier, trilingual message (English, Sinhala, Tamil), and a live connection retry action button.
+  - *Files*: `mobile/lib/features/farmer/data/farmer_repository.dart`, `mobile/lib/features/farmer/presentation/farmer_page.dart`.
 
-- [ ] **Task 15 (P1)**: Verify market prices screen reads the API, and wire it if not.
-  - *Current Status*: Uses mock or local data in `market_prices_screen.dart`.
-  - *Target*: Connect screen to live backend prices endpoint (`/api/prices` or `/api/market-prices`) with graceful offline fallback.
-  - *Files*: `mobile/lib/features/farmer/screens/market_prices_screen.dart`, `mobile/lib/features/farmer/services/farmer_api_service.dart`.
+- [x] **Task 15 (P1)**: Verify market prices screen reads the API, and wire it if not.
+  - *Current Status*: Completed. Verified that the screen previously relied on static hardcoded items. Created backend endpoints `GET /api/market-prices` and `GET /api/prices` backed by `MarketPriceRecord` and seeded with CBSL/HARTI daily benchmark DEC feeds. Created `MarketPriceItem` model with JSON deserialization, added `getMarketPrices()` to `FarmerApiService`, and wired `market_prices_page.dart` with asynchronous API fetching, category filtering, live vs. offline feed indicators (`● Live CBSL Feed` / `○ Offline Benchmark`), and pull-to-refresh (`RefreshIndicator`).
+  - *Files*: `src/govisense/api/main.py`, `src/govisense/api/schemas.py`, `src/govisense/db/session.py`, `src/govisense/db/models.py`, `mobile/lib/features/farmer/models/market_price_item.dart`, `mobile/lib/features/farmer/services/farmer_api_service.dart`, `mobile/lib/features/farmer/presentation/market_prices_page.dart`, `tests/test_tasks_13_14_15.py`.
 
 - [ ] **Task 16 (P1)**: Build alert inbox with *Acknowledge* and *Ask an Officer*, and verify trilingual localization.
   - *Current Status*: Basic alerts list exists in mobile state; lacks interactive acknowledge and officer query triggers.

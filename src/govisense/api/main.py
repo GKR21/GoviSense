@@ -26,7 +26,8 @@ from govisense.models.target_area import TargetAreaCalculator
 from govisense.feedback.planting_reports import PlantingReportStore, PlantingReport
 from govisense.db.history import DecisionHistoryStore, DecisionRecord, evaluate_confidence_badge, get_running_model_version
 from govisense.simulation.agent_sim import MarketAdoptionSimulator, calculate_interval_coverage
-from govisense.db.session import init_db
+from govisense.db.session import init_db, get_db_session
+from govisense.db.models import MarketPriceRecord
 from govisense.api.auth import (
     router as auth_router,
     require_farmer,
@@ -39,6 +40,8 @@ from govisense.api.schemas import (
     PlantingReportPayload,
     ReTriggerPayload,
     DecisionLogPayload,
+    MarketPricesResponse,
+    MarketPriceItemResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -714,4 +717,26 @@ def get_adoption_summary(
         district=district,
         season=season,
     )
+
+
+@app.get("/api/market-prices", response_model=MarketPricesResponse, tags=["Prices"])
+@app.get("/api/prices", response_model=MarketPricesResponse, tags=["Prices"])
+def get_market_prices(category: Optional[str] = None):
+    """
+    Task 15 (P1): Returns latest benchmark wholesale and retail DEC market prices from CBSL & HARTI.
+    Supports filtering by category (e.g. vegetable, pulse, grain, tuber).
+    """
+    with get_db_session() as db:
+        query = db.query(MarketPriceRecord)
+        if category and category.lower() != "all":
+            query = query.filter(MarketPriceRecord.category == category.lower())
+        records = query.all()
+        prices_list = [MarketPriceItemResponse(**r.to_dict()) for r in records]
+        return MarketPricesResponse(
+            data_available=True,
+            is_demo=False,
+            source_type="cbsl_harti_market_bulletin",
+            total=len(prices_list),
+            prices=prices_list,
+        )
 

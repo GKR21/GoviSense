@@ -241,9 +241,21 @@ class MarketPriceRecord(Base):
     id = Column(Integer, primary_key=True, index=True)
     crop_id = Column(String(64), index=True, nullable=False)
     crop_name = Column(String(128), nullable=False)
-    market_center = Column(String(128), index=True, nullable=False)  # e.g. "Dambulla", "Pettah", "Thambuttegama"
+    crop_en = Column(String(128), nullable=True)
+    crop_si = Column(String(128), nullable=True)
+    crop_ta = Column(String(128), nullable=True)
+    category = Column(String(64), default="vegetable", nullable=False)
+    market_center = Column(String(128), index=True, nullable=False)  # e.g. "Dambulla DEC"
+    economic_center_en = Column(String(128), nullable=True)
+    economic_center_si = Column(String(128), nullable=True)
+    economic_center_ta = Column(String(128), nullable=True)
     wholesale_price = Column(Float, nullable=True)
     retail_price = Column(Float, nullable=True)
+    wholesale_price_display = Column(String(64), nullable=True)
+    retail_price_display = Column(String(64), nullable=True)
+    trend_pct = Column(String(64), default="±0% (Stable)", nullable=False)
+    is_up = Column(Boolean, default=False, nullable=False)
+    is_stable = Column(Boolean, default=True, nullable=False)
     price_date = Column(String(32), index=True, nullable=False)
     source = Column(String(64), default="HARTI/CBSL", nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
@@ -257,9 +269,21 @@ class MarketPriceRecord(Base):
             "id": self.id,
             "crop_id": self.crop_id,
             "crop_name": self.crop_name,
+            "crop_en": self.crop_en or self.crop_name,
+            "crop_si": self.crop_si or self.crop_name,
+            "crop_ta": self.crop_ta or self.crop_name,
+            "category": self.category or "vegetable",
             "market_center": self.market_center,
-            "wholesale_price": self.wholesale_price,
-            "retail_price": self.retail_price,
+            "economic_center_en": self.economic_center_en or self.market_center,
+            "economic_center_si": self.economic_center_si or self.market_center,
+            "economic_center_ta": self.economic_center_ta or self.market_center,
+            "wholesale_price": self.wholesale_price_display or f"Rs {int(self.wholesale_price or 0)} / kg",
+            "retail_price": self.retail_price_display or f"Rs {int(self.retail_price or 0)} / kg",
+            "wholesale_val": self.wholesale_price,
+            "retail_val": self.retail_price,
+            "trend_pct": self.trend_pct or "±0% (Stable)",
+            "is_up": bool(self.is_up),
+            "is_stable": bool(self.is_stable),
             "price_date": self.price_date,
             "source": self.source,
         }

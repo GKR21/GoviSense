@@ -129,3 +129,38 @@ class AdoptionSummaryResponse(ProvenanceMeta):
     message: str
     provenance_note: str
 
+
+# ---------------------------------------------------------------------------
+# Market Prices Schemas (Task 15)
+# ---------------------------------------------------------------------------
+
+class MarketPriceItemResponse(BaseModel):
+    id: int
+    crop_id: str
+    crop_name: str
+    crop_en: str
+    crop_si: str
+    crop_ta: str
+    category: str
+    market_center: str
+    economic_center_en: str
+    economic_center_si: str
+    economic_center_ta: str
+    wholesale_price: str
+    retail_price: str
+    wholesale_val: Optional[float] = None
+    retail_val: Optional[float] = None
+    trend_pct: str
+    is_up: bool
+    is_stable: bool
+    price_date: str
+    source: str = "CBSL/HARTI"
+
+
+class MarketPricesResponse(ProvenanceMeta):
+    data_available: bool = True
+    is_demo: bool = False
+    source_type: str = "cbsl_harti_market_bulletin"
+    total: int
+    prices: List[MarketPriceItemResponse]
+

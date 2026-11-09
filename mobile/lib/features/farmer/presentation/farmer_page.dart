@@ -548,6 +548,9 @@ class _FarmerPageState extends State<FarmerPage> {
         ),
         const SizedBox(height: 8),
 
+        // Offline Fallback Recommendations Banner
+        _buildOfflineRecommendationsBanner(),
+
         // Top 3 Crop Snippets
         ...crops.map((crop) => _buildCropHomeSnippet(crop)),
         const SizedBox(height: 14),
@@ -597,6 +600,95 @@ class _FarmerPageState extends State<FarmerPage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildOfflineRecommendationsBanner() {
+    if (!_repo.isUsingOfflineFallback) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB), // amber-50
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFDE68A)), // amber-200
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 2),
+            child: Icon(Icons.cloud_off_rounded, color: Color(0xFFD97706), size: 20),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      _language == AppLanguage.si
+                          ? 'නොබැඳි නිර්දේශ මාදිලිය'
+                          : _language == AppLanguage.ta
+                              ? 'ஆஃப்லைன் பரிந்துரை முறை'
+                              : 'Offline Baseline Recommendations',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF92400E),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        '_initialCrops',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFB45309),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _language == AppLanguage.si
+                      ? 'පෙන්වනු ලබන්නේ පූර්ව-ක්‍රමාංකිත මූලික නිර්දේශයන්ය (_initialCrops). සජීවී AI අනාවැකි සඳහා සබඳතාව යාවත්කාලීන කරන්න.'
+                      : _language == AppLanguage.ta
+                          ? 'முன்கூட்டியே கணிக்கப்பட்ட மாதிரி பரிந்துரைகள் காட்டப்படுகின்றன (_initialCrops). நேரலை முன்னறிவிப்புகளுக்கு மீண்டும் முயற்சிக்கவும்.'
+                          : 'Showing pre-calibrated baseline recommendations (_initialCrops). Reconnect to sync live market forecasts from Anuradhapura Agrarian Ledger.',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFFB45309),
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            icon: _repo.isLoadingApi
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFD97706)),
+                  )
+                : const Icon(Icons.refresh_rounded, color: Color(0xFFD97706), size: 20),
+            tooltip: 'Retry Live Connection',
+            onPressed: _repo.isLoadingApi ? null : () => _repo.refreshRecommendations(),
+          ),
+        ],
+      ),
     );
   }
 
@@ -744,6 +836,9 @@ class _FarmerPageState extends State<FarmerPage> {
           ],
         ),
         const SizedBox(height: 14),
+
+        // Offline Fallback Recommendations Banner
+        _buildOfflineRecommendationsBanner(),
 
         ...crops.map((crop) => _buildFullCropCard(crop)),
       ],
@@ -1199,12 +1294,12 @@ class _FarmerPageState extends State<FarmerPage> {
             ],
             Expanded(
               child: ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   if (_reportStep < 3) {
                     setState(() => _reportStep++);
                   } else {
-                    // Submit report!
-                    final rep = _repo.submitPlantingReport(
+                    // Submit report (handles async live sync and graceful offline pending fallback)
+                    final rep = await _repo.submitPlantingReport(
                       cropId: _selectedCropId,
                       areaAcres: _reportedAreaAcres,
                       plantingDate: '2026-10-25',
@@ -1232,6 +1327,8 @@ class _FarmerPageState extends State<FarmerPage> {
 
   Widget _buildSuccessReceiptView() {
     final rep = _latestSubmittedReport!;
+    final bool isPending = rep.status == 'pending';
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
       children: [
@@ -1239,20 +1336,51 @@ class _FarmerPageState extends State<FarmerPage> {
           child: Container(
             height: 70,
             width: 70,
-            decoration: const BoxDecoration(
-              color: AppTheme.balancedTint,
+            decoration: BoxDecoration(
+              color: isPending ? const Color(0xFFFEF3C7) : AppTheme.balancedTint,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.check_circle_rounded, color: AppTheme.balanced, size: 44),
+            child: Icon(
+              isPending ? Icons.schedule_rounded : Icons.check_circle_rounded,
+              color: isPending ? const Color(0xFFD97706) : AppTheme.balanced,
+              size: 44,
+            ),
           ),
         ),
         const SizedBox(height: 14),
         Center(
           child: Text(
-            AppTranslations.t(_language, 'reportSuccessTitle'),
+            isPending
+                ? (_language == AppLanguage.si
+                    ? 'වාර්තාව දේශීයව සුරැකිණි (පොරොත්තු)'
+                    : _language == AppLanguage.ta
+                        ? 'உள்ளூரில் சேமிக்கப்பட்டது (நிலுவையில்)'
+                        : 'Saved Locally (Pending Sync)')
+                : AppTranslations.t(_language, 'reportSuccessTitle'),
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ),
+        if (isPending) ...[
+          const SizedBox(height: 8),
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Text(
+                _language == AppLanguage.si
+                    ? 'සබඳතාව නැත · ස්වයංක්‍රීයව නැවත උත්සාහ කෙරේ'
+                    : _language == AppLanguage.ta
+                        ? 'இணைப்பு இல்லை · தானாக மீண்டும் முயற்சிக்கும்'
+                        : 'Offline Mode · Auto-retry when connection restored',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFB45309)),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 18),
 
         // Receipt Card
@@ -1261,7 +1389,7 @@ class _FarmerPageState extends State<FarmerPage> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppTheme.cardBorder),
+            border: Border.all(color: isPending ? const Color(0xFFFDE68A) : AppTheme.cardBorder),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.04),
@@ -1290,6 +1418,7 @@ class _FarmerPageState extends State<FarmerPage> {
                 ],
               ),
               const Divider(height: 24),
+              _buildReceiptRow('Submission Status', isPending ? 'PENDING (Saved Locally)' : 'VERIFIED & SYNCED'),
               _buildReceiptRow('Recorded Crop', rep.cropNameEn),
               _buildReceiptRow('Declared Area', '${rep.areaAcres} Acres'),
               _buildReceiptRow('Irrigation', rep.irrigationType),
@@ -1299,6 +1428,26 @@ class _FarmerPageState extends State<FarmerPage> {
           ),
         ),
         const SizedBox(height: 20),
+        if (isPending) ...[
+          OutlinedButton.icon(
+            icon: const Icon(Icons.sync_rounded),
+            label: Text(
+              _language == AppLanguage.si
+                  ? 'දැන් නැවත උත්සාහ කරන්න'
+                  : _language == AppLanguage.ta
+                      ? 'இப்போது மீண்டும் முயற்சிக்கவும்'
+                      : 'Retry Sync Now',
+            ),
+            onPressed: () async {
+              final synced = await _repo.retryPendingReports();
+              if (synced > 0) {
+                final updated = _repo.reports.firstWhere((r) => r.id == rep.id, orElse: () => rep);
+                setState(() => _latestSubmittedReport = updated);
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+        ],
         ElevatedButton(
           onPressed: () => setState(() {
             _isSuccessView = false;

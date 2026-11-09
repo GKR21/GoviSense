@@ -52,6 +52,56 @@ class PlantingReport {
   double get effectiveActualHa => actualAreaHa ?? (areaAcres * 0.404686);
   double get effectivePlannedHa => plannedAreaHa ?? (areaAcres * 0.404686);
 
+  PlantingReport copyWith({
+    String? id,
+    String? cropId,
+    String? cropNameEn,
+    String? cropNameSi,
+    String? cropNameTa,
+    String? district,
+    double? areaAcres,
+    String? plantingDate,
+    String? irrigationType,
+    String? seedSource,
+    String? timestamp,
+    String? receiptHash,
+    String? status,
+    double? plannedAreaHa,
+    double? actualAreaHa,
+    double? harvestOutcomeMt,
+    double? salePriceRsKg,
+    String? saleChannel,
+    bool? consentGiven,
+    String? pseudonymousId,
+    String? season,
+    String? notes,
+  }) {
+    return PlantingReport(
+      id: id ?? this.id,
+      cropId: cropId ?? this.cropId,
+      cropNameEn: cropNameEn ?? this.cropNameEn,
+      cropNameSi: cropNameSi ?? this.cropNameSi,
+      cropNameTa: cropNameTa ?? this.cropNameTa,
+      district: district ?? this.district,
+      areaAcres: areaAcres ?? this.areaAcres,
+      plantingDate: plantingDate ?? this.plantingDate,
+      irrigationType: irrigationType ?? this.irrigationType,
+      seedSource: seedSource ?? this.seedSource,
+      timestamp: timestamp ?? this.timestamp,
+      receiptHash: receiptHash ?? this.receiptHash,
+      status: status ?? this.status,
+      plannedAreaHa: plannedAreaHa ?? this.plannedAreaHa,
+      actualAreaHa: actualAreaHa ?? this.actualAreaHa,
+      harvestOutcomeMt: harvestOutcomeMt ?? this.harvestOutcomeMt,
+      salePriceRsKg: salePriceRsKg ?? this.salePriceRsKg,
+      saleChannel: saleChannel ?? this.saleChannel,
+      consentGiven: consentGiven ?? this.consentGiven,
+      pseudonymousId: pseudonymousId ?? this.pseudonymousId,
+      season: season ?? this.season,
+      notes: notes ?? this.notes,
+    );
+  }
+
   Map<String, dynamic> toApiPayload() {
     return {
       'crop_id': _normalizeCropIdForBackend(cropId),

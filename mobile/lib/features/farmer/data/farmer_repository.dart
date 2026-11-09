@@ -30,6 +30,8 @@ class FarmerRepository extends ChangeNotifier {
   FarmerProfile get profile => _profile;
   bool get isLoadingApi => _isLoadingApi;
   bool get isLiveConnected => _isLiveConnected;
+  bool get isUsingOfflineFallback => !_isLiveConnected;
+  List<PlantingReport> get pendingReports => _reports.where((r) => r.status == 'pending').toList();
 
   int get unreadAlertsCount => _alerts.where((a) => !a.isRead).length;
 
@@ -282,6 +284,8 @@ class FarmerRepository extends ChangeNotifier {
       if (liveCrops != null && liveCrops.isNotEmpty) {
         _crops = liveCrops;
         _isLiveConnected = true;
+        // Automatically attempt to sync any pending offline reports
+        retryPendingReports();
       } else {
         _isLiveConnected = false;
       }
@@ -297,11 +301,17 @@ class FarmerRepository extends ChangeNotifier {
   Future<bool> checkBackendConnection() async {
     final ok = await _apiService.checkHealth();
     _isLiveConnected = ok;
+    if (ok) {
+      retryPendingReports();
+    }
     notifyListeners();
     return ok;
   }
 
-  PlantingReport submitPlantingReport({
+  /// Submits planting report.
+  /// If submission to backend fails or is offline, the report is saved as "pending"
+  /// for automatic background retry and the farmer is explicitly notified of offline status.
+  Future<PlantingReport> submitPlantingReport({
     required String cropId,
     required double areaAcres,
     required String plantingDate,
@@ -311,7 +321,7 @@ class FarmerRepository extends ChangeNotifier {
     double? salePriceRsKg,
     String? saleChannel,
     bool consentGiven = true,
-  }) {
+  }) async {
     final crop = _crops.firstWhere(
       (c) => c.id == cropId,
       orElse: () => _crops.first,
@@ -320,7 +330,8 @@ class FarmerRepository extends ChangeNotifier {
     final recordNum = 1000 + rng.nextInt(9000);
     final hexCode = rng.nextInt(0xFFFFFF).toRadixString(16).toUpperCase();
 
-    final report = PlantingReport(
+    // 1. Initial report created with 'pending' status
+    PlantingReport report = PlantingReport(
       id: 'REP-2026-M-$recordNum',
       cropId: cropId,
       cropNameEn: crop.nameEn,
@@ -333,6 +344,7 @@ class FarmerRepository extends ChangeNotifier {
       seedSource: seedSource,
       timestamp: DateTime.now().toString().substring(0, 16),
       receiptHash: '0x$hexCode...${rng.nextInt(0xFFFF).toRadixString(16).toUpperCase()}',
+      status: 'pending',
       harvestOutcomeMt: harvestOutcomeMt,
       salePriceRsKg: salePriceRsKg,
       saleChannel: saleChannel,
@@ -341,36 +353,115 @@ class FarmerRepository extends ChangeNotifier {
     );
 
     _reports.insert(0, report);
+    notifyListeners();
 
-    // Create a confirmation alert in the inbox
-    _alerts.insert(
-      0,
-      FarmerAlert(
-        id: 'alert-${DateTime.now().millisecondsSinceEpoch}',
-        type: AlertType.success,
-        titleEn: 'Planting Declaration Logged (${crop.nameEn})',
-        titleSi: 'වගා වාර්තාව ලියාපදිංචි විය (${crop.nameSi})',
-        titleTa: 'நடவு அறிக்கை பதிவு செய்யப்பட்டது (${crop.nameTa})',
-        messageEn:
-            'Successfully submitted $areaAcres acres for Maha 2026. Receipt ID: ${report.id}. Telemetry synced with Anuradhapura Agrarian Ledger.',
-        messageSi:
-            'අක්කර $areaAcres ක් සාර්ථකව වාර්තා කරන ලදී. රිසිට්පත් අංකය: ${report.id}.',
-        messageTa:
-            'மகா 2026 க்கான $areaAcres ஏக்கர் பதிவு செய்யப்பட்டது. ரசீது எண்: ${report.id}.',
-        timestamp: 'Just now',
-        isRead: false,
-      ),
-    );
+    // 2. Attempt live transmission to backend (FastAPI closed-loop feedback)
+    bool isSuccess = false;
+    try {
+      isSuccess = await _apiService.submitPlantingReport(report);
+    } catch (e) {
+      debugPrint('Planting report submission exception: $e');
+      isSuccess = false;
+    }
 
-    // Post to FastAPI backend asynchronously (Closed-Loop Feedback Item 7)
-    _apiService.submitPlantingReport(report).then((success) {
-      if (success) {
-        debugPrint('Planting report ${report.id} synced with FastAPI backend successfully');
-      }
-    });
+    if (isSuccess) {
+      // Confirmed by backend -> mark verified
+      report = report.copyWith(status: 'verified');
+      _updateReportInList(report);
+
+      _alerts.insert(
+        0,
+        FarmerAlert(
+          id: 'alert-${DateTime.now().millisecondsSinceEpoch}',
+          type: AlertType.success,
+          titleEn: 'Planting Declaration Confirmed (${crop.nameEn})',
+          titleSi: 'වගා වාර්තාව තහවුරු විය (${crop.nameSi})',
+          titleTa: 'நடவு அறிக்கை உறுதிப்படுத்தப்பட்டது (${crop.nameTa})',
+          messageEn:
+              'Successfully submitted $areaAcres acres for Maha 2026. Receipt ID: ${report.id}. Telemetry synced with Anuradhapura Agrarian Ledger.',
+          messageSi:
+              'අක්කර $areaAcres ක් සාර්ථකව වාර්තා කරන ලදී. රිසිට්පත් අංකය: ${report.id}. දත්ත අනුරාධපුර ගොවිජන ලේඛනය සමඟ සමමුහුර්ත විය.',
+          messageTa:
+              'மகா 2026 க்கான $areaAcres ஏக்கர் வெற்றிகரமாக சமர்ப்பிக்கப்பட்டது. ரசீது எண்: ${report.id}.',
+          timestamp: 'Just now',
+          isRead: false,
+        ),
+      );
+    } else {
+      // Failed submit -> save as 'pending' and inform the farmer honestly
+      report = report.copyWith(status: 'pending');
+      _updateReportInList(report);
+
+      _alerts.insert(
+        0,
+        FarmerAlert(
+          id: 'alert-pending-${DateTime.now().millisecondsSinceEpoch}',
+          type: AlertType.market,
+          titleEn: 'Submission Pending Sync (${crop.nameEn})',
+          titleSi: 'වාර්තාව සමමුහුර්ත වීම පොරොත්තුයි (${crop.nameSi})',
+          titleTa: 'அறிக்கை ஒத்திசைவு நிலுவையில் உள்ளது (${crop.nameTa})',
+          messageEn:
+              'Unable to reach Anuradhapura Agrarian Ledger. Report ${report.id} saved locally as "Pending" and will retry automatically when connection is restored.',
+          messageSi:
+              'අනුරාධපුර ගොවිජන ලේඛනය වෙත සම්බන්ධ විය නොහැක. වාර්තාව ${report.id} "පොරොත්තු" ලෙස දේශීයව සුරකින ලද අතර සබඳතාව යථා තත්ත්වයට පත් වූ විට ස්වයංක්‍රීයව නැවත උත්සාහ කරනු ඇත.',
+          messageTa:
+              'விவசாய லெட்ஜரை இணைக்க முடியவில்லை. அறிக்கை ${report.id} "நிலுவையில்" சேமிக்கப்பட்டது, இணைப்பு கிடைத்ததும் மீண்டும் அனுப்பப்படும்.',
+          timestamp: 'Just now',
+          isRead: false,
+        ),
+      );
+    }
 
     notifyListeners();
     return report;
+  }
+
+  /// Retries all pending offline reports against the live API
+  Future<int> retryPendingReports() async {
+    final pending = _reports.where((r) => r.status == 'pending').toList();
+    if (pending.isEmpty) return 0;
+
+    int syncedCount = 0;
+    for (final rep in pending) {
+      try {
+        final success = await _apiService.submitPlantingReport(rep);
+        if (success) {
+          final updated = rep.copyWith(status: 'verified');
+          _updateReportInList(updated);
+          syncedCount++;
+
+          _alerts.insert(
+            0,
+            FarmerAlert(
+              id: 'alert-synced-${DateTime.now().millisecondsSinceEpoch}',
+              type: AlertType.success,
+              titleEn: 'Pending Report Synced (${rep.cropNameEn})',
+              titleSi: 'පොරොත්තු වාර්තාව සමමුහුර්ත විය (${rep.cropNameSi})',
+              titleTa: 'நிலுவை அறிக்கை ஒத்திசைக்கப்பட்டது (${rep.cropNameTa})',
+              messageEn:
+                  'Report ${rep.id} has been successfully synced with Anuradhapura Agrarian Ledger.',
+              messageSi:
+                  'වාර්තාව ${rep.id} අනුරාධපුර ගොවිජන ලේඛනය සමඟ සාර්ථකව සමමුහුර්ත විය.',
+              messageTa:
+                  'அறிக்கை ${rep.id} விவசாய லெட்ஜருடன் வெற்றிகரமாக ஒத்திசைக்கப்பட்டது.',
+              timestamp: 'Just now',
+              isRead: false,
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('Retry sync failed for ${rep.id}: $e');
+      }
+    }
+
+    if (syncedCount > 0) {
+      notifyListeners();
+    }
+    return syncedCount;
+  }
+
+  void _updateReportInList(PlantingReport updated) {
+    _reports = _reports.map((r) => r.id == updated.id ? updated : r).toList();
   }
 
   void markAlertRead(String alertId) {
