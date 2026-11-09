@@ -32,7 +32,7 @@ from govisense.models.demand_estimator import DemandEstimator
 from govisense.models.a3_supply_pressure import SupplyPressureEngine
 from govisense.models.target_area import TargetAreaCalculator
 from govisense.data.crop_requirements import get_crop_requirements
-from govisense.provenance import compute_data_version, compute_model_version, get_git_commit
+from govisense.provenance import compute_data_version, compute_model_version, get_git_commit, compute_dataset_provenance
 
 logger = logging.getLogger("govisense.api.farmer")
 router = APIRouter(prefix="", tags=["Farmer Advisor"])
@@ -119,14 +119,16 @@ def farmer_top3_recommendations(
     m_ver = compute_model_version()
     g_commit = get_git_commit()
     run_id = f"RUN-{g_commit[:7]}"
+    prov_meta = compute_dataset_provenance()
 
     if not ranking:
         return {
             "run_id": run_id,
             "data_version": d_ver,
             "model_version": m_ver,
-            "data_quality": "real",
-            "is_demo": False,
+            "data_quality": prov_meta["data_quality"],
+            "is_demo": prov_meta["is_demo"],
+            "db_fallback": prov_meta["db_fallback"],
             "served_model": "SuitabilityScorer-v1.4",
             "assumptions_ref": "docs/assumptions.md",
             "farmer_id": eff_farmer_id,
@@ -248,13 +250,15 @@ def farmer_top3_recommendations(
     d_ver = compute_data_version()
     m_ver = compute_model_version()
     g_commit = get_git_commit()
+    prov_meta = compute_dataset_provenance()
 
     return {
         "run_id": f"RUN-{g_commit[:7]}",
         "data_version": d_ver,
         "model_version": m_ver,
-        "data_quality": "real",
-        "is_demo": False,
+        "data_quality": prov_meta["data_quality"],
+        "is_demo": prov_meta["is_demo"],
+        "db_fallback": prov_meta["db_fallback"],
         "served_model": "SuitabilityScorer-v1.4",
         "assumptions_ref": "docs/assumptions.md",
         "farmer_id": eff_farmer_id,

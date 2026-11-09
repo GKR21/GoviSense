@@ -120,6 +120,47 @@ def get_active_dialect() -> str:
     return _ACTIVE_DIALECT
 
 
+def seed_master_data_if_empty(engine: Engine) -> None:
+    """Seeds monthly_data table from monthly_master.csv if table is empty."""
+    from pathlib import Path
+    import pandas as pd
+    from govisense.db.models import MonthlyDataModel
+    from govisense.config import PROCESSED_DATA_DIR
+
+    master_csv = PROCESSED_DATA_DIR / "monthly_master.csv"
+    if not master_csv.exists():
+        return
+
+    SessionMaker = sessionmaker(bind=engine)
+    with SessionMaker() as session:
+        try:
+            cnt = session.query(MonthlyDataModel).count()
+            if cnt == 0:
+                df = pd.read_csv(master_csv)
+                records = []
+                for _, r in df.iterrows():
+                    m = MonthlyDataModel(
+                        crop_id=str(r["crop"]),
+                        district=str(r["district"]),
+                        month=str(r["year_month"]),
+                        planted_area_ha=float(r["planted_extent_ha"]) if pd.notnull(r["planted_extent_ha"]) else None,
+                        yield_mt_ha=float(r["yield_mt_per_ha"]) if pd.notnull(r["yield_mt_per_ha"]) else None,
+                        production_mt=float(r["harvest_volume_mt"]) if pd.notnull(r["harvest_volume_mt"]) else None,
+                        wholesale_price_rs_kg=float(r["wholesale_price_rs_kg"]) if pd.notnull(r["wholesale_price_rs_kg"]) else None,
+                        retail_price_rs_kg=float(r["retail_price_rs_kg"]) if pd.notnull(r["retail_price_rs_kg"]) else None,
+                        farmgate_price_rs_kg=float(r["farmgate_price_rs_kg"]) if pd.notnull(r["farmgate_price_rs_kg"]) else None,
+                        imports_mt=float(r["import_volume_mt"]) if pd.notnull(r["import_volume_mt"]) else None,
+                        weather_rainfall_anomaly=float(r["rainfall_anomaly_mm"]) if pd.notnull(r["rainfall_anomaly_mm"]) else None,
+                        source_type=str(r.get("source_type", "real")),
+                    )
+                    records.append(m)
+                session.add_all(records)
+                session.commit()
+                logger.info("Loaded %d master rows into monthly_data table.", len(records))
+        except Exception as exc:
+            logger.warning("Could not auto-seed monthly_data table: %s", exc)
+
+
 def init_db(engine: Optional[Engine] = None) -> None:
     """
     Creates all defined database tables in PostgreSQL / database engine.
@@ -127,4 +168,5 @@ def init_db(engine: Optional[Engine] = None) -> None:
     eng = engine or get_engine()
     Base.metadata.create_all(bind=eng)
     logger.info("Database schema initialized with tables: %s", list(Base.metadata.tables.keys()))
+    seed_master_data_if_empty(eng)
 

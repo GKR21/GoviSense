@@ -48,7 +48,7 @@ from govisense.db import (
     EvaluationResultModel,
 )
 from govisense.simulation.agent_sim import MarketAdoptionSimulator, calculate_interval_coverage
-from govisense.provenance import compute_data_version, compute_model_version, get_git_commit
+from govisense.provenance import compute_data_version, compute_model_version, get_git_commit, compute_dataset_provenance
 from govisense.evaluation.backtest import run_walk_forward_evaluation
 
 # Import modular routers
@@ -394,12 +394,14 @@ def get_latest_forecasts():
     except Exception as e:
         logger.warning("Could not persist forecast snapshots to database: %s", e)
 
+    prov_meta = compute_dataset_provenance(cached_df)
     return {
         "run_id": run_id,
         "data_version": d_ver,
         "model_version": m_ver,
-        "data_quality": "real",
-        "is_demo": False,
+        "data_quality": prov_meta["data_quality"],
+        "is_demo": prov_meta["is_demo"],
+        "db_fallback": prov_meta["db_fallback"],
         "served_model": "LightGBM-v2.1",
         "assumptions_ref": "docs/assumptions.md",
         "as_of": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
@@ -498,6 +500,7 @@ def simulate_scenario(req: SimulationRequest):
     d_ver = compute_data_version()
     m_ver = compute_model_version()
     g_commit = get_git_commit()
+    prov_meta = compute_dataset_provenance(cached_df)
 
     return {
         "crop": crop,
@@ -516,8 +519,9 @@ def simulate_scenario(req: SimulationRequest):
         "run_id": f"RUN-{g_commit[:7]}",
         "data_version": d_ver,
         "model_version": m_ver,
-        "data_quality": "real",
-        "is_demo": False,
+        "data_quality": prov_meta["data_quality"],
+        "is_demo": prov_meta["is_demo"],
+        "db_fallback": prov_meta["db_fallback"],
         "served_model": "LightGBM + Baseline Selector",
         "assumptions_ref": "docs/assumptions.md",
     }
@@ -1227,13 +1231,15 @@ def get_gap_timeline(
     d_ver = compute_data_version()
     m_ver = compute_model_version()
     g_commit = get_git_commit()
+    prov_meta = compute_dataset_provenance(cached_df)
 
     return {
         "run_id": f"RUN-{g_commit[:7]}",
         "data_version": d_ver,
         "model_version": m_ver,
-        "data_quality": "real",
-        "is_demo": False,
+        "data_quality": prov_meta["data_quality"],
+        "is_demo": prov_meta["is_demo"],
+        "db_fallback": prov_meta["db_fallback"],
         "served_model": "HiGHS-LP + A3-SPI",
         "assumptions_ref": "docs/assumptions.md",
         "timelines": timelines,
@@ -1308,13 +1314,15 @@ def get_price_outlook(crop_id: Optional[str] = Query(None)):
     d_ver = compute_data_version()
     m_ver = compute_model_version()
     g_commit = get_git_commit()
+    prov_meta = compute_dataset_provenance(cached_df)
 
     return {
         "run_id": f"RUN-{g_commit[:7]}",
         "data_version": d_ver,
         "model_version": m_ver,
-        "data_quality": "real",
-        "is_demo": False,
+        "data_quality": prov_meta["data_quality"],
+        "is_demo": prov_meta["is_demo"],
+        "db_fallback": prov_meta["db_fallback"],
         "served_model": "SARIMAX-LightGBM-ensemble",
         "assumptions_ref": "docs/assumptions.md",
         "crops": outlooks,

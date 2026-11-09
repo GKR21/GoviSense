@@ -137,3 +137,39 @@ def get_current_provenance() -> Dict[str, str]:
         "model_version": model_version,
     }
 
+
+def compute_dataset_provenance(df: Optional[pd.DataFrame] = None) -> Dict[str, Any]:
+    """
+    Computes data_quality and is_demo from the source_type of the rows actually used,
+    and checks if the database is in fallback SQLite mode.
+    """
+    try:
+        from govisense.db.session import get_active_dialect
+        from govisense.config import settings
+        is_db_fallback = (get_active_dialect() == "sqlite") and ("postgresql" in str(settings.database_url))
+    except Exception:
+        is_db_fallback = False
+
+    if df is None or len(df) == 0:
+        return {
+            "data_quality": "no_data",
+            "is_demo": False,
+            "db_fallback": is_db_fallback,
+        }
+
+    st_col = "source_type" if "source_type" in df.columns else ("source" if "source" in df.columns else None)
+    if st_col:
+        sources = set(df[st_col].dropna().astype(str).str.lower())
+        if "synthetic" in sources:
+            return {"data_quality": "synthetic", "is_demo": True, "db_fallback": is_db_fallback}
+        if "interpolated" in sources:
+            return {"data_quality": "interpolated", "is_demo": False, "db_fallback": is_db_fallback}
+        if "real" in sources or "anchor" in sources:
+            return {"data_quality": "real", "is_demo": False, "db_fallback": is_db_fallback}
+
+    return {
+        "data_quality": "real",
+        "is_demo": False,
+        "db_fallback": is_db_fallback,
+    }
+

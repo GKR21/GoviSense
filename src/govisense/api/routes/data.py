@@ -27,7 +27,7 @@ from govisense.db.models import (
     PipelineRunModel,
 )
 from govisense.models.a2_price_forecast import compute_modeled_retail_price
-from govisense.provenance import compute_data_version, compute_model_version, get_git_commit
+from govisense.provenance import compute_data_version, compute_model_version, get_git_commit, compute_dataset_provenance
 
 logger = logging.getLogger("govisense.api.data")
 router = APIRouter(prefix="", tags=["Dashboard Data"])
@@ -421,12 +421,15 @@ def get_evaluation_scoreboard(db: Any = Depends(get_db)):
             "scoreboard": [],
         }
 
+    prov_meta = compute_dataset_provenance()
+
     return {
         "run_id": run_id,
         "data_version": d_ver,
         "model_version": m_ver,
-        "data_quality": "real",
-        "is_demo": False,
+        "data_quality": prov_meta["data_quality"],
+        "is_demo": prov_meta["is_demo"],
+        "db_fallback": prov_meta["db_fallback"],
         "served_model": "LightGBM + Baseline Selector",
         "assumptions_ref": "docs/assumptions.md",
         "scoreboard": scoreboard,
