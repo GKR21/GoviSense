@@ -400,15 +400,33 @@ def get_latest_forecasts():
         db_error = str(e)
 
     prov_meta = compute_dataset_provenance(cached_df)
-    data_quality = "db_unavailable" if db_down else prov_meta["data_quality"]
+    data_age_days = None
+    if cached_df is not None and "date" in cached_df.columns and len(cached_df) > 0:
+        try:
+            max_dt = pd.to_datetime(cached_df["date"]).max()
+            data_age_days = max(0, (pd.Timestamp.now() - max_dt).days)
+        except Exception:
+            pass
+
+    if db_down:
+        data_quality = "db_unavailable"
+    elif data_age_days is not None and data_age_days > 60:
+        data_quality = "outdated"
+    else:
+        data_quality = prov_meta["data_quality"]
+
     db_fallback = True if db_down else prov_meta["db_fallback"]
     notes = f"Database unavailable ({db_error}); forecast served from runtime cache." if db_down else None
+    if data_age_days is not None and data_age_days > 60:
+        age_note = f"Data is outdated: latest observation is {data_age_days} days old (>60 days)."
+        notes = f"{age_note} {notes}" if notes else age_note
 
     return {
         "run_id": run_id,
         "data_version": d_ver,
         "model_version": m_ver,
         "data_quality": data_quality,
+        "data_age_days": data_age_days,
         "is_demo": prov_meta["is_demo"],
         "db_fallback": db_fallback,
         "notes": notes,
@@ -1103,11 +1121,25 @@ def get_price_outlook(crop_id: Optional[str] = Query(None)):
     g_commit = get_git_commit()
     prov_meta = compute_dataset_provenance(cached_df)
 
+    data_age_days = None
+    if cached_df is not None and "date" in cached_df.columns and len(cached_df) > 0:
+        try:
+            max_dt = pd.to_datetime(cached_df["date"]).max()
+            data_age_days = max(0, (pd.Timestamp.now() - max_dt).days)
+        except Exception:
+            pass
+
+    if data_age_days is not None and data_age_days > 60:
+        data_quality = "outdated"
+    else:
+        data_quality = prov_meta["data_quality"]
+
     return {
         "run_id": f"RUN-{g_commit[:7]}",
         "data_version": d_ver,
         "model_version": m_ver,
-        "data_quality": prov_meta["data_quality"],
+        "data_quality": data_quality,
+        "data_age_days": data_age_days,
         "is_demo": prov_meta["is_demo"],
         "db_fallback": prov_meta["db_fallback"],
         "served_model": "SARIMAX-LightGBM-ensemble",
