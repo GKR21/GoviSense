@@ -13,11 +13,12 @@ Rules:
 
 import numpy as np
 import pandas as pd
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from govisense.data.clean import load_monthly_dataset, engineer_features, get_walk_forward_splits
 from govisense.models.a1_allocation import HarvestVolumeForecaster
 from govisense.models.a2_price_forecast import PriceForecaster
 from govisense.models.a3_supply_pressure import SupplyPressureEngine
+from govisense.simulation.agent_sim import calculate_interval_coverage, MarketAdoptionSimulator
 
 
 def _wape(y_true: np.ndarray, y_pred: np.ndarray) -> float:
@@ -36,11 +37,13 @@ def _precision_recall(y_true_labels: list, y_pred_labels: list, cls: str) -> Dic
     return {"precision": round(precision, 3), "recall": round(recall, 3)}
 
 
-def run_walk_forward_evaluation(crops: List[str] = ["big_onion", "chilli"]) -> Dict[str, Any]:
+def run_walk_forward_evaluation(crops: Optional[List[str]] = None) -> Dict[str, Any]:
     """
     Executes walk-forward evaluation across available historical time steps.
     Uses WAPE as the primary metric; model or baseline is selected per crop.
     """
+    if crops is None:
+        crops = ["big_onion", "chilli"]
     raw_df = load_monthly_dataset()
     df = engineer_features(raw_df)
 
@@ -107,12 +110,20 @@ def run_walk_forward_evaluation(crops: List[str] = ["big_onion", "chilli"]) -> D
         a1_t = np.array(a1_true)
         a1_wape_m = _wape(a1_t, np.array(a1_model_preds)) if a1_true else None
         a1_wape_b = _wape(a1_t, np.array(a1_base_preds)) if a1_true else None
-        a1_source = "model" if (a1_wape_m is not None and a1_wape_m < a1_wape_b) else "baseline"
+        a1_source = (
+            "model"
+            if (a1_wape_m is not None and a1_wape_b is not None and a1_wape_m < a1_wape_b)
+            else "baseline"
+        )
 
         a2_t = np.array(a2_true)
         a2_wape_m = _wape(a2_t, np.array(a2_model_preds)) if a2_true else None
         a2_wape_b = _wape(a2_t, np.array(a2_base_preds)) if a2_true else None
-        a2_source = "model" if (a2_wape_m is not None and a2_wape_m < a2_wape_b) else "baseline"
+        a2_source = (
+            "model"
+            if (a2_wape_m is not None and a2_wape_b is not None and a2_wape_m < a2_wape_b)
+            else "baseline"
+        )
 
         # ── SPI hit rate + precision/recall ───────────────────────────
         n = len(spi_true_labels)
@@ -141,15 +152,24 @@ def run_walk_forward_evaluation(crops: List[str] = ["big_onion", "chilli"]) -> D
             spi_label_note = "SPI partially confirmed"
 
         # ── Coverage metric ───────────────────────────────────────────
-        from govisense.simulation.agent_sim import calculate_interval_coverage
         coverage_res = calculate_interval_coverage(
             np.array(a1_true), np.array(a1_low_bounds), np.array(a1_high_bounds)
         )
 
         # Market Adoption Simulation (0%, 30%, 60%)
-        from govisense.simulation.agent_sim import MarketAdoptionSimulator
         sim = MarketAdoptionSimulator()
         sim_res = sim.simulate(crop=crop)
+
+        a1_improvement = (
+            round(((a1_wape_b - a1_wape_m) / max(a1_wape_b, 1e-4)) * 100, 2)
+            if (a1_wape_b is not None and a1_wape_m is not None)
+            else 0.0
+        )
+        a2_improvement = (
+            round(((a2_wape_b - a2_wape_m) / max(a2_wape_b, 1e-4)) * 100, 2)
+            if (a2_wape_b is not None and a2_wape_m is not None)
+            else 0.0
+        )
 
         overall_report[crop] = {
             # Primary metrics — WAPE
@@ -186,10 +206,7 @@ def run_walk_forward_evaluation(crops: List[str] = ["big_onion", "chilli"]) -> D
                 "seasonal_naive_mae_mt": round(
                     float(np.mean(np.abs(a1_t - np.array(a1_base_preds)))) if a1_true else 0.0, 2
                 ),
-                "improvement_vs_baseline_pct": round(
-                    ((a1_wape_b - a1_wape_m) / max(a1_wape_b, 1e-4)) * 100
-                    if (a1_wape_b and a1_wape_m) else 0.0, 2,
-                ),
+                "improvement_vs_baseline_pct": a1_improvement,
             },
             "ai2_price_forecast": {
                 "selected_model_mae_rs": round(
@@ -198,10 +215,7 @@ def run_walk_forward_evaluation(crops: List[str] = ["big_onion", "chilli"]) -> D
                 "sarimax_baseline_mae_rs": round(
                     float(np.mean(np.abs(a2_t - np.array(a2_base_preds)))) if a2_true else 0.0, 2
                 ),
-                "improvement_vs_baseline_pct": round(
-                    ((a2_wape_b - a2_wape_m) / max(a2_wape_b, 1e-4)) * 100
-                    if (a2_wape_b and a2_wape_m) else 0.0, 2,
-                ),
+                "improvement_vs_baseline_pct": a2_improvement,
             },
             "ai3_spi_classification": {
                 "hit_rate_pct": round(hit_rate, 1),

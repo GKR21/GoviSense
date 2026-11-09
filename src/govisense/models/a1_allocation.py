@@ -19,7 +19,7 @@ Outputs:
 import numpy as np
 import pandas as pd
 import lightgbm as lgb
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple, List
 from dataclasses import dataclass, field
 
 
@@ -61,21 +61,21 @@ def compute_transparent_accounting_supply(
         window_weights = {8: 0.40, 9: 0.45, 10: 0.15}
         spread_factor = window_weights.get(month, 0.08)  # default low off-season
         harvest_window_desc = "Yala Peak (Aug-Oct)" if month in [8, 9, 10] else "Off-season lean"
-        planting_month = ((month - crop_duration_months - 1) % 12) + 1
     elif crop == "chilli":
         window_weights = {1: 0.35, 2: 0.45, 3: 0.20, 7: 0.35, 8: 0.45, 9: 0.20}
         spread_factor = window_weights.get(month, 0.10)
         harvest_window_desc = "Maha Peak (Jan-Mar)" if month in [1, 2, 3] else ("Yala Peak (Jul-Sep)" if month in [7, 8, 9] else "Inter-monsoon")
-        planting_month = ((month - crop_duration_months - 1) % 12) + 1
     else:
+        window_weights = {}
         spread_factor = 0.25
         harvest_window_desc = "General Harvest Window"
-        planting_month = ((month - crop_duration_months - 1) % 12) + 1
 
+    planting_month = ((month - crop_duration_months - 1) % 12) + 1
     net_yield = max(yield_mt_ha, 0.1)
     net_loss = np.clip(loss_pct, 0.0, 0.50)
     raw_production = planted_area_ha * net_yield
-    effective_supply = raw_production * (1.0 - net_loss) * (spread_factor / max(sum(window_weights.values()) if 'window_weights' in locals() else 1.0, 0.5))
+    weight_sum = sum(window_weights.values()) if window_weights else 1.0
+    effective_supply = raw_production * (1.0 - net_loss) * (spread_factor / max(weight_sum, 0.5))
 
     return {
         "accounting_supply_mt": round(float(effective_supply), 1),
@@ -94,7 +94,7 @@ def safe_forecast(
     model_pred: Optional[float],
     baseline: float,
     seasonal_profile: Optional[float] = None,
-) -> tuple:
+) -> Tuple[float, str]:
     """
     Guardrail: if model output is None, NaN or <= 0, fall back to the
     seasonal-naive baseline (or seasonal profile mean if available).
@@ -157,7 +157,7 @@ class HarvestVolumeForecaster:
         """Train three LightGBM models (point, lower, upper quantiles) strictly on empirical real rows."""
         crop_train = train_df[train_df["crop"] == self.crop]
         if "source" in crop_train.columns:
-            crop_train = crop_train[crop_train["source"] == "real"]
+            crop_train = crop_train[crop_train["source"].isin(["real", "anchor"])].copy()
         crop_train = crop_train.dropna(
             subset=self.features + ["harvest_volume_mt"]
         )
@@ -207,7 +207,7 @@ class HarvestVolumeForecaster:
         if not self.is_trained:
             raise RuntimeError("Model must be trained before predicting.")
 
-        X_row = pd.DataFrame([row[self.features]])
+        X_row = pd.DataFrame([row[self.features].to_dict()])
 
         # Seasonal-naive baseline: same month last year
         baseline = float(row.get("harvest_volume_lag12") or 0.0)
@@ -218,14 +218,9 @@ class HarvestVolumeForecaster:
             baseline = self.seasonal_mean_by_month.get(month, 1000.0)
 
         # Raw model predictions
-        raw_point = float(self.models["point"].predict(X_row)[0])
-        raw_lower = float(self.models["lower"].predict(X_row)[0])
-        raw_upper = float(self.models["upper"].predict(X_row)[0])
-
-        # Accounting estimate: area × yield × (1 - loss), used as sanity floor
-        area = float(row.get("planted_extent_lag3") or 0.0)
-        yield_val = float(row.get("yield_rolling_6m") or 0.0)
-        accounting_est = area * yield_val * (1.0 - self._LOSS_PCT) if (area > 0 and yield_val > 0) else None
+        raw_point = float(np.asarray(self.models["point"].predict(X_row))[0])
+        raw_lower = float(np.asarray(self.models["lower"].predict(X_row))[0])
+        raw_upper = float(np.asarray(self.models["upper"].predict(X_row))[0])
 
         # Guardrail: use model if valid, else fall back
         month = int(row.get("month", 1))

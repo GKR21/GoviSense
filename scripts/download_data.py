@@ -174,6 +174,8 @@ def compile_empirical_monthly_master() -> pd.DataFrame:
     except Exception:
         if master_path.exists():
             df = pd.read_csv(master_path)
+        elif demo_path.exists():
+            df = pd.read_csv(demo_path)
         else:
             raise RuntimeError("Base empirical monthly master records could not be loaded.")
 
