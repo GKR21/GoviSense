@@ -8,7 +8,7 @@ Also provides WP2 endpoints: /api/farmer/top3 (farmer crop recommendation).
 from contextlib import asynccontextmanager
 import logging
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
@@ -243,6 +243,11 @@ def get_latest_forecasts():
         latest_row = cached_df[cached_df["crop"] == crop].sort_values("date").iloc[-1]
         
         # AI 1
+        if crop not in a1_models:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"A1 harvest model for '{crop}' is not loaded.",
+            )
         a1_res = a1_models[crop].predict_row(latest_row)
         
         # Check if there are ground reports submitted for this crop
@@ -267,6 +272,11 @@ def get_latest_forecasts():
         spi_list.append(spi_res)
 
         # AI 2
+        if crop not in a2_models:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"A2 price model for '{crop}' is not loaded.",
+            )
         a2_res = a2_models[crop].forecast_step(latest_row, horizon=1)
 
         results[crop] = {
