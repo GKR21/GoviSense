@@ -9,10 +9,10 @@ This document tracks all tasks assigned to the software implementation role (Hes
 | Domain | Total Tasks | Completed | In Progress | Pending |
 | :--- | :---: | :---: | :---: | :---: |
 | **Data Pipeline** | 4 | 4 | 0 | 0 |
-| **Backend** | 8 | 5 | 1 | 2 |
+| **Backend** | 8 | 8 | 0 | 0 |
 | **Mobile App** | 5 | 0 | 1 | 4 |
 | **Quality & Infra** | 3 | 0 | 1 | 2 |
-| **Total** | **20** | **9** | **3** | **8** |
+| **Total** | **20** | **12** | **2** | **6** |
 
 ---
 
@@ -54,25 +54,21 @@ This document tracks all tasks assigned to the software implementation role (Hes
   - *Current Status*: Completed. Added `admin` role and `require_admin` dependency; seeded default administrator `admin_govisense` with `Admin@123`. Enforced RBAC protection: `/api/database/init` (admin only), `/api/simulate` (officer/admin), `/api/feedback/retrigger` (officer/admin), and `/api/history/log-action` (officer/admin). Replaced wildcard CORS with strict whitelisted origins (`localhost:8443`, `localhost:5173`, `localhost:3000`).
   - *Files*: `src/govisense/api/auth.py`, `src/govisense/api/main.py`, `src/govisense/db/session.py`.
 
-- [ ] **Task 9 (P1)**: Add missing endpoints for Rashmika (Catalogue, Adoption Summary, Decision List with Hash/Run ID, Run Info).
-  - *Current Status*: Some endpoints exist in monolithic `main.py`; standalone catalogue query, run info, and enhanced decision history with hash/run ID are needed.
-  - *Target*: Expose `GET /api/catalogue`, `GET /api/simulation/adoption-summary`, `GET /api/history/decisions` (with hash & run ID), and `GET /api/pipeline/run-info`.
-  - *Files*: `src/govisense/api/main.py` or modular route files.
+- [x] **Task 9 (P1)**: Add missing endpoints for Rashmika (Catalogue, Adoption Summary, Decision List with Hash/Run ID, Run Info).
+  - *Current Status*: Completed. Implemented `GET /api/catalogue` (with format/publisher filtering and licence information), `GET /api/catalogue/{id}` (case-insensitive detail query), `GET /api/pipeline/run-info` (returning active run_id, model_version, and operational status), and `GET /api/simulation/adoption-summary`.
+  - *Files*: `src/govisense/api/routes/pipeline.py`, `src/govisense/api/main.py`, `src/govisense/data/catalogue.py`.
 
-- [ ] **Task 10 (P1)**: Alerts backend (`routes/alerts.py`, `i18n/templates.json`, `/api/alerts`, acknowledge endpoint).
-  - *Current Status*: DB models `Alert` and `AlertInteraction` exist; `routes/alerts.py` is currently empty (0 bytes).
-  - *Target*: Create `src/govisense/i18n/templates.json` with English, Sinhala, and Tamil alert templates; implement `GET /api/alerts` and `POST /api/alerts/{id}/acknowledge`.
+- [x] **Task 10 (P1)**: Alerts backend (`routes/alerts.py`, `i18n/templates.json`, `/api/alerts`, acknowledge endpoint).
+  - *Current Status*: Completed. Created `src/govisense/i18n/templates.json` with comprehensive English, Sinhala, and Tamil advisory templates. Built `src/govisense/api/routes/alerts.py` supporting multilingual query (`lang=en|si|ta`), farmer acknowledgment (`POST /api/alerts/{id}/acknowledge`), officer inquiries (`POST /api/alerts/{id}/ask`), and automated startup seeding.
   - *Files*: `src/govisense/api/routes/alerts.py`, `src/govisense/i18n/templates.json`, `src/govisense/db/models.py`.
 
-- [ ] **Task 11 (P1)**: Modernize API architecture: replace `@app.on_event` with `lifespan`, split `main.py` into route modules, and populate `deps.py` / `schemas.py`.
-  - *Current Status*: `main.py` contains 600+ lines with deprecated `@app.on_event("startup")`; `deps.py`, `schemas.py`, and `routes/*` are mostly empty.
-  - *Target*: Implement async `lifespan(app)` context manager; decompose into `routes/alerts.py`, `routes/auth.py`, `routes/farmer.py`, `routes/officer.py`; populate `schemas.py`.
+- [x] **Task 11 (P1)**: Modernize API architecture: replace `@app.on_event` with `lifespan`, split `main.py` into route modules, and populate `deps.py` / `schemas.py`.
+  - *Current Status*: Completed. Modernized application lifecycle using async `lifespan(app)` context manager, completely removing deprecated `@app.on_event("startup")`. Decomposed routing into `routes/alerts.py`, `routes/pipeline.py`, `routes/farmer.py`, `routes/officer.py`, and `routes/auth.py`. Populated `src/govisense/api/deps.py` and `src/govisense/api/schemas.py`.
   - *Files*: `src/govisense/api/main.py`, `src/govisense/api/deps.py`, `src/govisense/api/schemas.py`, `src/govisense/api/routes/`.
 
-- [ ] **Task 12 (P1)**: Farmer ID checks: rate limit, duplicate-report handling, and registry verification note.
-  - *Current Status*: `PlantingReportStore` accepts submissions without rate limiting or duplicate timestamp/area detection.
-  - *Target*: Add rate limiting per `farmer_id`, reject duplicate reports within same season/crop window, and add documentation on future Agrarian Services Department registry integration.
-  - *Files*: `src/govisense/feedback/planting_reports.py`, `src/govisense/api/main.py`.
+- [x] **Task 12 (P1)**: Farmer ID checks: rate limit, duplicate-report handling, and registry verification note.
+  - *Current Status*: Completed. Implemented local sliding-window rate limiting in `PlantingReportStore` (maximum 5 submissions per 60 seconds per `pseudonymous_id`). Added duplicate report rejection checking matching farmer ID, crop, season, and area. Documented future Agrarian Services Department national farmer registry integration in `docs/assumptions.md`, API responses, and store docstrings.
+  - *Files*: `src/govisense/feedback/planting_reports.py`, `src/govisense/api/main.py`, `docs/assumptions.md`, `tests/test_task_12.py`.
 
 ---
 

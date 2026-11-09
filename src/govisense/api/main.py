@@ -5,6 +5,9 @@ AI 3 (Supply Pressure Index), and AI 4 (Gap-Filling Optimization).
 Also provides WP2 endpoints: /api/farmer/top3 (farmer crop recommendation).
 """
 
+from contextlib import asynccontextmanager
+import logging
+
 from fastapi import FastAPI, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -23,6 +26,7 @@ from govisense.models.target_area import TargetAreaCalculator
 from govisense.feedback.planting_reports import PlantingReportStore, PlantingReport
 from govisense.db.history import DecisionHistoryStore, DecisionRecord, evaluate_confidence_badge, get_running_model_version
 from govisense.simulation.agent_sim import MarketAdoptionSimulator, calculate_interval_coverage
+from govisense.db.session import init_db
 from govisense.api.auth import (
     router as auth_router,
     require_farmer,
@@ -37,10 +41,67 @@ from govisense.api.schemas import (
     DecisionLogPayload,
 )
 
+logger = logging.getLogger(__name__)
+
+# Global in-memory cache for models and data
+cached_df: Optional[pd.DataFrame] = None
+spi_engine = SupplyPressureEngine()
+optimizer = GapFillingOptimizer()
+farmer_optimizer = FarmerAllocationOptimizer()
+demand_estimator = DemandEstimator()
+suitability_scorer = SuitabilityScorer()
+target_area_calc = TargetAreaCalculator()
+report_store = PlantingReportStore()
+history_store = DecisionHistoryStore()
+adoption_sim = MarketAdoptionSimulator()
+a1_models: Dict[str, HarvestVolumeForecaster] = {}
+a2_models: Dict[str, PriceForecaster] = {}
+
+
+def load_and_train():
+    """Initializes SQLite tables, engineers features, and fits operational forecasters."""
+    global cached_df, a1_models, a2_models
+    init_db()
+    raw = load_monthly_dataset()
+    cached_df = engineer_features(raw)
+    
+    for crop in ["big_onion", "chilli"]:
+        # AI 1
+        a1 = HarvestVolumeForecaster(crop=crop)
+        a1.train(cached_df)
+        a1_models[crop] = a1
+        
+        # AI 2
+        cutoff = cached_df["date"].max() - pd.DateOffset(months=6)
+        train_s = cached_df[cached_df["date"] <= cutoff]
+        val_s = cached_df[cached_df["date"] > cutoff]
+        a2 = PriceForecaster(crop=crop)
+        a2.train_and_select(train_s, val_s)
+        a2_models[crop] = a2
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager for FastAPI (Task 11).
+    Replaces deprecated @app.on_event('startup') with modern async lifecycle handler.
+    Initializes database tables, fits baseline forecasters, and seeds multilingual alerts.
+    """
+    init_db()
+    load_and_train()
+    try:
+        from govisense.api.routes.alerts import seed_alerts_from_templates
+        seed_alerts_from_templates()
+    except Exception as e:
+        logger.warning(f"Failed to seed alert templates during startup: {e}")
+    yield
+
+
 app = FastAPI(
     title="GoviSense API",
     description="Agricultural Supply Pressure & Price Forecasting System for Sri Lanka",
-    version="1.0.0"
+    version="2.0.0",
+    lifespan=lifespan,
 )
 
 # Whitelisted CORS origins for React web dashboard and mobile dev server (Task 8)
@@ -68,46 +129,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Authentication & RBAC Router
+# Include Modular Routers (Task 9, 10, 11)
+from govisense.api.routes.alerts import router as alerts_router
+from govisense.api.routes.pipeline import router as pipeline_router
+
 app.include_router(auth_router)
-
-# Global in-memory cache for models and data
-cached_df: Optional[pd.DataFrame] = None
-spi_engine = SupplyPressureEngine()
-optimizer = GapFillingOptimizer()
-farmer_optimizer = FarmerAllocationOptimizer()
-demand_estimator = DemandEstimator()
-suitability_scorer = SuitabilityScorer()
-target_area_calc = TargetAreaCalculator()
-report_store = PlantingReportStore()
-history_store = DecisionHistoryStore()
-adoption_sim = MarketAdoptionSimulator()
-a1_models: Dict[str, HarvestVolumeForecaster] = {}
-a2_models: Dict[str, PriceForecaster] = {}
-
-
-from govisense.db.session import init_db
-
-@app.on_event("startup")
-def load_and_train():
-    global cached_df, a1_models, a2_models
-    init_db()
-    raw = load_monthly_dataset()
-    cached_df = engineer_features(raw)
-    
-    for crop in ["big_onion", "chilli"]:
-        # AI 1
-        a1 = HarvestVolumeForecaster(crop=crop)
-        a1.train(cached_df)
-        a1_models[crop] = a1
-        
-        # AI 2
-        cutoff = cached_df["date"].max() - pd.DateOffset(months=6)
-        train_s = cached_df[cached_df["date"] <= cutoff]
-        val_s = cached_df[cached_df["date"] > cutoff]
-        a2 = PriceForecaster(crop=crop)
-        a2.train_and_select(train_s, val_s)
-        a2_models[crop] = a2
+app.include_router(alerts_router)
+app.include_router(pipeline_router)
 
 
 @app.get("/")

@@ -120,13 +120,15 @@ def test_farmer_top3_endpoint():
 
 
 def test_planting_report_and_retrigger_endpoints():
+    import uuid
+    test_farmer_id = f"LK-TEST-{uuid.uuid4().hex[:6]}"
     payload = PlantingReportPayload(
         crop_id="big_onion",
         season="Maha 2025/2026",
         planned_area_ha=2.0,
         actual_area_ha=2.5,
         consent_given=True,
-        pseudonymous_id="LK-TEST-001",
+        pseudonymous_id=test_farmer_id,
     )
     rep_res = submit_planting_report(payload)
     assert rep_res["status"] == "ACCEPTED"

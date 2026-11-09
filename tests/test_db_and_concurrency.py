@@ -44,13 +44,14 @@ def test_planting_report_db_roundtrip():
     """Verify PlantingReportStore writes to and reads from DB with full audit trail."""
     store = PlantingReportStore()  # Uses DB
     rep_id = f"REP-TEST-{uuid.uuid4().hex[:6].upper()}"
+    pseudo_id = f"PSEUDO-DB-{uuid.uuid4().hex[:6].upper()}"
     report = PlantingReport(
         crop_id="big_onion",
         season="Maha 2025/2026",
         planned_area_ha=3.0,
         actual_area_ha=3.5,
         consent_given=True,
-        pseudonymous_id="PSEUDO-DB-001",
+        pseudonymous_id=pseudo_id,
         harvest_outcome_mt=50.0,
         sale_price_rs_kg=130.0,
         sale_channel="Dambulla DEC",
@@ -107,6 +108,7 @@ def test_concurrent_writes_safety():
     store = PlantingReportStore()
     history_store = DecisionHistoryStore()
     errors = []
+    run_tag = uuid.uuid4().hex[:6].upper()
 
     def worker(worker_id: int):
         try:
@@ -117,7 +119,7 @@ def test_concurrent_writes_safety():
                 planned_area_ha=1.0 + worker_id,
                 actual_area_ha=1.2 + worker_id,
                 consent_given=True,
-                pseudonymous_id=f"CONCURRENT-FARMER-{worker_id}",
+                pseudonymous_id=f"CONCURRENT-FARMER-{worker_id}-{run_tag}",
                 report_id=f"REP-CONC-{worker_id}-{uuid.uuid4().hex[:4].upper()}",
             )
             store.submit_report(rep)
