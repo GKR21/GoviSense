@@ -56,3 +56,4 @@ def test_price_outlook_retail_uses_cbsl_model():
     assert retail["p10"] == expected_p10
     assert retail["p50"] == expected_p50
     assert retail["p90"] == expected_p90
+

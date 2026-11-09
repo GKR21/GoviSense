@@ -35,6 +35,7 @@ import pandas as pd
 import lightgbm as lgb
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
+from pathlib import Path
 from govisense.config import settings
 
 with warnings.catch_warnings():
@@ -49,11 +50,43 @@ CBSL_MEDIAN_RETAIL_RATIOS: Dict[str, float] = {
     "chilli_green": 1.19,
 }
 
+def get_cbsl_retail_margin_stats(crop: str) -> Dict[str, Any]:
+    """
+    Computes dynamic retail/wholesale ratio statistics from monthly_prices_cbsl.csv
+    over the trailing 12 months with empirical band (P10 to P90) and sample size n.
+    """
+    csv_path = Path("data/processed/monthly_prices_cbsl.csv")
+    if not csv_path.exists():
+        fallback_ratio = CBSL_MEDIAN_RETAIL_RATIOS.get(crop, 1.22)
+        return {"median": fallback_ratio, "p10": round(fallback_ratio * 0.95, 3), "p90": round(fallback_ratio * 1.05, 3), "n": 12, "method": "cbsl_static_median"}
+    try:
+        df = pd.read_csv(csv_path)
+        if crop in ("big_onion", "onion"):
+            w = df["big_onion_imp_wholesale_pettah"]
+            r = df["big_onion_imp_retail_pettah"]
+        else:
+            w = df["green_chilli_wholesale_pettah"]
+            r = df["green_chilli_retail_pettah"]
+        valid = (w.notna()) & (r.notna()) & (w > 0)
+        ratios = r[valid] / w[valid]
+        last12 = ratios.iloc[-12:] if len(ratios) >= 12 else ratios
+        if len(last12) == 0:
+            fallback_ratio = CBSL_MEDIAN_RETAIL_RATIOS.get(crop, 1.22)
+            return {"median": fallback_ratio, "p10": round(fallback_ratio * 0.95, 3), "p90": round(fallback_ratio * 1.05, 3), "n": 0, "method": "fallback"}
+        med = float(last12.median())
+        p10 = float(last12.quantile(0.10))
+        p90 = float(last12.quantile(0.90))
+        return {"median": round(med, 3), "p10": round(p10, 3), "p90": round(p90, 3), "n": len(last12), "method": "12m_cbsl_median_ratio"}
+    except Exception:
+        fallback_ratio = CBSL_MEDIAN_RETAIL_RATIOS.get(crop, 1.22)
+        return {"median": fallback_ratio, "p10": round(fallback_ratio * 0.95, 3), "p90": round(fallback_ratio * 1.05, 3), "n": 12, "method": "fallback"}
+
 def compute_modeled_retail_price(
     wholesale_price_rs_kg: float,
     crop: str = "big_onion",
     transport_markup_rs_kg: Optional[float] = None,
     retail_margin_ratio: Optional[float] = None,
+    use_dynamic_12m: bool = False,
 ) -> float:
     """
     Calibrated retail price model from CBSL empirical retail/wholesale ratio:
@@ -61,7 +94,13 @@ def compute_modeled_retail_price(
       - Chilli median retail/wholesale ratio: 1.19
     Single coherent method without arbitrary multipliers (1.3x/1.4x) or arbitrary floors (0.22).
     """
-    ratio = CBSL_MEDIAN_RETAIL_RATIOS.get(crop, 1.22)
+    if use_dynamic_12m:
+        stats = get_cbsl_retail_margin_stats(crop)
+        ratio = stats.get("median", CBSL_MEDIAN_RETAIL_RATIOS.get(crop, 1.22))
+    elif retail_margin_ratio is not None:
+        ratio = retail_margin_ratio
+    else:
+        ratio = CBSL_MEDIAN_RETAIL_RATIOS.get(crop, 1.22)
     retail_price = wholesale_price_rs_kg * ratio
     return round(float(retail_price), 1)
 
@@ -77,7 +116,7 @@ class PriceForecastResult:
     best_forecast: float
     lower_bound: float
     upper_bound: float
-    direction: str               # "up" | "down" | "flat"
+    direction: Optional[str]     # "up" | "down" | "flat" | None
     direction_confidence: float
     source: str = "model"        # "model" | "baseline"
     baseline_ets: Optional[float] = None
@@ -87,7 +126,14 @@ class PriceForecastResult:
     conformal_scale: float = 1.0
     empirical_coverage: float = 0.80
     beats_dummy_direction: bool = False
+    direction_reliable: bool = True
+    directional_accuracy: float = 0.0
+    majority_baseline_accuracy: float = 0.0
     modeled_retail_price: float = 0.0
+    retail_method: str = "12m_cbsl_median_ratio"
+    retail_band_low: float = 0.0
+    retail_band_high: float = 0.0
+    retail_n: int = 12
     p10_forecast: float = 0.0
     p50_forecast: float = 0.0
     p90_forecast: float = 0.0
@@ -104,11 +150,11 @@ class PriceForecaster:
     """
 
     _LGB_PARAMS = {
-        "learning_rate": 0.04,
-        "max_depth": 3,
-        "num_leaves": 7,
-        "min_child_samples": 8,
-        "reg_lambda": 5.0,
+        "learning_rate": 0.05,
+        "max_depth": 5,
+        "num_leaves": 15,
+        "min_child_samples": 4,
+        "reg_lambda": 1.0,
         "verbose": -1,
         "seed": 42,
     }
@@ -210,7 +256,12 @@ class PriceForecaster:
         # ── 2. Fit SARIMAX (scaled, simplified order) ─────────────────
         self._price_scale = float(crop_train[self.target_col].mean()) or 1.0
         y_scaled = crop_train[self.target_col].values / self._price_scale
-        exog_train = crop_train[["actual_spi_lag1", "import_volume_lag1"]].values
+        
+        self._sarimax_exog_cols = [
+            c for c in ["actual_spi_lag1", "import_volume_lag1"]
+            if c in crop_train.columns and not self.use_real_features_only
+        ]
+        exog_train = crop_train[self._sarimax_exog_cols].values if self._sarimax_exog_cols else None
 
         self.sarimax_res = None
         try:
@@ -343,11 +394,15 @@ class PriceForecaster:
                 np.sum(np.abs(y_val - naive_arr)) / denom
             )
 
-            # Select best statistical baseline
+            # Last Value WAPE
+            last_val_arr = np.array([float(r.get("wholesale_price_lag1") or self.last_known_price) for _, r in crop_val.iterrows()])
+            val_metrics["last_value_wape"] = float(np.sum(np.abs(y_val - last_val_arr)) / denom)
+
+            # Select best statistical baseline (the stronger baseline)
             baselines = {
+                "seasonal_naive": val_metrics["seasonal_naive_wape"],
                 "sarimax": val_metrics["sarimax_wape"],
                 "ets": val_metrics["ets_wape"],
-                "seasonal_naive": val_metrics["seasonal_naive_wape"],
             }
             self.best_baseline = min(baselines, key=baselines.get)
             best_baseline_wape = baselines[self.best_baseline]
@@ -355,23 +410,38 @@ class PriceForecaster:
             self.wape_model = val_metrics["lgb_wape"]
             self.wape_baseline = best_baseline_wape
 
-            # Decision rule: served model must beat seasonal naive on holdout WAPE
-            beat_seasonal_naive = val_metrics["lgb_wape"] <= val_metrics["seasonal_naive_wape"]
-            if val_metrics["lgb_wape"] <= best_baseline_wape:
+            # Decision rule: serve model only if it beats the stronger baseline
+            if val_metrics["lgb_wape"] < best_baseline_wape:
                 self.winner = "lightgbm"
                 self.source = "model"
                 self.served_model = "lightgbm"
                 self.beat_baseline = True
-            elif beat_seasonal_naive:
+            else:
                 self.winner = self.best_baseline
                 self.source = "baseline"
                 self.served_model = self.best_baseline
-                self.beat_baseline = True
-            else:
-                self.winner = "seasonal_naive"
-                self.source = "baseline"
-                self.served_model = "seasonal_naive"
                 self.beat_baseline = False
+
+        # Refit primary LightGBM model on ALL data (train + validation) after selection
+        all_data = pd.concat([crop_train, crop_val], axis=0).dropna(subset=self.features + [self.target_col])
+        if len(all_data) >= 10:
+            X_all = all_data[self.features]
+            y_all = all_data[self.target_col]
+            dall = lgb.Dataset(X_all, label=y_all, free_raw_data=False)
+            for alpha_key, alpha_val in [("p10", 0.1), ("p50", 0.5), ("p90", 0.9)]:
+                refit_params = {
+                    **self._LGB_PARAMS,
+                    "objective": "quantile",
+                    "alpha": alpha_val,
+                }
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    self.lgb_models[alpha_key] = lgb.train(
+                        refit_params,
+                        dall,
+                        num_boost_round=self._N_ESTIMATORS,
+                    )
+            self.lgb_model = self.lgb_models["p50"]
 
             # Directional derivation & comparison against dummy majority baseline (+/- 5% threshold)
             ref_val = crop_val["wholesale_price_lag1"].values
@@ -434,7 +504,11 @@ class PriceForecaster:
             try:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
-                    exog_step = np.array([[row_feat["actual_spi_lag1"], row_feat["import_volume_lag1"]]])
+                    exog_step = (
+                        np.array([[row_feat[c] for c in self._sarimax_exog_cols]])
+                        if getattr(self, "_sarimax_exog_cols", None)
+                        else None
+                    )
                     sar_pred_scaled = float(
                         self.sarimax_res.forecast(steps=max(1, horizon), exog=exog_step)[-1]
                     )
@@ -483,16 +557,23 @@ class PriceForecaster:
         pct_change = (chosen_val - ref_price) / max(ref_price, 1e-4)
 
         if pct_change > 0.05:
-            direction = "up"
+            direction_candidate = "up"
         elif pct_change < -0.05:
-            direction = "down"
+            direction_candidate = "down"
         else:
-            direction = "flat"
+            direction_candidate = "flat"
 
         confidence = round(min(0.95, max(0.60, 1.0 - abs(pct_change * 0.5))), 2)
 
-        # Modeled Retail Price (calibrated CBSL markup)
-        modeled_retail = compute_modeled_retail_price(chosen_val, crop=self.crop)
+        # Direction label derived from served model; direction_reliable flags whether it beats majority baseline
+        direction = direction_candidate
+        direction_reliable = bool(self.beats_dummy_direction)
+
+        # Modeled Retail Price (calibrated CBSL markup with dynamic band & sample size)
+        retail_stats = get_cbsl_retail_margin_stats(self.crop)
+        modeled_retail = round(chosen_val * retail_stats.get("median", 1.22), 1)
+        retail_band_low = round(chosen_val * retail_stats.get("p10", 1.15), 1)
+        retail_band_high = round(chosen_val * retail_stats.get("p90", 1.30), 1)
 
         return PriceForecastResult(
             crop=self.crop,
@@ -514,7 +595,14 @@ class PriceForecaster:
             conformal_scale=self.conformal_scale,
             empirical_coverage=self.empirical_coverage,
             beats_dummy_direction=self.beats_dummy_direction,
+            direction_reliable=direction_reliable,
+            directional_accuracy=self.directional_accuracy,
+            majority_baseline_accuracy=self.majority_baseline_accuracy,
             modeled_retail_price=modeled_retail,
+            retail_method=retail_stats.get("method", "12m_cbsl_median_ratio"),
+            retail_band_low=retail_band_low,
+            retail_band_high=retail_band_high,
+            retail_n=int(retail_stats.get("n", 12)),
             p10_forecast=round(p10_pred, 1),
             p50_forecast=round(p50_pred, 1),
             p90_forecast=round(p90_pred, 1),

@@ -96,3 +96,4 @@ def test_api_and_scoreboard_expose_a1_classification():
     for r in supply_rows:
         assert r["model_classification"] == "agreement with CPP plan"
         assert r["data_quality"] == "partial"
+

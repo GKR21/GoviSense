@@ -83,8 +83,10 @@ class SPIResult:
     forecast_supply_mt: float
     projected_demand_mt: float
     gap_mt: float
-    spi_score: float        # Delta formula: (Supply - Demand) / Demand
-    spi_ratio: float = 1.0  # Ratio formula: Supply / Demand (Bands 0.8 / 1.2)
+    spi_score: float        # Delta formula: (Supply - Demand) / Demand (clamped for chart)
+    spi_ratio: float = 1.0  # Ratio formula: Supply / Demand (clamped for chart)
+    spi_ratio_raw: float = 1.0  # Unclipped ratio for classification
+    spi_score_raw: float = 0.0  # Unclipped delta for classification
     spi_label: str = "Balanced"  # "Glut", "Balanced", "Shortage"
     action_summary: str = ""
     demand_low_mt: float = 0.0
@@ -154,23 +156,24 @@ class SupplyPressureEngine:
         # Primary ratio formula: S / D
         # Secondary delta formula: (S - D) / D
         if projected_demand <= 0:
-            spi_score = 0.0
-            spi_ratio = 1.0
+            spi_score_raw = 0.0
+            spi_ratio_raw = 1.0
         else:
-            spi_score = gap_mt / projected_demand
-            spi_ratio = effective_supply / projected_demand
+            spi_score_raw = round(float(gap_mt / projected_demand), 4)
+            spi_ratio_raw = round(float(effective_supply / projected_demand), 4)
 
-        spi_score = round(float(np.clip(spi_score, -0.65, 0.75)), 3)
-        spi_ratio = round(float(np.clip(spi_ratio, 0.35, 1.75)), 3)
+        # Clamped values strictly for UI/chart display
+        spi_score = round(float(np.clip(spi_score_raw, -0.65, 0.75)), 3)
+        spi_ratio = round(float(np.clip(spi_ratio_raw, 0.35, 1.75)), 3)
 
-        glut_ratio = glut_ratio_threshold if glut_ratio_threshold is not None else self.glut_ratio_threshold
-        shortage_ratio = shortage_ratio_threshold if shortage_ratio_threshold is not None else self.shortage_ratio_threshold
+        glut_ratio = float(glut_ratio_threshold if glut_ratio_threshold is not None else self.glut_ratio_threshold)
+        shortage_ratio = float(shortage_ratio_threshold if shortage_ratio_threshold is not None else self.shortage_ratio_threshold)
 
-        # Primary classification based on 0.8 / 1.2 ratio bands (configurable in config.py, adjustable by officers)
-        if spi_ratio > glut_ratio or spi_score > self.glut_threshold:
+        # Primary classification based on 0.8 / 1.2 ratio bands (using raw unclipped ratio)
+        if spi_ratio_raw > glut_ratio:
             label = "Glut"
             action = "Oversupply detected: Farm-gate crash risk. Activate storage buffers / defer imports."
-        elif spi_ratio < shortage_ratio or spi_score < self.shortage_threshold:
+        elif spi_ratio_raw < shortage_ratio:
             label = "Shortage"
             action = "Deficit detected: Consumer price spike risk. Nudge planting expansion or plan targeted imports."
         else:
@@ -250,6 +253,8 @@ class SupplyPressureEngine:
             gap_mt=round(gap_mt, 1),
             spi_score=spi_score,
             spi_ratio=spi_ratio,
+            spi_ratio_raw=spi_ratio_raw,
+            spi_score_raw=spi_score_raw,
             spi_label=label,
             action_summary=action,
             confidence_badge=confidence_badge,

@@ -129,6 +129,7 @@ class GoviSenseSettings:
         "chilli": 6,
         "red_onion": 6,
     })
+    onion_storage_capacity_mt: float = 15000.0
 
     # Linear Programming Cost Parameters for Decision Optimizer (A4)
     # Sources cited in docs/assumptions.md

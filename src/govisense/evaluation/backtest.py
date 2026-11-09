@@ -41,7 +41,7 @@ def _precision_recall(y_true_labels: list, y_pred_labels: list, cls: str) -> Dic
 
 def run_walk_forward_evaluation(
     df: Optional[pd.DataFrame] = None,
-    crops: List[str] = ["big_onion", "chilli"]
+    crops: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """
     Executes walk-forward evaluation across available historical time steps.
@@ -52,6 +52,12 @@ def run_walk_forward_evaluation(
       - Statistical time series baseline (SARIMAX for price)
     Stores baseline_name explicitly per evaluation row.
     """
+    if isinstance(df, (list, tuple)):
+        crops = list(df)
+        df = None
+    if crops is None:
+        crops = ["big_onion", "chilli"]
+
     if df is None:
         raw_df = load_monthly_dataset()
         df = engineer_features(raw_df)

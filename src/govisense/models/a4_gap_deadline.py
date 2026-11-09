@@ -64,15 +64,17 @@ def compute_gap_and_deadline(
     supply_high_mt: Optional[float] = None,
     shortage_month_first_day: Optional[date] = None,
     as_of_date: Optional[date] = None,
+    lead_weeks: Optional[int] = None,
+    storage_capacity_mt: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Computes gap_mt = demand_mt - supply_mt (positive = shortage, negative = surplus).
     Calculates best-case and worst-case gap, decision deadline, and policy option.
     Policy options:
-      - IMPORT_NOW (severe shortage, deadline within 2 weeks)
+      - IMPORT_NOW (severe shortage, deadline within 2 weeks or already passed)
       - IMPORT_LATER (shortage projected, deadline > 2 weeks away)
-      - DELAY (marginal gap within uncertainty band, wait for next reports)
-      - STORE (surplus, storage / minimum farmgate price support)
+      - DELAY (marginal gap within uncertainty band, or storage capacity exhausted)
+      - STORE (surplus within storage buffer capacity)
     """
     # Gap definition: positive = shortage, negative = surplus
     mid_gap = demand_mt - supply_mt
@@ -85,21 +87,27 @@ def compute_gap_and_deadline(
     # High supply gives best-case gap (least shortage or deepest surplus)
     best_gap = demand_mt - s_high
 
-    lead_weeks = settings.import_lead_time_weeks.get(crop, 7)
+    effective_lead_weeks = lead_weeks if lead_weeks is not None else settings.import_lead_time_weeks.get(crop, 7)
     today = as_of_date if as_of_date is not None else date.today()
 
     if shortage_month_first_day is None:
         shortage_month_first_day = today + timedelta(days=60)
 
     # Decision deadline formula: shortage_month_first_day - import_lead_time_weeks
-    deadline_date = shortage_month_first_day - timedelta(weeks=lead_weeks)
+    deadline_date = shortage_month_first_day - timedelta(weeks=effective_lead_weeks)
     days_until_deadline = (deadline_date - today).days
+
+    cap = storage_capacity_mt if storage_capacity_mt is not None else getattr(settings, "onion_storage_capacity_mt", 15000.0)
 
     # Policy option classification
     if mid_gap < -150.0:
-        # Clear surplus -> STORE
-        policy_option = "STORE"
-        action_summary = "Surplus projected: Activate storage buffers and price support."
+        # Clear surplus
+        if abs(mid_gap) <= cap:
+            policy_option = "STORE"
+            action_summary = "Surplus projected: Activate storage buffers and price support."
+        else:
+            policy_option = "DELAY"
+            action_summary = "Storage capacity exhausted: Defer imports and distribute surplus to regional hubs."
     elif mid_gap > 200.0:
         # Significant shortage
         if days_until_deadline <= 14:
@@ -119,9 +127,11 @@ def compute_gap_and_deadline(
         "mid_case_gap_mt": round(mid_gap, 1),
         "best_case_gap_mt": round(best_gap, 1),
         "worst_case_gap_mt": round(worst_gap, 1),
-        "import_lead_time_weeks": lead_weeks,
+        "decision_deadline": deadline_date.isoformat(),
         "decision_deadline_date": deadline_date.isoformat(),
         "days_until_deadline": days_until_deadline,
+        "is_deadline_passed": bool(days_until_deadline < 0),
+        "import_lead_time_weeks": effective_lead_weeks,
         "policy_option": policy_option,
         "action_summary": action_summary,
     }

@@ -80,3 +80,4 @@ def test_scoreboard_persists_baseline_names():
         assert "walk-forward_t+1" in periods
         assert "walk-forward_t+2" in periods
         assert "walk-forward_t+3" in periods
+
