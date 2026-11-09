@@ -25,7 +25,7 @@ def load_monthly_dataset(filepath: Optional[Path] = None, training_only: bool = 
     df = pd.read_csv(filepath)
     df["date"] = pd.to_datetime(df["date"])
     if training_only and "source" in df.columns:
-        df = df[df["source"] == "real"].copy()
+        df = df[df["source"].isin(["real", "anchor"])].copy()
     df = df.sort_values(by=["crop", "date"]).reset_index(drop=True)
     return df
 
