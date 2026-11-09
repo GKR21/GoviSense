@@ -97,6 +97,37 @@ class FarmerApiService {
     return null;
   }
 
+  /// Acknowledges an alert on behalf of the farmer (/api/alerts/{id}/acknowledge)
+  Future<bool> acknowledgeAlert(String alertId, String farmerId) async {
+    try {
+      final response = await _client.post(
+        '/api/alerts/$alertId/acknowledge',
+        data: {'farmer_id': farmerId},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Acknowledge alert API fallback: $e');
+      return false;
+    }
+  }
+
+  /// Sends farmer inquiry to the agricultural extension officer (/api/alerts/{id}/ask)
+  Future<bool> askOfficer(String alertId, String farmerId, String question) async {
+    try {
+      final response = await _client.post(
+        '/api/alerts/$alertId/ask',
+        data: {
+          'farmer_id': farmerId,
+          'question': question,
+        },
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Ask officer API fallback: $e');
+      return false;
+    }
+  }
+
   CropItem _mapJsonToCropItem(Map<String, dynamic> json) {
     final cropId = (json['crop_id'] as String? ?? 'unknown').toLowerCase();
     final fitScore = (json['fit_score'] as num?)?.toInt() ?? 80;

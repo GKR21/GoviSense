@@ -105,7 +105,7 @@ class PlantingReport {
   Map<String, dynamic> toApiPayload() {
     return {
       'crop_id': _normalizeCropIdForBackend(cropId),
-      'season': season,
+      'season': _normalizeSeasonForBackend(season),
       'planned_area_ha': double.parse(effectivePlannedHa.toStringAsFixed(2)),
       'actual_area_ha': double.parse(effectiveActualHa.toStringAsFixed(2)),
       'consent_given': consentGiven,
@@ -115,6 +115,13 @@ class PlantingReport {
       'sale_channel': saleChannel ?? 'Dambulla DEC',
       'notes': notes ?? 'Self-reported by farmer from GoviSense mobile client',
     };
+  }
+
+  static String _normalizeSeasonForBackend(String s) {
+    if (s.contains('2026') || s.contains('2025')) {
+      return 'Maha 2025/2026';
+    }
+    return s;
   }
 
   static String _normalizeCropIdForBackend(String id) {

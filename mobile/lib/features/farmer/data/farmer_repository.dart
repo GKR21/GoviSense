@@ -474,6 +474,32 @@ class FarmerRepository extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Acknowledges an alert and syncs status with backend /api/alerts/{id}/acknowledge
+  void acknowledgeAlert(String alertId) {
+    _alerts = _alerts.map((a) {
+      if (a.id == alertId) {
+        return a.copyWith(isRead: true, isAcknowledged: true);
+      }
+      return a;
+    }).toList();
+    notifyListeners();
+
+    _apiService.acknowledgeAlert(alertId, _profile.farmerId);
+  }
+
+  /// Records a farmer inquiry to the extension officer and syncs with backend /api/alerts/{id}/ask
+  void askOfficer(String alertId, String question) {
+    _alerts = _alerts.map((a) {
+      if (a.id == alertId) {
+        return a.copyWith(questionAsked: question);
+      }
+      return a;
+    }).toList();
+    notifyListeners();
+
+    _apiService.askOfficer(alertId, _profile.farmerId, question);
+  }
+
   void addOfficerDecisionAlert(String decision, String crop) {
     _alerts.insert(
       0,

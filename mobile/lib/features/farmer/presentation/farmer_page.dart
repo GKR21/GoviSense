@@ -1487,13 +1487,13 @@ class _FarmerPageState extends State<FarmerPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        const Text(
-          'Agrarian Advisories & Circulars',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.ink),
+        Text(
+          AppTranslations.t(_language, 'alertsInboxTitle'),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.ink),
         ),
-        const Text(
-          'Official notifications from Department of Agriculture and ASC officers',
-          style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
+        Text(
+          AppTranslations.t(_language, 'alertsInboxSub'),
+          style: const TextStyle(fontSize: 11, color: AppTheme.neutral600),
         ),
         const SizedBox(height: 12),
 
@@ -1502,20 +1502,20 @@ class _FarmerPageState extends State<FarmerPage> {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              _buildFilterChip('All', 'all', allAlerts.length),
-              _buildFilterChip('Unread', 'unread', _repo.unreadAlertsCount),
-              _buildFilterChip('Market (SPI)', 'market', null),
-              _buildFilterChip('Weather', 'weather', null),
+              _buildFilterChip(AppTranslations.t(_language, 'filterAll'), 'all', allAlerts.length),
+              _buildFilterChip(AppTranslations.t(_language, 'filterUnread'), 'unread', _repo.unreadAlertsCount),
+              _buildFilterChip(AppTranslations.t(_language, 'filterMarket'), 'market', null),
+              _buildFilterChip(AppTranslations.t(_language, 'filterWeather'), 'weather', null),
             ],
           ),
         ),
         const SizedBox(height: 14),
 
         if (filtered.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 40),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 40),
             child: Center(
-              child: Text('No alerts in this category.'),
+              child: Text(AppTranslations.t(_language, 'noAlerts')),
             ),
           )
         else
@@ -1538,6 +1538,55 @@ class _FarmerPageState extends State<FarmerPage> {
           fontWeight: FontWeight.bold,
           fontSize: 11,
         ),
+      ),
+    );
+  }
+
+  void _showAskOfficerDialog(FarmerAlert alert) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(AppTranslations.t(_language, 'askOfficerDialogTitle')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              alert.localizedTitle(_language),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: controller,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: AppTranslations.t(_language, 'askOfficerHint'),
+                border: const OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(AppTranslations.t(_language, 'cancelBtn')),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              if (text.isNotEmpty) {
+                _repo.askOfficer(alert.id, text);
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(AppTranslations.t(_language, 'questionSent'))),
+                );
+              }
+            },
+            child: Text(AppTranslations.t(_language, 'sendQuestionBtn')),
+          ),
+        ],
       ),
     );
   }
@@ -1603,22 +1652,95 @@ class _FarmerPageState extends State<FarmerPage> {
             alert.localizedMessage(_language),
             style: const TextStyle(fontSize: 11, color: AppTheme.neutral600, height: 1.4),
           ),
+          if (alert.questionAsked != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.help_outline_rounded, size: 12, color: AppTheme.primary),
+                      const SizedBox(width: 4),
+                      Text(
+                        _language == AppLanguage.si ? 'ඔබගේ විමසීම:' : _language == AppLanguage.ta ? 'உங்கள் கேள்வி:' : 'Your Inquiry:',
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    alert.questionAsked!,
+                    style: const TextStyle(fontSize: 11, color: AppTheme.ink),
+                  ),
+                  if (alert.officerResponse != null) ...[
+                    const Divider(height: 12),
+                    Text(
+                      _language == AppLanguage.si ? 'නිලධාරී පිළිතුර:' : _language == AppLanguage.ta ? 'அதிகாரியின் பதில்:' : 'Officer Response:',
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.balanced),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      alert.officerResponse!,
+                      style: const TextStyle(fontSize: 11, color: AppTheme.balanced),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(alert.timestamp, style: const TextStyle(fontSize: 10, color: AppTheme.neutral400)),
-              Row(
+              Wrap(
+                spacing: 6,
                 children: [
-                  if (!alert.isRead)
-                    TextButton(
-                      style: TextButton.styleFrom(
+                  if (alert.isAcknowledged)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.balancedTint,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.balanced.withOpacity(0.3)),
+                      ),
+                      child: Text(
+                        AppTranslations.t(_language, 'acknowledgedBadge'),
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.balanced),
+                      ),
+                    )
+                  else
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
                         visualDensity: VisualDensity.compact,
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                       ),
-                      onPressed: () => _repo.markAlertRead(alert.id),
-                      child: const Text('Mark Read', style: TextStyle(fontSize: 11)),
+                      onPressed: () => _repo.acknowledgeAlert(alert.id),
+                      icon: const Icon(Icons.check, size: 12),
+                      label: Text(
+                        AppTranslations.t(_language, 'acknowledgeBtn'),
+                        style: const TextStyle(fontSize: 11),
+                      ),
                     ),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    onPressed: () => _showAskOfficerDialog(alert),
+                    icon: const Icon(Icons.chat_bubble_outline_rounded, size: 12),
+                    label: Text(
+                      AppTranslations.t(_language, 'askOfficerBtn'),
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                  ),
                   if (alert.officerPhone != null)
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
@@ -1631,13 +1753,19 @@ class _FarmerPageState extends State<FarmerPage> {
                         );
                       },
                       icon: const Icon(Icons.phone, size: 12),
-                      label: const Text('Call Officer', style: TextStyle(fontSize: 11)),
+                      label: Text(
+                        AppTranslations.t(_language, 'callOfficerBtn'),
+                        style: const TextStyle(fontSize: 11),
+                      ),
                     ),
                 ],
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
       ),
     );
   }

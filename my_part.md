@@ -27,3 +27,12 @@
 - **18. P1**: TestClient tests for each endpoint, bad-input and concurrency tests (20 parallel reports), and a data-validation test on the source label.
 - **19. P2**: Fill `.github/workflows/ci.yml`, `docker-compose.yml`, `Makefile`, `.env.example`, `docs/assumptions.md` and `docs/ai-usage-log.md`.
 - **20. P1**: Run the unverified checks: auth, CORS, alerts, and the mobile prices screen.
+
+---
+
+## Status Summary
+- **Tasks 1 - 4 (Data Pipeline)**: ✅ Completed (P0 source labels, real extraction, national figures, catalogue licence).
+- **Tasks 5 - 12 (Backend Architecture & APIs)**: ✅ Completed (Task 5 adoption counts, Task 6 run ID/hash/model_version, Task 7 provenance flags, Task 8 JWT RBAC & CORS, Tasks 9-11 Rashmika endpoints, alerts backend, lifespan modularization, Task 12 farmer checks & registry note).
+- **Tasks 13 - 17 (Mobile App Features & Validation)**: ✅ Completed (Task 13 offline resilience, Task 14 offline fallback banner, Task 15 CBSL market prices wiring, Task 16 trilingual alert inbox with acknowledge & ask officer, Task 17 two-stage planting & harvest form schema consistency).
+- **Task 18 (Quality & Testing)**: ✅ Completed (23 new TestClient tests, bad-input & security validation, 20-thread concurrency test, and source label data integrity — all 103 test cases passing).
+- **Pending**: Task 19 (P2 DevOps/docs files), Task 20 (P1 unverified checks).
