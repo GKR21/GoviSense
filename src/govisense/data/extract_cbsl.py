@@ -172,103 +172,120 @@ class CBSLPriceExtractor:
 
                 effective_date = inferred_date or "2024-01-01"
 
-                # 2. Extract structured tables
-                tables = page.extract_tables()
-                for table in tables:
-                    if not table or len(table) < 2:
-                        continue
-
-                    # Analyze header row to identify column indices
-                    header = [str(c or "").lower().strip() for c in table[0]]
-                    wholesale_col = None
-                    retail_col = None
-                    market_col = None
-                    item_col = 0
-
-                    for idx, col_name in enumerate(header):
-                        if "wholesale" in col_name or "whsl" in col_name or "තොග" in col_name:
-                            wholesale_col = idx
-                        elif "retail" in col_name or "සිල්ලර" in col_name:
-                            retail_col = idx
-                        elif "market" in col_name or "center" in col_name or "වෙළඳපොළ" in col_name:
-                            market_col = idx
-                        elif "item" in col_name or "crop" in col_name or "commodity" in col_name:
-                            item_col = idx
-
-                    # If header couldn't be auto-detected, default by standard CBSL layout:
-                    # [Item, Wholesale Pettah, Wholesale Dambulla, Retail Pettah, Retail Dambulla]
-                    if wholesale_col is None:
-                        wholesale_col = 1 if len(header) > 1 else None
-                    if retail_col is None:
-                        retail_col = 2 if len(header) > 2 else None
-
-                    for row in table[1:]:
-                        if not row or len(row) <= item_col:
-                            continue
-                        raw_item = str(row[item_col] or "").strip()
-                        crop_id = match_commodity_name(raw_item)
-                        if not crop_id:
-                            continue
-
-                        # Extract wholesale and retail
-                        raw_wholesale = row[wholesale_col] if wholesale_col is not None and len(row) > wholesale_col else None
-                        raw_retail = row[retail_col] if retail_col is not None and len(row) > retail_col else None
-                        raw_market = (
-                            str(row[market_col]).strip()
-                            if market_col is not None and len(row) > market_col and row[market_col]
-                            else "Dambulla DEC"
-                        )
-
-                        p_wholesale = parse_numeric_price(raw_wholesale)
-                        p_retail = parse_numeric_price(raw_retail)
-
-                        if p_wholesale is not None or p_retail is not None:
-                            # Estimate farmgate if not explicit (historical producer share ~80-84%)
-                            p_farmgate = round(p_wholesale * 0.82, 1) if p_wholesale else None
-                            records.append({
-                                "date": effective_date,
-                                "crop": crop_id,
-                                "market": raw_market,
-                                "wholesale_price_rs_kg": p_wholesale,
-                                "retail_price_rs_kg": p_retail,
-                                "farmgate_price_rs_kg": p_farmgate,
-                                "source": "CBSL_Daily_PDF",
-                                "raw_item": raw_item,
-                                "is_interpolated": False,
-                            })
-
-                # 3. Fallback: Line-by-line regex if table extraction returned nothing
-                if not records and text:
+                # 2. Extract from formatted text lines (primary for real CBSL daily bulletins)
+                page_records: List[Dict[str, Any]] = []
+                if text:
                     for line in text.split("\n"):
                         crop_id = match_commodity_name(line)
-                        if crop_id:
-                            clean_line = normalize_cbsl_line_numbers(line)
-                            nums = [float(x) for x in re.findall(r"\b\d+(?:\.\d+)?\b", clean_line) if float(x) > 10.0]
-                            if len(nums) >= 8:
-                                # Layout: Pettah Whsl [Yest, Today], Dambulla Whsl [Yest, Today],
-                                # Pettah Retail [Yest, Today], Dambulla Retail [Yest, Today]
-                                p_whsl = nums[3] if nums[3] > 10.0 else nums[1]
-                                p_ret = nums[7] if nums[7] > 10.0 else nums[5]
-                            elif len(nums) >= 4:
-                                p_whsl = nums[1]
-                                p_ret = nums[3]
-                            elif len(nums) >= 2:
-                                p_whsl = nums[0]
-                                p_ret = nums[1]
-                            else:
-                                continue
+                        if not crop_id:
+                            continue
+                        clean_line = normalize_cbsl_line_numbers(line)
+                        clean_line = re.sub(r"(\d)\s*,\s*(\d)", r"\1\2", clean_line)
+                        clean_line = re.sub(r"(\d)\s+(\d{2}\.\d{2})", r"\1\2", clean_line)
+                        nums = [float(x) for x in re.findall(r"\b\d+(?:\.\d+)?\b", clean_line) if float(x) > 10.0]
+                        if len(nums) >= 8:
+                            # Standard layout: [Pettah Yest, Pettah Today, Dambulla Yest, Dambulla Today, Pettah Ret Yest, Pettah Ret Today, Dambulla Ret Yest, Dambulla Ret Today]
+                            p_damb_w = nums[3]
+                            p_damb_r = nums[7]
+                            p_pett_w = nums[1]
+                            p_pett_r = nums[5]
 
-                            records.append({
+                            page_records.append({
                                 "date": effective_date,
+                                "commodity": crop_id,
                                 "crop": crop_id,
-                                "market": "Dambulla/Pettah",
-                                "wholesale_price_rs_kg": p_whsl,
-                                "retail_price_rs_kg": p_ret,
-                                "farmgate_price_rs_kg": round(p_whsl * 0.82, 1),
-                                "source": "CBSL_Daily_PDF_Text",
+                                "market_center": "Dambulla DEC",
+                                "market": "Dambulla DEC",
+                                "wholesale_price_rs_kg": p_damb_w,
+                                "retail_price_rs_kg": p_damb_r,
+                                "farmgate_price_rs_kg": round(p_damb_w * 0.82, 1),
+                                "source": "CBSL_Daily_PDF",
                                 "raw_item": line.strip()[:60],
                                 "is_interpolated": False,
                             })
+                            page_records.append({
+                                "date": effective_date,
+                                "commodity": crop_id,
+                                "crop": crop_id,
+                                "market_center": "Pettah",
+                                "market": "Pettah",
+                                "wholesale_price_rs_kg": p_pett_w,
+                                "retail_price_rs_kg": p_pett_r,
+                                "farmgate_price_rs_kg": round(p_pett_w * 0.82, 1),
+                                "source": "CBSL_Daily_PDF",
+                                "raw_item": line.strip()[:60],
+                                "is_interpolated": False,
+                            })
+                        elif len(nums) >= 2:
+                            page_records.append({
+                                "date": effective_date,
+                                "commodity": crop_id,
+                                "crop": crop_id,
+                                "market_center": "Dambulla DEC",
+                                "market": "Dambulla DEC",
+                                "wholesale_price_rs_kg": nums[0],
+                                "retail_price_rs_kg": nums[1] if len(nums) > 1 else None,
+                                "farmgate_price_rs_kg": round(nums[0] * 0.82, 1),
+                                "source": "CBSL_Daily_PDF",
+                                "raw_item": line.strip()[:60],
+                                "is_interpolated": False,
+                            })
+
+                if page_records:
+                    records.extend(page_records)
+                else:
+                    # 3. Fallback to table extraction if text lines did not match
+                    tables = page.extract_tables()
+                    for table in tables:
+                        if not table or len(table) < 2:
+                            continue
+                        header = [str(c or "").lower().strip() for c in table[0]]
+                        wholesale_col = 1 if len(header) > 1 else None
+                        retail_col = 2 if len(header) > 2 else None
+                        market_col = 0
+
+                        for idx, col_name in enumerate(header):
+                            if "wholesale" in col_name or "whsl" in col_name or "තොග" in col_name:
+                                wholesale_col = idx
+                            elif "retail" in col_name or "සිල්ලර" in col_name:
+                                retail_col = idx
+                            elif "market" in col_name or "center" in col_name or "වෙළඳපොළ" in col_name:
+                                market_col = idx
+
+                        for row in table[1:]:
+                            if not row:
+                                continue
+                            raw_item = str(row[0] or "").strip()
+                            crop_id = match_commodity_name(raw_item)
+                            if not crop_id:
+                                continue
+
+                            raw_wholesale = row[wholesale_col] if wholesale_col is not None and len(row) > wholesale_col else None
+                            raw_retail = row[retail_col] if retail_col is not None and len(row) > retail_col else None
+                            raw_market = (
+                                str(row[market_col]).strip()
+                                if market_col is not None and len(row) > market_col and row[market_col]
+                                else "Dambulla DEC"
+                            )
+
+                            p_wholesale = parse_numeric_price(raw_wholesale)
+                            p_retail = parse_numeric_price(raw_retail)
+
+                            if p_wholesale is not None or p_retail is not None:
+                                p_farmgate = round(p_wholesale * 0.82, 1) if p_wholesale else None
+                                records.append({
+                                    "date": effective_date,
+                                    "commodity": crop_id,
+                                    "crop": crop_id,
+                                    "market_center": raw_market,
+                                    "market": raw_market,
+                                    "wholesale_price_rs_kg": p_wholesale,
+                                    "retail_price_rs_kg": p_retail,
+                                    "farmgate_price_rs_kg": p_farmgate,
+                                    "source": "CBSL_Daily_PDF",
+                                    "raw_item": raw_item,
+                                    "is_interpolated": False,
+                                })
 
         return records
 
