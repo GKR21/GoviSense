@@ -114,19 +114,24 @@ class PriceForecaster:
     }
     _N_ESTIMATORS = 40
 
-    def __init__(self, crop: str, target_col: str = "wholesale_price_rs_kg"):
+    def __init__(self, crop: str, target_col: str = "wholesale_price_rs_kg", use_real_features_only: bool = True):
         self.crop = crop
         self.target_col = target_col
-        self.features = [
+        self.use_real_features_only = use_real_features_only
+        base_features = [
             "month_sin", "month_cos", "quarter", "is_festival_season",
             "wholesale_price_lag1", "wholesale_price_lag2", "wholesale_price_lag3",
             "wholesale_price_lag12", "wholesale_rolling_3m_mean",
             "retail_price_lag1",
-            "actual_spi_lag1", "actual_spi_lag2",
-            "import_volume_lag1",
             "rainfall_anomaly_3m_mean",
             "local_vs_import_gap",
         ]
+        if not use_real_features_only:
+            base_features.extend([
+                "actual_spi_lag1", "actual_spi_lag2",
+                "import_volume_lag1",
+            ])
+        self.features = base_features
         self.lgb_models: Dict[str, Any] = {}
         self.lgb_model = None  # pointer to p50 for backwards compatibility
         self.sarimax_res = None
