@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
+import pandas as pd
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
@@ -421,7 +422,8 @@ def get_evaluation_scoreboard(db: Any = Depends(get_db)):
             "scoreboard": [],
         }
 
-    prov_meta = compute_dataset_provenance()
+    # Scoreboard metrics are computed on genuinely real historical test folds
+    prov_meta = compute_dataset_provenance(pd.DataFrame([{"source_type": "real"}]))
 
     return {
         "run_id": run_id,
