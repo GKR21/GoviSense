@@ -138,3 +138,34 @@ def test_planting_report_and_retrigger_endpoints():
     )
     ret_res = retrigger_pipeline(ret_payload)
     assert "new_a_rec_ha" in ret_res
+
+
+def test_adoption_summary_explicit_data_available_false():
+    """
+    Task 5 (P0): Tests that /api/simulation/adoption-summary and /api/adoption/summary
+    return explicit data_available: false instead of hardcoded 64/24/12 counts.
+    """
+    from fastapi.testclient import TestClient
+    from govisense.api.main import app
+
+    client = TestClient(app)
+    res = client.get("/api/simulation/adoption-summary?crop_id=big_onion")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["data_available"] is False
+    assert data["counts"]["coordinated_adopters"] is None
+    assert data["counts"]["uncoordinated"] is None
+    assert "not available" in data["message"].lower()
+
+    # Alias check
+    res_alias = client.get("/api/adoption/summary")
+    assert res_alias.status_code == 200
+    assert res_alias.json()["data_available"] is False
+
+    # Check simulation endpoint has data_available: false flag
+    res_sim = client.get("/api/simulation/adoption?crop_id=big_onion")
+    assert res_sim.status_code == 200
+    sim_data = res_sim.json()
+    assert sim_data["data_available"] is False
+    assert sim_data["source_type"] == "agent_simulation"
+    assert sim_data["is_demo"] is True

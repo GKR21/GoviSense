@@ -1,6 +1,6 @@
 """
 Confidence Badge & Decision History Audit Module (Item 8)
-Team DARKBITE · ModelX 2.0 Phase 1
+Team DARKBITE · ModelX 2.0 Phase 2
 Pilot: Anuradhapura (Big Onion, Chilli)
 
 Provides:
@@ -11,6 +11,7 @@ Provides:
      - SPI validation pass
      - Soil data present
   2. Audit Decision History Store:
+     - Database-backed (SQLite with WAL or PostgreSQL) with concurrent-write safety
      - Saves model version, data version, key assumptions, officer actions per run.
 """
 
@@ -23,10 +24,8 @@ from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
-from govisense.config import PROCESSED_DATA_DIR
-
-
-_DEFAULT_HISTORY_PATH = PROCESSED_DATA_DIR / "decision_history.json"
+from govisense.db.models import DecisionHistoryRecord
+from govisense.db.session import get_db_session, sqlite_write_lock
 
 
 # ---------------------------------------------------------------------------
@@ -161,15 +160,19 @@ class DecisionRecord:
 class DecisionHistoryStore:
     """
     Persistent audit ledger for decisions, assumptions, and model runs.
+    Database-backed (SQLite / PostgreSQL) with concurrent-write safety.
     """
 
     def __init__(self, storage_path: Optional[Path] = None):
-        self.storage_path = storage_path or _DEFAULT_HISTORY_PATH
+        self.storage_path = storage_path
+        self._use_db = storage_path is None
         self._records: List[DecisionRecord] = []
-        self._load()
 
-    def _load(self) -> None:
-        if self.storage_path.exists():
+        if not self._use_db:
+            self._load_json()
+
+    def _load_json(self) -> None:
+        if self.storage_path and self.storage_path.exists():
             try:
                 with open(self.storage_path, "r", encoding="utf-8") as f:
                     raw_data = json.load(f)
@@ -177,15 +180,37 @@ class DecisionHistoryStore:
             except Exception:
                 self._records = []
 
-    def _save(self) -> None:
-        self.storage_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.storage_path, "w", encoding="utf-8") as f:
-            json.dump([asdict(r) for r in self._records], f, indent=2)
+    def _save_json(self) -> None:
+        if self.storage_path:
+            self.storage_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.storage_path, "w", encoding="utf-8") as f:
+                json.dump([asdict(r) for r in self._records], f, indent=2)
 
     def log_decision(self, record: DecisionRecord) -> Dict[str, Any]:
         """Record an officer action with snapshot of model version and assumptions."""
-        self._records.append(record)
-        self._save()
+        with sqlite_write_lock:
+            if self._use_db:
+                with get_db_session() as db:
+                    rec = DecisionHistoryRecord(
+                        decision_id=record.decision_id,
+                        crop_id=record.crop_id,
+                        season=record.season,
+                        officer_id=record.officer_id,
+                        action_type=record.action_type,
+                        quantity=record.quantity,
+                        unit=record.unit,
+                        rationale=record.rationale,
+                        model_version=record.model_version,
+                        data_version=record.data_version,
+                        assumptions=record.assumptions or {},
+                        timestamp=record.timestamp,
+                    )
+                    db.add(rec)
+                    db.commit()
+            else:
+                self._records.append(record)
+                self._save_json()
+
         return {
             "status": "RECORDED",
             "decision_id": record.decision_id,
@@ -201,13 +226,37 @@ class DecisionHistoryStore:
         limit: int = 50,
     ) -> List[DecisionRecord]:
         """List historical decisions, newest first."""
-        records = self._records
-        if crop_id:
-            records = [r for r in records if r.crop_id == crop_id]
-        if season:
-            records = [r for r in records if r.season == season]
-        # Return sorted descending by timestamp
-        records = sorted(records, key=lambda r: r.timestamp, reverse=True)
         lim = int(limit) if isinstance(limit, int) else 50
-        return records[:lim]
-
+        if self._use_db:
+            with get_db_session() as db:
+                query = db.query(DecisionHistoryRecord)
+                if crop_id:
+                    query = query.filter(DecisionHistoryRecord.crop_id == crop_id)
+                if season:
+                    query = query.filter(DecisionHistoryRecord.season == season)
+                records = query.order_by(DecisionHistoryRecord.timestamp.desc()).limit(lim).all()
+                return [
+                    DecisionRecord(
+                        crop_id=r.crop_id,
+                        season=r.season,
+                        officer_id=r.officer_id,
+                        action_type=r.action_type,
+                        quantity=r.quantity,
+                        unit=r.unit,
+                        rationale=r.rationale,
+                        model_version=r.model_version,
+                        data_version=r.data_version,
+                        assumptions=r.assumptions or {},
+                        decision_id=r.decision_id,
+                        timestamp=r.timestamp,
+                    )
+                    for r in records
+                ]
+        else:
+            records = self._records
+            if crop_id:
+                records = [r for r in records if r.crop_id == crop_id]
+            if season:
+                records = [r for r in records if r.season == season]
+            records = sorted(records, key=lambda r: r.timestamp, reverse=True)
+            return records[:lim]

@@ -59,3 +59,25 @@ def test_market_adoption_simulation():
     assert s60["farmgate_price_rs_kg"] > s0["farmgate_price_rs_kg"]
     assert s60["price_crash_risk_pct"] < s0["price_crash_risk_pct"]
     assert s60["price_crash_risk_pct"] <= 50.0
+
+    # Task 5 (P0): Provenance and data availability flags
+    assert res["data_available"] is False
+    assert res["is_demo"] is True
+    assert res["source_type"] == "agent_simulation"
+
+
+def test_empirical_adoption_summary_data_available_false():
+    """
+    Task 5 (P0): Validates that adoption summary returns an explicit data_available: false
+    response instead of hardcoded 64/24/12 counts.
+    """
+    sim = MarketAdoptionSimulator()
+    summary = sim.get_adoption_summary(crop="big_onion", district="Anuradhapura")
+
+    assert summary["data_available"] is False
+    assert summary["sample_size"] == 0
+    assert summary["counts"]["coordinated_adopters"] is None
+    assert summary["counts"]["partial_adopters"] is None
+    assert summary["counts"]["uncoordinated"] is None
+    assert summary["breakdown_pct"]["coordinated_pct"] is None
+    assert "64/24/12" in summary["message"] or "not available" in summary["message"].lower()

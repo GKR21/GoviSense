@@ -1,12 +1,13 @@
 """
 Feedback Loop Module (WP7 / Item 7)
-Team DARKBITE · ModelX 2.0 Phase 1
+Team DARKBITE · ModelX 2.0 Phase 2
 Pilot: Anuradhapura (Big Onion, Chilli)
 
 Enables farmers and ground agricultural officers to submit actual planting reports.
+Database-backed (SQLite with WAL or PostgreSQL) with concurrent-write safety.
 On report ingestion:
   1. Validates farmer consent and pseudonymous ID.
-  2. Replaces planned / estimated area with farmer-reported area.
+  2. Records report with ACID transaction and thread safety.
   3. Re-triggers SPI and Target Area Calculator (A_rec).
 """
 
@@ -19,14 +20,9 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
-from govisense.config import PROCESSED_DATA_DIR, settings
-from govisense.models.target_area import TargetAreaCalculator, TargetAreaResult
-from govisense.models.a3_supply_pressure import SupplyPressureEngine, SPIResult
-from govisense.models.demand_estimator import DemandEstimator
-from govisense.data.crop_requirements import get_crop_requirements
-
-
-_DEFAULT_STORE_PATH = PROCESSED_DATA_DIR / "planting_reports.json"
+from govisense.config import settings
+from govisense.db.models import PlantingReportRecord
+from govisense.db.session import get_db_session, sqlite_write_lock
 
 
 @dataclass
@@ -70,32 +66,36 @@ class ReTriggerResult:
 
 class PlantingReportStore:
     """
-    In-memory and persistent JSON storage for planting reports.
+    Database-backed storage for planting reports with concurrent-write safety.
     Provides aggregation and automatic pipeline re-triggering.
     """
 
     def __init__(self, storage_path: Optional[Path] = None):
-        self.storage_path = storage_path or _DEFAULT_STORE_PATH
-        self._reports: List[PlantingReport] = []
-        self._load()
+        self.storage_path = storage_path
+        self._use_db = storage_path is None
+        self._records: List[PlantingReport] = []
 
-    def _load(self) -> None:
-        if self.storage_path.exists():
+        if not self._use_db:
+            self._load_json()
+
+    def _load_json(self) -> None:
+        if self.storage_path and self.storage_path.exists():
             try:
                 with open(self.storage_path, "r", encoding="utf-8") as f:
                     raw_data = json.load(f)
-                    self._reports = [PlantingReport(**item) for item in raw_data]
+                    self._records = [PlantingReport(**item) for item in raw_data]
             except Exception:
-                self._reports = []
+                self._records = []
 
-    def _save(self) -> None:
-        self.storage_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.storage_path, "w", encoding="utf-8") as f:
-            json.dump([asdict(r) for r in self._reports], f, indent=2)
+    def _save_json(self) -> None:
+        if self.storage_path:
+            self.storage_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.storage_path, "w", encoding="utf-8") as f:
+                json.dump([asdict(r) for r in self._records], f, indent=2)
 
     def submit_report(self, report: PlantingReport) -> Dict[str, Any]:
         """
-        Validates and records a planting report.
+        Validates and records a planting report with concurrent-write safety.
         Strict privacy rule: consent must be explicitly given.
         """
         if not report.consent_given:
@@ -104,11 +104,31 @@ class PlantingReportStore:
             )
         if report.actual_area_ha < 0 or report.planned_area_ha < 0:
             raise ValueError("Planted areas cannot be negative.")
-        if not report.pseudonymous_id.strip():
+        if not report.pseudonymous_id or not report.pseudonymous_id.strip():
             raise ValueError("A pseudonymous ID is required for auditability and privacy.")
 
-        self._reports.append(report)
-        self._save()
+        with sqlite_write_lock:
+            if self._use_db:
+                with get_db_session() as db:
+                    rec = PlantingReportRecord(
+                        report_id=report.report_id,
+                        crop_id=report.crop_id,
+                        season=report.season,
+                        planned_area_ha=report.planned_area_ha,
+                        actual_area_ha=report.actual_area_ha,
+                        consent_given=report.consent_given,
+                        pseudonymous_id=report.pseudonymous_id,
+                        harvest_outcome_mt=report.harvest_outcome_mt,
+                        sale_price_rs_kg=report.sale_price_rs_kg,
+                        sale_channel=report.sale_channel,
+                        notes=report.notes,
+                        timestamp=report.timestamp,
+                    )
+                    db.add(rec)
+                    db.commit()
+            else:
+                self._records.append(report)
+                self._save_json()
 
         total_actual = self.get_total_reported_area(report.crop_id, report.season)
         return {
@@ -127,12 +147,38 @@ class PlantingReportStore:
         season: Optional[str] = None,
     ) -> List[PlantingReport]:
         """Retrieve stored reports, optionally filtered by crop and season."""
-        results = self._reports
-        if crop_id:
-            results = [r for r in results if r.crop_id == crop_id]
-        if season:
-            results = [r for r in results if r.season == season]
-        return results
+        if self._use_db:
+            with get_db_session() as db:
+                query = db.query(PlantingReportRecord)
+                if crop_id:
+                    query = query.filter(PlantingReportRecord.crop_id == crop_id)
+                if season:
+                    query = query.filter(PlantingReportRecord.season == season)
+                records = query.order_by(PlantingReportRecord.id.desc()).all()
+                return [
+                    PlantingReport(
+                        crop_id=r.crop_id,
+                        season=r.season,
+                        planned_area_ha=r.planned_area_ha,
+                        actual_area_ha=r.actual_area_ha,
+                        consent_given=r.consent_given,
+                        pseudonymous_id=r.pseudonymous_id,
+                        harvest_outcome_mt=r.harvest_outcome_mt,
+                        sale_price_rs_kg=r.sale_price_rs_kg,
+                        sale_channel=r.sale_channel,
+                        notes=r.notes,
+                        report_id=r.report_id,
+                        timestamp=r.timestamp,
+                    )
+                    for r in records
+                ]
+        else:
+            results = self._records
+            if crop_id:
+                results = [r for r in results if r.crop_id == crop_id]
+            if season:
+                results = [r for r in results if r.season == season]
+            return results
 
     def get_total_reported_area(self, crop_id: str, season: str) -> float:
         """
@@ -156,12 +202,15 @@ class PlantingReportStore:
         """
         Replaces planned area with reported area and recalculates SPI + A_rec.
         """
+        from govisense.models.target_area import TargetAreaCalculator
+        from govisense.models.a3_supply_pressure import SupplyPressureEngine
+        from govisense.models.demand_estimator import DemandEstimator
+        from govisense.data.crop_requirements import get_crop_requirements
+
         demand_est = DemandEstimator()
         dem_res = demand_est.estimate(crop_id, target_month)
-        # Seasonal demand (e.g. 4 months duration)
         season_demand = dem_res.demand_mt * 4.0
 
-        # Crop parameters
         reqs = get_crop_requirements()
         req = reqs.get(crop_id)
         yield_mid = req.yield_mid_mt_ha if req else 15.5
@@ -169,7 +218,6 @@ class PlantingReportStore:
 
         target_calc = TargetAreaCalculator()
 
-        # Previous baseline (before reported acreage)
         prev_ta = target_calc.compute(
             crop=crop_id,
             season=season,
@@ -181,10 +229,8 @@ class PlantingReportStore:
             suitable_land_ha=suitable_land_ha,
         )
 
-        # Actual cumulative reported acreage
         total_reported = self.get_total_reported_area(crop_id, season)
 
-        # New target area with actual reported acreage
         new_ta = target_calc.compute(
             crop=crop_id,
             season=season,
@@ -196,19 +242,18 @@ class PlantingReportStore:
             suitable_land_ha=suitable_land_ha,
         )
 
-        # Supply Pressure Index before and after
         spi_engine = SupplyPressureEngine()
         prev_supply = prev_ta.a_target_ha * yield_mid * (1.0 - loss_pct)
         new_supply = total_reported * yield_mid * (1.0 - loss_pct)
 
         prev_spi = spi_engine.compute_spi(
             crop=crop_id,
-            forecast_supply_mt=prev_supply / 4.0,  # monthly rate
+            forecast_supply_mt=prev_supply / 4.0,
             month=target_month,
         )
         new_spi = spi_engine.compute_spi(
             crop=crop_id,
-            forecast_supply_mt=new_supply / 4.0,  # monthly rate
+            forecast_supply_mt=new_supply / 4.0,
             month=target_month,
         )
 
@@ -238,4 +283,3 @@ class PlantingReportStore:
             oversupply_stop_triggered=oversupply_stop,
             action_summary=summary,
         )
-

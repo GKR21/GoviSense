@@ -5,7 +5,7 @@ AI 3 (Supply Pressure Index), and AI 4 (Gap-Filling Optimization).
 Also provides WP2 endpoints: /api/farmer/top3 (farmer crop recommendation).
 """
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
@@ -23,6 +23,7 @@ from govisense.models.target_area import TargetAreaCalculator
 from govisense.feedback.planting_reports import PlantingReportStore, PlantingReport
 from govisense.db.history import DecisionHistoryStore, DecisionRecord, evaluate_confidence_badge
 from govisense.simulation.agent_sim import MarketAdoptionSimulator, calculate_interval_coverage
+from govisense.api.auth import router as auth_router, require_farmer, require_officer
 
 app = FastAPI(
     title="GoviSense API",
@@ -39,6 +40,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Authentication & RBAC Router
+app.include_router(auth_router)
+
 # Global in-memory cache for models and data
 cached_df: Optional[pd.DataFrame] = None
 spi_engine = SupplyPressureEngine()
@@ -54,9 +58,12 @@ a1_models: Dict[str, HarvestVolumeForecaster] = {}
 a2_models: Dict[str, PriceForecaster] = {}
 
 
+from govisense.db.session import init_db
+
 @app.on_event("startup")
 def load_and_train():
     global cached_df, a1_models, a2_models
+    init_db()
     raw = load_monthly_dataset()
     cached_df = engineer_features(raw)
     
@@ -265,10 +272,10 @@ def simulate_scenario(req: SimulationRequest):
 
 
 # ---------------------------------------------------------------------------
-# Item 6 – Farmer Top-3 Comparison Endpoint
+# Item 6 – Farmer Top-3 Comparison Endpoint (Protected: Farmer Role Required)
 # ---------------------------------------------------------------------------
 
-@app.get("/api/farmer/top3")
+@app.get("/api/farmer/top3", dependencies=[Depends(require_farmer)])
 def farmer_top3(
     farmer_id: str = Query(..., description="Pseudonymous farmer identifier"),
     season: str = Query("Maha", description="Season: 'Maha' or 'Yala'"),
@@ -536,7 +543,7 @@ def get_confidence_badge(
     return asdict(eval_res)
 
 
-@app.post("/api/history/log-action")
+@app.post("/api/history/log-action", dependencies=[Depends(require_officer)])
 def log_officer_action(payload: DecisionLogPayload):
     """
     Item 8: Save officer action with model version, data version, and assumptions snapshot.
@@ -589,10 +596,29 @@ def get_adoption_simulation(
 ):
     """
     Item 9: Multi-agent market simulation at 0%, 30%, and 60% farmer adoption tiers.
+    Explicitly tags data_available: false to distinguish simulation scenarios from live ground adoption.
     """
     return adoption_sim.simulate(
         crop=crop_id,
         season_demand_mt=season_demand_mt,
         uncoordinated_supply_mt=uncoordinated_supply_mt,
+    )
+
+
+@app.get("/api/simulation/adoption-summary")
+@app.get("/api/adoption/summary")
+def get_adoption_summary(
+    crop_id: str = Query("big_onion"),
+    season: str = Query("Maha 2025/2026"),
+    district: str = Query("Anuradhapura"),
+):
+    """
+    Task 5 (P0): Replaces the hardcoded 64/24/12 adoption counts with an explicit data_available: false response.
+    Returns transparent status indicating empirical farmer adoption telemetry is not yet connected.
+    """
+    return adoption_sim.get_adoption_summary(
+        crop=crop_id,
+        district=district,
+        season=season,
     )
 

@@ -152,9 +152,54 @@ class MarketAdoptionSimulator:
             "crop": crop,
             "season_demand_mt": season_demand_mt,
             "fair_floor_price_rs_kg": fair_floor,
+            "data_available": False,
+            "is_demo": True,
+            "source_type": "agent_simulation",
+            "empirical_counts": None,
+            "message": (
+                "Simulation scenario model only. Empirical farmer adoption counts (e.g. 64/24/12) "
+                "are unavailable without live Agrarian Services Department registry integration."
+            ),
             "scenarios": [asdict(s) for s in scenarios],
             "conclusion": (
                 "At 60% farmer adoption, supply aligns with demand, SPI enters the balanced "
                 "band (+/-0.15), and price crash risk drops below 5%, preserving farmer profitability."
             ),
+        }
+
+    def get_adoption_summary(
+        self,
+        crop: str = "big_onion",
+        district: str = "Anuradhapura",
+        season: str = "Maha 2025/2026",
+    ) -> Dict[str, Any]:
+        """
+        Task 5 (P0): Returns an explicit data_available: false response for farmer adoption counts,
+        replacing hardcoded 64/24/12 adoption counts with transparent telemetry provenance.
+        """
+        return {
+            "data_available": False,
+            "is_demo": False,
+            "source_type": "none",
+            "crop": crop,
+            "district": district,
+            "season": season,
+            "sample_size": 0,
+            "message": (
+                "Empirical adoption counts (previously hardcoded as 64/24/12) are not available. "
+                "Live telemetry requires Agrarian Services Department farmer registry integration."
+            ),
+            "counts": {
+                "coordinated_adopters": None,
+                "partial_adopters": None,
+                "uncoordinated": None,
+            },
+            "breakdown_pct": {
+                "coordinated_pct": None,
+                "partial_pct": None,
+                "uncoordinated_pct": None,
+            },
+            "registry_status": "PENDING_INTEGRATION",
+            "simulation_available": True,
+            "simulation_endpoint": "/api/simulation/adoption",
         }
