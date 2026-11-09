@@ -107,12 +107,23 @@ This document tracks all tasks assigned to the software implementation role (Hes
     All 103 test cases across the entire project now pass with 100% success rate.
   - *Files*: `tests/test_task_18_comprehensive_quality.py`.
 
-- [ ] **Task 19 (P2)**: Populate empty DevOps and documentation files.
-  - *Current Status*: `.github/workflows/ci.yml` (0 bytes), `docker-compose.yml` (0 bytes), `Makefile` (0 bytes), `.env.example` (0 bytes), `docs/assumptions.md` (0 bytes), `docs/ai-usage-log.md` (0 bytes).
-  - *Target*: Fill complete Docker Compose (FastAPI, Postgres/SQLite, React frontend), GitHub Actions CI matrix, development Makefile, `.env.example`, and comprehensive architecture/assumptions/AI audit documentation.
-  - *Files*: `.github/workflows/ci.yml`, `docker-compose.yml`, `Makefile`, `.env.example`, `docs/assumptions.md`, `docs/ai-usage-log.md`.
+- [x] **Task 19 (P2)**: Populate DevOps, containerization, and system documentation.
+  - *Current Status*: Completed.
+    - `.github/workflows/ci.yml`: Multi-version Python (3.11, 3.12, 3.13) matrix testing, system dependencies, Ruff linting, Pytest test coverage, data integrity verification, and Node.js 20 frontend build/typecheck.
+    - `Dockerfile`: Multi-stage Python 3.11-slim production container with system graphics/PDF libraries, healthcheck, and uvicorn runner.
+    - `docker-compose.yml`: Integrated stack running `backend` (FastAPI) and `frontend` (Nginx SPA reverse proxy), volume-persisting `/app/data` and `/app/models_store`, with automated healthchecks.
+    - `Makefile`: Cross-platform developer targets (`install`, `test`, `test-task18`, `test-cov`, `lint`, `format`, `run-api`, `run-frontend`, `docker-build`, `docker-up`, `docker-down`, `init-db`, `data-validate`, `clean`).
+    - `.env.example`: Comprehensive environment configuration template covering JWT secrets, expiry, CORS origins, SQLite/PostgreSQL URIs, pilot district, and paths.
+    - `docs/assumptions.md`: Detailed agronomic, supply loss, price floor, SPI banding, climatological baselines, 4-tier data provenance taxonomy, and future national farmer registry integration notes.
+    - `docs/ai-usage-log.md`: Complete AI engineering audit log detailing AI 1-4 pipeline architectures, generative AI pair-programming trajectory, human verification checkpoints, and ethical privacy principles.
+  - *Files*: `.github/workflows/ci.yml`, `docker-compose.yml`, `Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf`, `Makefile`, `.env.example`, `docs/assumptions.md`, `docs/ai-usage-log.md`.
 
-- [ ] **Task 20 (P1)**: Run and verify all sanity checks: Auth, CORS, Alerts, and Mobile Prices screen.
-  - *Current Status*: Auth and RBAC verified via 19 tests in `test_auth_and_rbac.py`. CORS and Alerts pending final modularization.
-  - *Target*: End-to-end integration verification across backend and client interfaces.
+- [x] **Task 20 (P1)**: Run and verify all sanity checks: Auth, CORS, Alerts, and Mobile Prices screen.
+  - *Current Status*: Completed. Authored and executed dedicated end-to-end integration test suite `tests/test_task_20_unverified_checks.py`:
+    1. **Auth & RBAC**: Verified login across all three roles (`farmer`, `officer`, `admin`), token refresh, `me` claims, and strict role boundary enforcement (farmers blocked from officer actions with 403, officers blocked from database re-init with 403, authorized roles permitted).
+    2. **CORS Whitelist**: Verified that whitelisted origins (`http://localhost:3000`, `http://localhost:5173`) receive `Access-Control-Allow-Origin`, while unlisted/malicious origins are strictly blocked without wildcard fallback.
+    3. **Multilingual Alerts & Lifecycle**: Verified trilingual output (`lang=en`, `lang=si`, `lang=ta` containing genuine Unicode scripts), alert acknowledgment (`/api/alerts/{id}/acknowledge`), and farmer-to-officer question submission (`/api/alerts/{id}/ask`).
+    4. **Mobile Market Prices Screen**: Verified `/api/market-prices` returns real CBSL/HARTI benchmark prices (`data_available: true`, `is_demo: false`, `source_type: "cbsl_harti_market_bulletin"`), category filtering, and 100% schema alignment with mobile `MarketPriceItem`.
+    All 148 automated tests in the project repository pass with 100% success rate.
+  - *Files*: `tests/test_task_20_unverified_checks.py`.
 

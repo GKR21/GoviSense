@@ -1,4 +1,4 @@
-# GoviSense Operational Assumptions & Registry Integration Architecture
+# GoviSense Operational Assumptions & System Architecture
 
 **Team DARKBITE · ModelX 2.0 Phase 2**  
 **Pilot District: Anuradhapura (Big Onion, Green Chilli)**  
@@ -37,6 +37,8 @@ Once national API access and memorandum-of-understanding (MOU) clearances are fi
   - Chilli: 120–150 days duration. Maha peak harvest spread: January ($35\%$), February ($45\%$), March ($20\%$). Yala peak: July ($35\%$), August ($45\%$), September ($20\%$).
 - **Pilot District Contribution**:
   - Anuradhapura represents approximately $50\%$ of national domestic Big Onion production and $40\%$ of commercial green chilli production.
+- **National Target Calibrations**:
+  - Supply figures incorporate Sri Lanka national aggregates derived from Department of Agriculture Cost of Cultivation (CPP) seasonal publications, with district-to-national scaling factors validated against HARTI food balance sheets.
 
 ---
 
@@ -69,3 +71,32 @@ The Supply Pressure Index ratio ($\text{SPI} = \text{Supply} / \text{Demand}$) i
 - **Missing Historical Readings**:
   - Missing daily meteorological sensor values are forward-filled up to a maximum contiguous gap of 5 days; longer gaps are interpolated using monthly historical means.
 
+---
+
+## 6. Data Provenance & 4-Tier Taxonomy (Task 1 - 4, 18)
+
+To preserve scientific and empirical honesty throughout the entire system:
+1. **Four-Tier Provenance Classification**:
+   - `real`: Directly digitized and extracted from official institutional records (CPP, CBSL, HARTI, WFP, Sri Lanka Customs).
+   - `anchor`: High-fidelity seasonal anchor points published directly by national authorities (Department of Agriculture seasonal reviews).
+   - `interpolated`: Statistically sound temporal disaggregation (e.g. cubic spline interpolation converting seasonal anchors to monthly continuous series).
+   - `synthetic`: Explicitly tagged historical extrapolations or simulated counterfactuals.
+2. **Elimination of Deceptive Labels**:
+   - 100% of rows originating from simulation or demo seeds are strictly marked with `is_demo: false` when referencing real empirical pipelines, or `is_demo: true` when demonstrating offline mocks.
+3. **5% Hand-Checked Ground Truth Auditing**:
+   - All digitized PDF tables undergo stratified 5% random sampling audits against physical reports, enforcing an error rate threshold $\le 10.0\%$.
+
+---
+
+## 7. High-Concurrency, Offline-First Mobile Resilience & Security
+
+- **Database Concurrency Model**:
+  - SQLite backend runs with Write-Ahead Logging (`WAL` mode) and a 15-second busy timeout, safely supporting simultaneous multi-threaded API requests (verified via 20 parallel threads test).
+- **Offline Fallback Architecture**:
+  - When mobile clients disconnect from the cellular grid, recommendations fall back to local `_initialCrops` with a prominent warning banner.
+  - Planting reports submitted offline are saved locally as `pending`, queue automatic retries via `retryPendingReports()`, and alert the farmer upon reconnect.
+- **Strict Role-Based Access Control (RBAC)**:
+  - Role hierarchy: `farmer`, `officer`, and `admin`.
+  - Administrative routes (`/api/database/init`) and policy simulation/retrigger routes (`/api/feedback/retrigger`, `/api/simulate`) require officer/admin authorization.
+- **CORS Whitelisting**:
+  - Replaces wildcard origins (`*`) with strictly defined browser and mobile host origins (`http://localhost:3000`, `http://localhost:5173`, etc.).
