@@ -88,6 +88,9 @@ def get_engine(force_new: bool = False) -> Engine:
             _ACTIVE_DIALECT = "postgresql"
             logger.info("Successfully connected to PostgreSQL database at %s", target_url.split("@")[-1])
         except (OperationalError, Exception) as exc:
+            if not settings.allow_sqlite_fallback:
+                logger.error("PostgreSQL connection failed and SQLite fallback is disabled.")
+                raise
             logger.warning(
                 "PostgreSQL server not accessible (%s). Falling back to local persistent SQLite (%s).",
                 str(exc).split("\n")[0],
