@@ -9,7 +9,7 @@ class ApiClient {
   final Dio? _customDio;
 
   Dio get _dio {
-    if (_customDio != null) return _customDio!;
+    if (_customDio != null) return _customDio;
     return Dio(
       BaseOptions(
         baseUrl: AppConfig.apiBaseUrl,

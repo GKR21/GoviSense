@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/localization/app_translations.dart';
@@ -36,7 +37,8 @@ class _FarmerPageState extends State<FarmerPage> {
   bool _isSuccessView = false;
 
   // Post-Harvest & Marketing Telemetry (from farmer_app)
-  final TextEditingController _harvestOutcomeController = TextEditingController();
+  final TextEditingController _harvestOutcomeController =
+      TextEditingController();
   final TextEditingController _salePriceController = TextEditingController();
   String _selectedSaleChannel = 'Dambulla DEC';
   bool _consentGiven = true;
@@ -45,7 +47,9 @@ class _FarmerPageState extends State<FarmerPage> {
   late double _profileLandAcres;
   late bool _profileIsRainfed;
   late double _profileSoilPh;
-  final TextEditingController _serverUrlController = TextEditingController(text: AppConfig.apiBaseUrl);
+  final TextEditingController _serverUrlController = TextEditingController(
+    text: AppConfig.apiBaseUrl,
+  );
   bool _isTestingServer = false;
   String? _serverStatusMessage;
 
@@ -123,7 +127,11 @@ class _FarmerPageState extends State<FarmerPage> {
                 color: AppTheme.primary,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.spa_rounded, color: Colors.white, size: 18),
+              child: const Icon(
+                Icons.spa_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
             ),
             const SizedBox(width: 8),
             Column(
@@ -133,18 +141,28 @@ class _FarmerPageState extends State<FarmerPage> {
                   children: [
                     Text(
                       AppTranslations.t(_language, 'appName'),
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 1,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.primaryTint,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: const Text(
                         'Maha 2026',
-                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primary,
+                        ),
                       ),
                     ),
                   ],
@@ -161,13 +179,21 @@ class _FarmerPageState extends State<FarmerPage> {
           // DEC Market Prices Quick View
           IconButton(
             tooltip: 'DEC Market Prices',
-            icon: const Icon(Icons.trending_up_rounded, size: 21, color: AppTheme.primary),
+            icon: const Icon(
+              Icons.trending_up_rounded,
+              size: 21,
+              color: AppTheme.primary,
+            ),
             onPressed: _openMarketPrices,
           ),
           // Role switch for competition demo (Closed loop showcase)
           IconButton(
             tooltip: 'Switch to Officer View',
-            icon: const Icon(Icons.dashboard_customize_outlined, size: 20, color: AppTheme.primary),
+            icon: const Icon(
+              Icons.dashboard_customize_outlined,
+              size: 20,
+              color: AppTheme.primary,
+            ),
             onPressed: () {
               context.go('/officer');
             },
@@ -186,14 +212,17 @@ class _FarmerPageState extends State<FarmerPage> {
                 return GestureDetector(
                   onTap: () => _onLanguageChange(lang),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: isSelected ? Colors.white : Colors.transparent,
                       borderRadius: BorderRadius.circular(8),
                       boxShadow: isSelected
                           ? [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.08),
+                                color: Colors.black.withValues(alpha: 0.08),
                                 blurRadius: 4,
                                 offset: const Offset(0, 1),
                               ),
@@ -201,11 +230,17 @@ class _FarmerPageState extends State<FarmerPage> {
                           : null,
                     ),
                     child: Text(
-                      lang == AppLanguage.en ? 'EN' : lang == AppLanguage.si ? 'සිං' : 'த',
+                      lang == AppLanguage.en
+                          ? 'EN'
+                          : lang == AppLanguage.si
+                          ? 'සිං'
+                          : 'த',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: isSelected ? AppTheme.primary : AppTheme.neutral600,
+                        color: isSelected
+                            ? AppTheme.primary
+                            : AppTheme.neutral600,
                       ),
                     ),
                   ),
@@ -216,7 +251,11 @@ class _FarmerPageState extends State<FarmerPage> {
           // Visible Log Out Button in Mobile AppBar
           IconButton(
             tooltip: 'Log Out',
-            icon: const Icon(Icons.logout_rounded, size: 19, color: AppTheme.neutral600),
+            icon: const Icon(
+              Icons.logout_rounded,
+              size: 19,
+              color: AppTheme.neutral600,
+            ),
             onPressed: () => _confirmLogout(context),
           ),
           const SizedBox(width: 4),
@@ -261,7 +300,11 @@ class _FarmerPageState extends State<FarmerPage> {
                 color: AppTheme.primary,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+              child: const Icon(
+                Icons.add_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
             selectedIcon: Container(
               padding: const EdgeInsets.all(6),
@@ -269,7 +312,11 @@ class _FarmerPageState extends State<FarmerPage> {
                 color: AppTheme.primaryDark,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+              child: const Icon(
+                Icons.add_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
             label: AppTranslations.t(_language, 'navReport'),
           ),
@@ -317,7 +364,7 @@ class _FarmerPageState extends State<FarmerPage> {
             borderRadius: BorderRadius.circular(22),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.primary.withOpacity(0.2),
+                color: AppTheme.primary.withValues(alpha: 0.2),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -330,25 +377,39 @@ class _FarmerPageState extends State<FarmerPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
+                      color: Colors.white.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       AppTranslations.t(_language, 'seasonPeriod'),
-                      style: const TextStyle(color: AppTheme.accent, fontSize: 11, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        color: AppTheme.accent,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.accent,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Text(
                       '11 Days Left',
-                      style: TextStyle(color: Color(0xFF073820), fontSize: 10, fontWeight: FontWeight.w900),
+                      style: TextStyle(
+                        color: Color(0xFF073820),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
                 ],
@@ -356,12 +417,19 @@ class _FarmerPageState extends State<FarmerPage> {
               const SizedBox(height: 10),
               Text(
                 AppTranslations.t(_language, 'greeting'),
-                style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
                 AppTranslations.t(_language, 'greetingSub'),
-                style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.8),
+                  fontSize: 12,
+                ),
               ),
               const SizedBox(height: 14),
               ElevatedButton.icon(
@@ -398,7 +466,11 @@ class _FarmerPageState extends State<FarmerPage> {
                     color: const Color(0xFF2563EB),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.cloudy_snowing, color: Colors.white, size: 18),
+                  child: const Icon(
+                    Icons.cloudy_snowing,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -417,12 +489,19 @@ class _FarmerPageState extends State<FarmerPage> {
                       const SizedBox(height: 2),
                       Text(
                         AppTranslations.t(_language, 'weatherAlertTitle'),
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.ink),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.ink,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         AppTranslations.t(_language, 'weatherAlertDesc'),
-                        style: const TextStyle(fontSize: 11, color: AppTheme.neutral600),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.neutral600,
+                        ),
                       ),
                     ],
                   ),
@@ -444,7 +523,7 @@ class _FarmerPageState extends State<FarmerPage> {
               border: Border.all(color: AppTheme.cardBorder),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
+                  color: Colors.black.withValues(alpha: 0.03),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),
@@ -458,7 +537,11 @@ class _FarmerPageState extends State<FarmerPage> {
                     color: AppTheme.primaryTint,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.trending_up_rounded, color: AppTheme.primary, size: 20),
+                  child: const Icon(
+                    Icons.trending_up_rounded,
+                    color: AppTheme.primary,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -470,18 +553,29 @@ class _FarmerPageState extends State<FarmerPage> {
                         children: [
                           Text(
                             AppTranslations.t(_language, 'marketPrices'),
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.ink),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.ink,
+                            ),
                           ),
                           const Text(
                             'View Feed ›',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.primary,
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 2),
                       const Text(
                         'Dambulla DEC: Big Onion Rs. 320–365 · Chilli Rs. 240–280',
-                        style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.neutral600,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -508,13 +602,20 @@ class _FarmerPageState extends State<FarmerPage> {
                 SizedBox(
                   height: 14,
                   width: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppTheme.primary,
+                  ),
                 ),
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     'Querying FastAPI AI recommendation engine...',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primary,
+                    ),
                   ),
                 ),
               ],
@@ -530,17 +631,27 @@ class _FarmerPageState extends State<FarmerPage> {
               children: [
                 Text(
                   AppTranslations.t(_language, 'topPicksTitle'),
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.ink),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.ink,
+                  ),
                 ),
                 Text(
                   AppTranslations.t(_language, 'topPicksSub'),
-                  style: const TextStyle(fontSize: 11, color: AppTheme.neutral600),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.neutral600,
+                  ),
                 ),
               ],
             ),
             TextButton(
               onPressed: () => setState(() => _selectedIndex = 1),
-              child: const Text('View All (3)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              child: const Text(
+                'View All (3)',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
             ),
           ],
         ),
@@ -569,14 +680,29 @@ class _FarmerPageState extends State<FarmerPage> {
                 children: [
                   Text(
                     AppTranslations.t(_language, 'spiTitle'),
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.ink),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.ink,
+                    ),
                   ),
                   GestureDetector(
                     onTap: () => WhyAdviceBottomSheet.show(context, _language),
                     child: const Row(
                       children: [
-                        Text('Why?', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary)),
-                        Icon(Icons.help_outline, size: 14, color: AppTheme.primary),
+                        Text(
+                          'Why?',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primary,
+                          ),
+                        ),
+                        Icon(
+                          Icons.help_outline,
+                          size: 14,
+                          color: AppTheme.primary,
+                        ),
                       ],
                     ),
                   ),
@@ -586,12 +712,42 @@ class _FarmerPageState extends State<FarmerPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildMonthPill('Jan', '0.98×', AppTheme.balancedTint, AppTheme.balanced),
-                  _buildMonthPill('Feb', '0.74×', AppTheme.shortageTint, AppTheme.shortage),
-                  _buildMonthPill('Mar', '1.38×', AppTheme.oversupplyTint, AppTheme.oversupply),
-                  _buildMonthPill('Apr', '1.25×', AppTheme.oversupplyTint, AppTheme.oversupply),
-                  _buildMonthPill('May', '1.05×', AppTheme.balancedTint, AppTheme.balanced),
-                  _buildMonthPill('Jun', '0.89×', AppTheme.balancedTint, AppTheme.balanced),
+                  _buildMonthPill(
+                    'Jan',
+                    '0.98×',
+                    AppTheme.balancedTint,
+                    AppTheme.balanced,
+                  ),
+                  _buildMonthPill(
+                    'Feb',
+                    '0.74×',
+                    AppTheme.shortageTint,
+                    AppTheme.shortage,
+                  ),
+                  _buildMonthPill(
+                    'Mar',
+                    '1.38×',
+                    AppTheme.oversupplyTint,
+                    AppTheme.oversupply,
+                  ),
+                  _buildMonthPill(
+                    'Apr',
+                    '1.25×',
+                    AppTheme.oversupplyTint,
+                    AppTheme.oversupply,
+                  ),
+                  _buildMonthPill(
+                    'May',
+                    '1.05×',
+                    AppTheme.balancedTint,
+                    AppTheme.balanced,
+                  ),
+                  _buildMonthPill(
+                    'Jun',
+                    '0.89×',
+                    AppTheme.balancedTint,
+                    AppTheme.balanced,
+                  ),
                 ],
               ),
             ],
@@ -617,7 +773,11 @@ class _FarmerPageState extends State<FarmerPage> {
         children: [
           const Padding(
             padding: EdgeInsets.only(top: 2),
-            child: Icon(Icons.cloud_off_rounded, color: Color(0xFFD97706), size: 20),
+            child: Icon(
+              Icons.cloud_off_rounded,
+              color: Color(0xFFD97706),
+              size: 20,
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -630,8 +790,8 @@ class _FarmerPageState extends State<FarmerPage> {
                       _language == AppLanguage.si
                           ? 'නොබැඳි නිර්දේශ මාදිලිය'
                           : _language == AppLanguage.ta
-                              ? 'ஆஃப்லைன் பரிந்துரை முறை'
-                              : 'Offline Baseline Recommendations',
+                          ? 'ஆஃப்லைன் பரிந்துரை முறை'
+                          : 'Offline Baseline Recommendations',
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -640,7 +800,10 @@ class _FarmerPageState extends State<FarmerPage> {
                     ),
                     const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFEF3C7),
                         borderRadius: BorderRadius.circular(6),
@@ -662,8 +825,8 @@ class _FarmerPageState extends State<FarmerPage> {
                   _language == AppLanguage.si
                       ? 'පෙන්වනු ලබන්නේ පූර්ව-ක්‍රමාංකිත මූලික නිර්දේශයන්ය (_initialCrops). සජීවී AI අනාවැකි සඳහා සබඳතාව යාවත්කාලීන කරන්න.'
                       : _language == AppLanguage.ta
-                          ? 'முன்கூட்டியே கணிக்கப்பட்ட மாதிரி பரிந்துரைகள் காட்டப்படுகின்றன (_initialCrops). நேரலை முன்னறிவிப்புகளுக்கு மீண்டும் முயற்சிக்கவும்.'
-                          : 'Showing pre-calibrated baseline recommendations (_initialCrops). Reconnect to sync live market forecasts from Anuradhapura Agrarian Ledger.',
+                      ? 'முன்கூட்டியே கணிக்கப்பட்ட மாதிரி பரிந்துரைகள் காட்டப்படுகின்றன (_initialCrops). நேரலை முன்னறிவிப்புகளுக்கு மீண்டும் முயற்சிக்கவும்.'
+                      : 'Showing pre-calibrated baseline recommendations (_initialCrops). Reconnect to sync live market forecasts from Anuradhapura Agrarian Ledger.',
                   style: const TextStyle(
                     fontSize: 11,
                     color: Color(0xFFB45309),
@@ -679,11 +842,20 @@ class _FarmerPageState extends State<FarmerPage> {
                 ? const SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFD97706)),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Color(0xFFD97706),
+                    ),
                   )
-                : const Icon(Icons.refresh_rounded, color: Color(0xFFD97706), size: 20),
+                : const Icon(
+                    Icons.refresh_rounded,
+                    color: Color(0xFFD97706),
+                    size: 20,
+                  ),
             tooltip: 'Retry Live Connection',
-            onPressed: _repo.isLoadingApi ? null : () => _repo.refreshRecommendations(),
+            onPressed: _repo.isLoadingApi
+                ? null
+                : () => _repo.refreshRecommendations(),
           ),
         ],
       ),
@@ -722,34 +894,40 @@ class _FarmerPageState extends State<FarmerPage> {
                       Expanded(
                         child: Text(
                           crop.localizedName(_language),
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: crop.risk == MarketRisk.balanced
                               ? AppTheme.balancedTint
                               : crop.risk == MarketRisk.shortage
-                                  ? AppTheme.shortageTint
-                                  : AppTheme.oversupplyTint,
+                              ? AppTheme.shortageTint
+                              : AppTheme.oversupplyTint,
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           crop.risk == MarketRisk.balanced
                               ? 'Balanced'
                               : crop.risk == MarketRisk.shortage
-                                  ? 'High Demand'
-                                  : 'Watch Glut',
+                              ? 'High Demand'
+                              : 'Watch Glut',
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.bold,
                             color: crop.risk == MarketRisk.balanced
                                 ? AppTheme.balanced
                                 : crop.risk == MarketRisk.shortage
-                                    ? AppTheme.shortage
-                                    : AppTheme.oversupply,
+                                ? AppTheme.shortage
+                                : AppTheme.oversupply,
                           ),
                         ),
                       ),
@@ -772,7 +950,10 @@ class _FarmerPageState extends State<FarmerPage> {
                       const SizedBox(width: 8),
                       Text(
                         'Harvest: ${crop.localizedHarvestWindow(_language)}',
-                        style: const TextStyle(fontSize: 10, color: AppTheme.neutral600),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: AppTheme.neutral600,
+                        ),
                       ),
                     ],
                   ),
@@ -786,7 +967,12 @@ class _FarmerPageState extends State<FarmerPage> {
     );
   }
 
-  Widget _buildMonthPill(String month, String value, Color bg, Color textColor) {
+  Widget _buildMonthPill(
+    String month,
+    String value,
+    Color bg,
+    Color textColor,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
@@ -795,7 +981,14 @@ class _FarmerPageState extends State<FarmerPage> {
       ),
       child: Column(
         children: [
-          Text(month, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textColor)),
+          Text(
+            month,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
+          ),
           Text(value, style: TextStyle(fontSize: 9, color: textColor)),
         ],
       ),
@@ -819,11 +1012,18 @@ class _FarmerPageState extends State<FarmerPage> {
               children: [
                 Text(
                   AppTranslations.t(_language, 'compareTitle'),
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.ink),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.ink,
+                  ),
                 ),
                 Text(
                   AppTranslations.t(_language, 'compareSub'),
-                  style: const TextStyle(fontSize: 11, color: AppTheme.neutral600),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.neutral600,
+                  ),
                 ),
               ],
             ),
@@ -852,7 +1052,7 @@ class _FarmerPageState extends State<FarmerPage> {
         border: Border.all(color: AppTheme.cardBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -865,7 +1065,9 @@ class _FarmerPageState extends State<FarmerPage> {
           Stack(
             children: [
               ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(21)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(21),
+                ),
                 child: Image.network(
                   crop.imageUrl,
                   height: 140,
@@ -877,14 +1079,21 @@ class _FarmerPageState extends State<FarmerPage> {
                 top: 10,
                 left: 10,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.95),
+                    color: Colors.white.withValues(alpha: 0.95),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Text(
                     crop.localizedFitBadge(_language),
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primary,
+                    ),
                   ),
                 ),
               ),
@@ -901,11 +1110,18 @@ class _FarmerPageState extends State<FarmerPage> {
                   children: [
                     Text(
                       crop.localizedName(_language),
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     Text(
                       crop.scientificName,
-                      style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: AppTheme.neutral600),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontStyle: FontStyle.italic,
+                        color: AppTheme.neutral600,
+                      ),
                     ),
                   ],
                 ),
@@ -923,11 +1139,19 @@ class _FarmerPageState extends State<FarmerPage> {
                     children: [
                       Text(
                         '${AppTranslations.t(_language, 'profitRange')} (${AppTranslations.t(_language, 'perAcre')})',
-                        style: const TextStyle(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       Text(
                         crop.localizedProfit(_language),
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: AppTheme.ink),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: AppTheme.ink,
+                        ),
                       ),
                     ],
                   ),
@@ -936,13 +1160,16 @@ class _FarmerPageState extends State<FarmerPage> {
 
                 // Perspective Risk Tag
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: crop.risk == MarketRisk.balanced
                         ? AppTheme.balancedTint
                         : crop.risk == MarketRisk.shortage
-                            ? AppTheme.shortageTint
-                            : AppTheme.oversupplyTint,
+                        ? AppTheme.shortageTint
+                        : AppTheme.oversupplyTint,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
@@ -953,8 +1180,8 @@ class _FarmerPageState extends State<FarmerPage> {
                         color: crop.risk == MarketRisk.balanced
                             ? AppTheme.balanced
                             : crop.risk == MarketRisk.shortage
-                                ? AppTheme.shortage
-                                : AppTheme.oversupply,
+                            ? AppTheme.shortage
+                            : AppTheme.oversupply,
                       ),
                       const SizedBox(width: 6),
                       Expanded(
@@ -966,8 +1193,8 @@ class _FarmerPageState extends State<FarmerPage> {
                             color: crop.risk == MarketRisk.balanced
                                 ? AppTheme.balanced
                                 : crop.risk == MarketRisk.shortage
-                                    ? AppTheme.shortage
-                                    : AppTheme.oversupply,
+                                ? AppTheme.shortage
+                                : AppTheme.oversupply,
                           ),
                         ),
                       ),
@@ -1036,7 +1263,11 @@ class _FarmerPageState extends State<FarmerPage> {
           children: [
             Text(
               'Step $_reportStep of 3',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.primary,
+              ),
             ),
             Text(
               '${(_reportStep / 3 * 100).toInt()}% Done',
@@ -1058,7 +1289,11 @@ class _FarmerPageState extends State<FarmerPage> {
 
         Text(
           AppTranslations.t(_language, 'reportTitle'),
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.ink),
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.ink,
+          ),
         ),
         Text(
           AppTranslations.t(_language, 'reportSub'),
@@ -1068,7 +1303,10 @@ class _FarmerPageState extends State<FarmerPage> {
 
         // STEP 1: Select Crop
         if (_reportStep == 1) ...[
-          const Text('Select Target Crop', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          const Text(
+            'Select Target Crop',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 10),
           ...crops.map((c) {
             final isSelected = c.id == _selectedCropId;
@@ -1089,19 +1327,34 @@ class _FarmerPageState extends State<FarmerPage> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: Image.network(c.imageUrl, height: 48, width: 48, fit: BoxFit.cover),
+                      child: Image.network(
+                        c.imageUrl,
+                        height: 48,
+                        width: 48,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(c.localizedName(_language), style: const TextStyle(fontWeight: FontWeight.bold)),
-                          Text(c.localizedProfit(_language), style: const TextStyle(fontSize: 11, color: AppTheme.primary)),
+                          Text(
+                            c.localizedName(_language),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            c.localizedProfit(_language),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.primary,
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    if (isSelected) const Icon(Icons.check_circle, color: AppTheme.primary),
+                    if (isSelected)
+                      const Icon(Icons.check_circle, color: AppTheme.primary),
                   ],
                 ),
               ),
@@ -1113,10 +1366,17 @@ class _FarmerPageState extends State<FarmerPage> {
         if (_reportStep == 2) ...[
           Text(
             'Target Crop: ${selectedCrop.localizedName(_language)}',
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.primary),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.primary,
+            ),
           ),
           const SizedBox(height: 14),
-          const Text('Cultivated Area (Acres)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          const Text(
+            'Cultivated Area (Acres)',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 8),
           Row(
             children: [0.5, 1.0, 1.5, 2.0, 3.0].map((acres) {
@@ -1127,7 +1387,8 @@ class _FarmerPageState extends State<FarmerPage> {
                   child: ChoiceChip(
                     label: Text('$acres ac'),
                     selected: isSelected,
-                    onSelected: (val) => setState(() => _reportedAreaAcres = acres),
+                    onSelected: (val) =>
+                        setState(() => _reportedAreaAcres = acres),
                     selectedColor: AppTheme.primary,
                     labelStyle: TextStyle(
                       color: isSelected ? Colors.white : AppTheme.ink,
@@ -1140,44 +1401,91 @@ class _FarmerPageState extends State<FarmerPage> {
             }).toList(),
           ),
           const SizedBox(height: 18),
-          const Text('Water / Irrigation Source', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          const Text(
+            'Water / Irrigation Source',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 8),
-          ...['Minor Tank', 'Rainfed', 'Major Irrigation', 'Agro-well'].map((irr) {
-            return RadioListTile<String>(
-              value: irr,
-              groupValue: _selectedIrrigation,
-              onChanged: (val) => setState(() => _selectedIrrigation = val!),
-              title: Text(irr, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              dense: true,
-              activeColor: AppTheme.primary,
-            );
-          }),
+          RadioGroup<String>(
+            groupValue: _selectedIrrigation,
+            onChanged: (val) => setState(() => _selectedIrrigation = val!),
+            child: Column(
+              children: [
+                ...[
+                  'Minor Tank',
+                  'Rainfed',
+                  'Major Irrigation',
+                  'Agro-well',
+                ].map((irr) {
+                  return RadioListTile<String>(
+                    value: irr,
+                    title: Text(
+                      irr,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    dense: true,
+                    activeColor: AppTheme.primary,
+                  );
+                }),
+              ],
+            ),
+          ),
         ],
 
         // STEP 3: Date & Seed
         if (_reportStep == 3) ...[
-          const Text('Seed Variety & Origin', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          const Text(
+            'Seed Variety & Origin',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 8),
-          ...['Certified DOA Seed', 'Farmer Saved Seed', 'Registered Private'].map((src) {
-            return RadioListTile<String>(
-              value: src,
-              groupValue: _selectedSeedSource,
-              onChanged: (val) => setState(() => _selectedSeedSource = val!),
-              title: Text(src, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              dense: true,
-              activeColor: AppTheme.primary,
-            );
-          }),
+          RadioGroup<String>(
+            groupValue: _selectedSeedSource,
+            onChanged: (val) => setState(() => _selectedSeedSource = val!),
+            child: Column(
+              children: [
+                ...[
+                  'Certified DOA Seed',
+                  'Farmer Saved Seed',
+                  'Registered Private',
+                ].map((src) {
+                  return RadioListTile<String>(
+                    value: src,
+                    title: Text(
+                      src,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    dense: true,
+                    activeColor: AppTheme.primary,
+                  );
+                }),
+              ],
+            ),
+          ),
           const SizedBox(height: 14),
           const Divider(color: AppTheme.cardBorder),
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(Icons.analytics_outlined, size: 16, color: AppTheme.primary),
+              const Icon(
+                Icons.analytics_outlined,
+                size: 16,
+                color: AppTheme.primary,
+              ),
               const SizedBox(width: 6),
               const Text(
                 'Post-Harvest & Marketing Telemetry (Optional)',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.ink),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.ink,
+                ),
               ),
             ],
           ),
@@ -1192,7 +1500,9 @@ class _FarmerPageState extends State<FarmerPage> {
               Expanded(
                 child: TextField(
                   controller: _harvestOutcomeController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: const InputDecoration(
                     labelText: 'Yield (MT)',
                     hintText: 'e.g. 3.5',
@@ -1205,7 +1515,9 @@ class _FarmerPageState extends State<FarmerPage> {
               Expanded(
                 child: TextField(
                   controller: _salePriceController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: const InputDecoration(
                     labelText: 'Price (Rs/kg)',
                     hintText: 'e.g. 320',
@@ -1217,28 +1529,38 @@ class _FarmerPageState extends State<FarmerPage> {
             ],
           ),
           const SizedBox(height: 12),
-          const Text('Marketing Channel', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          const Text(
+            'Marketing Channel',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 6),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: ['Dambulla DEC', 'Keppetipola DEC', 'ASC Buy-Back', 'Local Collector'].map((channel) {
-                final isSelected = _selectedSaleChannel == channel;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: ChoiceChip(
-                    label: Text(channel),
-                    selected: isSelected,
-                    onSelected: (_) => setState(() => _selectedSaleChannel = channel),
-                    selectedColor: AppTheme.primary,
-                    labelStyle: TextStyle(
-                      color: isSelected ? Colors.white : AppTheme.ink,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                );
-              }).toList(),
+              children:
+                  [
+                    'Dambulla DEC',
+                    'Keppetipola DEC',
+                    'ASC Buy-Back',
+                    'Local Collector',
+                  ].map((channel) {
+                    final isSelected = _selectedSaleChannel == channel;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ChoiceChip(
+                        label: Text(channel),
+                        selected: isSelected,
+                        onSelected: (_) =>
+                            setState(() => _selectedSaleChannel = channel),
+                        selectedColor: AppTheme.primary,
+                        labelStyle: TextStyle(
+                          color: isSelected ? Colors.white : AppTheme.ink,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    );
+                  }).toList(),
             ),
           ),
           const SizedBox(height: 12),
@@ -1260,16 +1582,26 @@ class _FarmerPageState extends State<FarmerPage> {
             decoration: BoxDecoration(
               color: AppTheme.primaryTint,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+              border: Border.all(
+                color: AppTheme.primary.withValues(alpha: 0.2),
+              ),
             ),
             child: Row(
               children: [
-                const Icon(Icons.shield_outlined, color: AppTheme.primary, size: 20),
+                const Icon(
+                  Icons.shield_outlined,
+                  color: AppTheme.primary,
+                  size: 20,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     AppTranslations.t(_language, 'privacyNotice'),
-                    style: const TextStyle(fontSize: 11, color: AppTheme.primary, height: 1.4),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.primary,
+                      height: 1.4,
+                    ),
                   ),
                 ),
               ],
@@ -1301,7 +1633,9 @@ class _FarmerPageState extends State<FarmerPage> {
                       plantingDate: '2026-10-25',
                       irrigationType: _selectedIrrigation,
                       seedSource: _selectedSeedSource,
-                      harvestOutcomeMt: double.tryParse(_harvestOutcomeController.text),
+                      harvestOutcomeMt: double.tryParse(
+                        _harvestOutcomeController.text,
+                      ),
                       salePriceRsKg: double.tryParse(_salePriceController.text),
                       saleChannel: _selectedSaleChannel,
                       consentGiven: _consentGiven,
@@ -1312,7 +1646,11 @@ class _FarmerPageState extends State<FarmerPage> {
                     });
                   }
                 },
-                child: Text(_reportStep == 3 ? AppTranslations.t(_language, 'submitReport') : 'Next'),
+                child: Text(
+                  _reportStep == 3
+                      ? AppTranslations.t(_language, 'submitReport')
+                      : 'Next',
+                ),
               ),
             ),
           ],
@@ -1333,7 +1671,9 @@ class _FarmerPageState extends State<FarmerPage> {
             height: 70,
             width: 70,
             decoration: BoxDecoration(
-              color: isPending ? const Color(0xFFFEF3C7) : AppTheme.balancedTint,
+              color: isPending
+                  ? const Color(0xFFFEF3C7)
+                  : AppTheme.balancedTint,
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -1348,10 +1688,10 @@ class _FarmerPageState extends State<FarmerPage> {
           child: Text(
             isPending
                 ? (_language == AppLanguage.si
-                    ? 'වාර්තාව දේශීයව සුරැකිණි (පොරොත්තු)'
-                    : _language == AppLanguage.ta
-                        ? 'உள்ளூரில் சேமிக்கப்பட்டது (நிலுவையில்)'
-                        : 'Saved Locally (Pending Sync)')
+                      ? 'වාර්තාව දේශීයව සුරැකිණි (පොරොත්තු)'
+                      : _language == AppLanguage.ta
+                      ? 'உள்ளூரில் சேமிக்கப்பட்டது (நிலுவையில்)'
+                      : 'Saved Locally (Pending Sync)')
                 : AppTranslations.t(_language, 'reportSuccessTitle'),
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
@@ -1370,9 +1710,13 @@ class _FarmerPageState extends State<FarmerPage> {
                 _language == AppLanguage.si
                     ? 'සබඳතාව නැත · ස්වයංක්‍රීයව නැවත උත්සාහ කෙරේ'
                     : _language == AppLanguage.ta
-                        ? 'இணைப்பு இல்லை · தானாக மீண்டும் முயற்சிக்கும்'
-                        : 'Offline Mode · Auto-retry when connection restored',
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFB45309)),
+                    ? 'இணைப்பு இல்லை · தானாக மீண்டும் முயற்சிக்கும்'
+                    : 'Offline Mode · Auto-retry when connection restored',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFB45309),
+                ),
               ),
             ),
           ),
@@ -1385,10 +1729,12 @@ class _FarmerPageState extends State<FarmerPage> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: isPending ? const Color(0xFFFDE68A) : AppTheme.cardBorder),
+            border: Border.all(
+              color: isPending ? const Color(0xFFFDE68A) : AppTheme.cardBorder,
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 10,
                 offset: const Offset(0, 2),
               ),
@@ -1401,7 +1747,11 @@ class _FarmerPageState extends State<FarmerPage> {
                 children: [
                   Text(
                     AppTranslations.t(_language, 'receiptTitle'),
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.neutral600),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.neutral600,
+                    ),
                   ),
                   Text(
                     rep.id,
@@ -1414,7 +1764,10 @@ class _FarmerPageState extends State<FarmerPage> {
                 ],
               ),
               const Divider(height: 24),
-              _buildReceiptRow('Submission Status', isPending ? 'PENDING (Saved Locally)' : 'VERIFIED & SYNCED'),
+              _buildReceiptRow(
+                'Submission Status',
+                isPending ? 'PENDING (Saved Locally)' : 'VERIFIED & SYNCED',
+              ),
               _buildReceiptRow('Recorded Crop', rep.cropNameEn),
               _buildReceiptRow('Declared Area', '${rep.areaAcres} Acres'),
               _buildReceiptRow('Irrigation', rep.irrigationType),
@@ -1431,13 +1784,16 @@ class _FarmerPageState extends State<FarmerPage> {
               _language == AppLanguage.si
                   ? 'දැන් නැවත උත්සාහ කරන්න'
                   : _language == AppLanguage.ta
-                      ? 'இப்போது மீண்டும் முயற்சிக்கவும்'
-                      : 'Retry Sync Now',
+                  ? 'இப்போது மீண்டும் முயற்சிக்கவும்'
+                  : 'Retry Sync Now',
             ),
             onPressed: () async {
               final synced = await _repo.retryPendingReports();
               if (synced > 0) {
-                final updated = _repo.reports.firstWhere((r) => r.id == rep.id, orElse: () => rep);
+                final updated = _repo.reports.firstWhere(
+                  (r) => r.id == rep.id,
+                  orElse: () => rep,
+                );
                 setState(() => _latestSubmittedReport = updated);
               }
             },
@@ -1461,8 +1817,18 @@ class _FarmerPageState extends State<FarmerPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.neutral600)),
-          Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.ink)),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 12, color: AppTheme.neutral600),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.ink,
+            ),
+          ),
         ],
       ),
     );
@@ -1485,7 +1851,11 @@ class _FarmerPageState extends State<FarmerPage> {
       children: [
         Text(
           AppTranslations.t(_language, 'alertsInboxTitle'),
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.ink),
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.ink,
+          ),
         ),
         Text(
           AppTranslations.t(_language, 'alertsInboxSub'),
@@ -1498,10 +1868,26 @@ class _FarmerPageState extends State<FarmerPage> {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              _buildFilterChip(AppTranslations.t(_language, 'filterAll'), 'all', allAlerts.length),
-              _buildFilterChip(AppTranslations.t(_language, 'filterUnread'), 'unread', _repo.unreadAlertsCount),
-              _buildFilterChip(AppTranslations.t(_language, 'filterMarket'), 'market', null),
-              _buildFilterChip(AppTranslations.t(_language, 'filterWeather'), 'weather', null),
+              _buildFilterChip(
+                AppTranslations.t(_language, 'filterAll'),
+                'all',
+                allAlerts.length,
+              ),
+              _buildFilterChip(
+                AppTranslations.t(_language, 'filterUnread'),
+                'unread',
+                _repo.unreadAlertsCount,
+              ),
+              _buildFilterChip(
+                AppTranslations.t(_language, 'filterMarket'),
+                'market',
+                null,
+              ),
+              _buildFilterChip(
+                AppTranslations.t(_language, 'filterWeather'),
+                'weather',
+                null,
+              ),
             ],
           ),
         ),
@@ -1550,7 +1936,11 @@ class _FarmerPageState extends State<FarmerPage> {
           children: [
             Text(
               alert.localizedTitle(_language),
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.primary,
+              ),
             ),
             const SizedBox(height: 10),
             TextField(
@@ -1576,7 +1966,9 @@ class _FarmerPageState extends State<FarmerPage> {
                 _repo.askOfficer(alert.id, text);
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(AppTranslations.t(_language, 'questionSent'))),
+                  SnackBar(
+                    content: Text(AppTranslations.t(_language, 'questionSent')),
+                  ),
                 );
               }
             },
@@ -1591,18 +1983,18 @@ class _FarmerPageState extends State<FarmerPage> {
     final iconData = alert.type == AlertType.weather
         ? Icons.cloudy_snowing
         : alert.type == AlertType.market
-            ? Icons.trending_up_rounded
-            : alert.type == AlertType.success
-                ? Icons.check_circle_outline
-                : Icons.campaign_rounded;
+        ? Icons.trending_up_rounded
+        : alert.type == AlertType.success
+        ? Icons.check_circle_outline
+        : Icons.campaign_rounded;
 
     final color = alert.type == AlertType.weather
         ? const Color(0xFF2563EB)
         : alert.type == AlertType.market
-            ? AppTheme.oversupply
-            : alert.type == AlertType.success
-                ? AppTheme.balanced
-                : AppTheme.primary;
+        ? AppTheme.oversupply
+        : alert.type == AlertType.success
+        ? AppTheme.balanced
+        : AppTheme.primary;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1611,7 +2003,9 @@ class _FarmerPageState extends State<FarmerPage> {
         color: alert.isRead ? AppTheme.background : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: alert.isRead ? AppTheme.cardBorder : AppTheme.primary.withOpacity(0.4),
+          color: alert.isRead
+              ? AppTheme.cardBorder
+              : AppTheme.primary.withValues(alpha: 0.4),
           width: alert.isRead ? 1 : 1.5,
         ),
       ),
@@ -1627,7 +2021,9 @@ class _FarmerPageState extends State<FarmerPage> {
                   alert.localizedTitle(_language),
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: alert.isRead ? FontWeight.w600 : FontWeight.bold,
+                    fontWeight: alert.isRead
+                        ? FontWeight.w600
+                        : FontWeight.bold,
                     color: AppTheme.ink,
                   ),
                 ),
@@ -1646,7 +2042,11 @@ class _FarmerPageState extends State<FarmerPage> {
           const SizedBox(height: 6),
           Text(
             alert.localizedMessage(_language),
-            style: const TextStyle(fontSize: 11, color: AppTheme.neutral600, height: 1.4),
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppTheme.neutral600,
+              height: 1.4,
+            ),
           ),
           if (alert.questionAsked != null) ...[
             const SizedBox(height: 8),
@@ -1662,11 +2062,23 @@ class _FarmerPageState extends State<FarmerPage> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.help_outline_rounded, size: 12, color: AppTheme.primary),
+                      const Icon(
+                        Icons.help_outline_rounded,
+                        size: 12,
+                        color: AppTheme.primary,
+                      ),
                       const SizedBox(width: 4),
                       Text(
-                        _language == AppLanguage.si ? 'ඔබගේ විමසීම:' : _language == AppLanguage.ta ? 'உங்கள் கேள்வி:' : 'Your Inquiry:',
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                        _language == AppLanguage.si
+                            ? 'ඔබගේ විමසීම:'
+                            : _language == AppLanguage.ta
+                            ? 'உங்கள் கேள்வி:'
+                            : 'Your Inquiry:',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primary,
+                        ),
                       ),
                     ],
                   ),
@@ -1678,13 +2090,24 @@ class _FarmerPageState extends State<FarmerPage> {
                   if (alert.officerResponse != null) ...[
                     const Divider(height: 12),
                     Text(
-                      _language == AppLanguage.si ? 'නිලධාරී පිළිතුර:' : _language == AppLanguage.ta ? 'அதிகாரியின் பதில்:' : 'Officer Response:',
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.balanced),
+                      _language == AppLanguage.si
+                          ? 'නිලධාරී පිළිතුර:'
+                          : _language == AppLanguage.ta
+                          ? 'அதிகாரியின் பதில்:'
+                          : 'Officer Response:',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.balanced,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       alert.officerResponse!,
-                      style: const TextStyle(fontSize: 11, color: AppTheme.balanced),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.balanced,
+                      ),
                     ),
                   ],
                 ],
@@ -1695,21 +2118,36 @@ class _FarmerPageState extends State<FarmerPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(alert.timestamp, style: const TextStyle(fontSize: 10, color: AppTheme.neutral400)),
+              Text(
+                alert.timestamp,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: AppTheme.neutral400,
+                ),
+              ),
               Wrap(
                 spacing: 6,
                 children: [
                   if (alert.isAcknowledged)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.balancedTint,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppTheme.balanced.withOpacity(0.3)),
+                        border: Border.all(
+                          color: AppTheme.balanced.withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Text(
                         AppTranslations.t(_language, 'acknowledgedBadge'),
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.balanced),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.balanced,
+                        ),
                       ),
                     )
                   else
@@ -1731,7 +2169,10 @@ class _FarmerPageState extends State<FarmerPage> {
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                     ),
                     onPressed: () => _showAskOfficerDialog(alert),
-                    icon: const Icon(Icons.chat_bubble_outline_rounded, size: 12),
+                    icon: const Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      size: 12,
+                    ),
                     label: Text(
                       AppTranslations.t(_language, 'askOfficerBtn'),
                       style: const TextStyle(fontSize: 11),
@@ -1745,7 +2186,11 @@ class _FarmerPageState extends State<FarmerPage> {
                       ),
                       onPressed: () {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Calling officer at ${alert.officerPhone}')),
+                          SnackBar(
+                            content: Text(
+                              'Calling officer at ${alert.officerPhone}',
+                            ),
+                          ),
                         );
                       },
                       icon: const Icon(Icons.phone, size: 12),
@@ -1774,7 +2219,11 @@ class _FarmerPageState extends State<FarmerPage> {
       children: [
         const Text(
           'Farmer Profile & Govijana Pass',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.ink),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.ink,
+          ),
         ),
         const SizedBox(height: 14),
 
@@ -1793,7 +2242,10 @@ class _FarmerPageState extends State<FarmerPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Display Language', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+              const Text(
+                'Display Language',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 10),
               Row(
                 children: AppLanguage.values.map((lang) {
@@ -1803,8 +2255,14 @@ class _FarmerPageState extends State<FarmerPage> {
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: OutlinedButton(
                         style: OutlinedButton.styleFrom(
-                          backgroundColor: isSelected ? AppTheme.primaryTint : Colors.white,
-                          side: BorderSide(color: isSelected ? AppTheme.primary : AppTheme.cardBorder),
+                          backgroundColor: isSelected
+                              ? AppTheme.primaryTint
+                              : Colors.white,
+                          side: BorderSide(
+                            color: isSelected
+                                ? AppTheme.primary
+                                : AppTheme.cardBorder,
+                          ),
                         ),
                         onPressed: () => _onLanguageChange(lang),
                         child: Text(
@@ -1834,7 +2292,7 @@ class _FarmerPageState extends State<FarmerPage> {
             border: Border.all(color: AppTheme.cardBorder),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 10,
                 offset: const Offset(0, 3),
               ),
@@ -1851,12 +2309,20 @@ class _FarmerPageState extends State<FarmerPage> {
                       color: AppTheme.primaryTint,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.tune_rounded, color: AppTheme.primary, size: 18),
+                    child: const Icon(
+                      Icons.tune_rounded,
+                      color: AppTheme.primary,
+                      size: 18,
+                    ),
                   ),
                   const SizedBox(width: 8),
                   const Text(
                     'Farm Parcel Calibration',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.ink),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.ink,
+                    ),
                   ),
                 ],
               ),
@@ -1867,7 +2333,10 @@ class _FarmerPageState extends State<FarmerPage> {
               ),
               const SizedBox(height: 14),
               // Land Area Chips
-              const Text('Cultivated Land Area (Acres)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              const Text(
+                'Cultivated Land Area (Acres)',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 6),
               Row(
                 children: [0.5, 1.0, 1.5, 2.0, 3.0].map((acres) {
@@ -1878,7 +2347,8 @@ class _FarmerPageState extends State<FarmerPage> {
                       child: ChoiceChip(
                         label: Text('$acres'),
                         selected: isSelected,
-                        onSelected: (val) => setState(() => _profileLandAcres = acres),
+                        onSelected: (val) =>
+                            setState(() => _profileLandAcres = acres),
                         selectedColor: AppTheme.primary,
                         labelStyle: TextStyle(
                           color: isSelected ? Colors.white : AppTheme.ink,
@@ -1892,21 +2362,43 @@ class _FarmerPageState extends State<FarmerPage> {
               ),
               const SizedBox(height: 14),
               // Irrigation Toggle
-              const Text('Irrigation Regime', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              const Text(
+                'Irrigation Regime',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 6),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
-                        backgroundColor: !_profileIsRainfed ? AppTheme.primaryTint : Colors.white,
-                        side: BorderSide(color: !_profileIsRainfed ? AppTheme.primary : AppTheme.cardBorder),
+                        backgroundColor: !_profileIsRainfed
+                            ? AppTheme.primaryTint
+                            : Colors.white,
+                        side: BorderSide(
+                          color: !_profileIsRainfed
+                              ? AppTheme.primary
+                              : AppTheme.cardBorder,
+                        ),
                       ),
-                      onPressed: () => setState(() => _profileIsRainfed = false),
-                      icon: Icon(Icons.water_drop, size: 16, color: !_profileIsRainfed ? AppTheme.primary : AppTheme.neutral600),
+                      onPressed: () =>
+                          setState(() => _profileIsRainfed = false),
+                      icon: Icon(
+                        Icons.water_drop,
+                        size: 16,
+                        color: !_profileIsRainfed
+                            ? AppTheme.primary
+                            : AppTheme.neutral600,
+                      ),
                       label: Text(
                         'Canal / Tank',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: !_profileIsRainfed ? AppTheme.primary : AppTheme.ink),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: !_profileIsRainfed
+                              ? AppTheme.primary
+                              : AppTheme.ink,
+                        ),
                       ),
                     ),
                   ),
@@ -1914,14 +2406,32 @@ class _FarmerPageState extends State<FarmerPage> {
                   Expanded(
                     child: OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
-                        backgroundColor: _profileIsRainfed ? AppTheme.primaryTint : Colors.white,
-                        side: BorderSide(color: _profileIsRainfed ? AppTheme.primary : AppTheme.cardBorder),
+                        backgroundColor: _profileIsRainfed
+                            ? AppTheme.primaryTint
+                            : Colors.white,
+                        side: BorderSide(
+                          color: _profileIsRainfed
+                              ? AppTheme.primary
+                              : AppTheme.cardBorder,
+                        ),
                       ),
                       onPressed: () => setState(() => _profileIsRainfed = true),
-                      icon: Icon(Icons.cloudy_snowing, size: 16, color: _profileIsRainfed ? AppTheme.primary : AppTheme.neutral600),
+                      icon: Icon(
+                        Icons.cloudy_snowing,
+                        size: 16,
+                        color: _profileIsRainfed
+                            ? AppTheme.primary
+                            : AppTheme.neutral600,
+                      ),
                       label: Text(
                         'Rainfed',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _profileIsRainfed ? AppTheme.primary : AppTheme.ink),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: _profileIsRainfed
+                              ? AppTheme.primary
+                              : AppTheme.ink,
+                        ),
                       ),
                     ),
                   ),
@@ -1932,16 +2442,26 @@ class _FarmerPageState extends State<FarmerPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Soil pH Level', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Soil pH Level',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.primaryTint,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       '${_profileSoilPh.toStringAsFixed(1)} pH',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primary,
+                      ),
                     ),
                   ),
                 ],
@@ -1974,7 +2494,9 @@ class _FarmerPageState extends State<FarmerPage> {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Recommendations recalibrated for updated parcel parameters!'),
+                              content: Text(
+                                'Recommendations recalibrated for updated parcel parameters!',
+                              ),
                               backgroundColor: AppTheme.primary,
                             ),
                           );
@@ -1984,7 +2506,10 @@ class _FarmerPageState extends State<FarmerPage> {
                     ? const SizedBox(
                         height: 14,
                         width: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : const Icon(Icons.auto_awesome, size: 16),
                 label: Text(AppTranslations.t(_language, 'recalibrateCta')),
@@ -2003,7 +2528,7 @@ class _FarmerPageState extends State<FarmerPage> {
             border: Border.all(color: AppTheme.cardBorder),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 10,
                 offset: const Offset(0, 3),
               ),
@@ -2020,26 +2545,39 @@ class _FarmerPageState extends State<FarmerPage> {
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: _repo.isLiveConnected ? AppTheme.balancedTint : const Color(0xFFFEF3C7),
+                          color: _repo.isLiveConnected
+                              ? AppTheme.balancedTint
+                              : const Color(0xFFFEF3C7),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
                           Icons.cloud_sync_rounded,
-                          color: _repo.isLiveConnected ? AppTheme.balanced : const Color(0xFFB45309),
+                          color: _repo.isLiveConnected
+                              ? AppTheme.balanced
+                              : const Color(0xFFB45309),
                           size: 18,
                         ),
                       ),
                       const SizedBox(width: 8),
                       const Text(
                         'Backend Server & Sync',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.ink),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.ink,
+                        ),
                       ),
                     ],
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
-                      color: _repo.isLiveConnected ? AppTheme.balancedTint : const Color(0xFFFEF3C7),
+                      color: _repo.isLiveConnected
+                          ? AppTheme.balancedTint
+                          : const Color(0xFFFEF3C7),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
@@ -2047,7 +2585,9 @@ class _FarmerPageState extends State<FarmerPage> {
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
-                        color: _repo.isLiveConnected ? AppTheme.balanced : const Color(0xFFB45309),
+                        color: _repo.isLiveConnected
+                            ? AppTheme.balanced
+                            : const Color(0xFFB45309),
                       ),
                     ),
                   ),
@@ -2061,9 +2601,15 @@ class _FarmerPageState extends State<FarmerPage> {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  _buildServerChip('Emulator (10.0.2.2)', 'http://10.0.2.2:8000'),
+                  _buildServerChip(
+                    'Emulator (10.0.2.2)',
+                    'http://10.0.2.2:8000',
+                  ),
                   const SizedBox(width: 6),
-                  _buildServerChip('Localhost (127.0.0.1)', 'http://127.0.0.1:8000'),
+                  _buildServerChip(
+                    'Localhost (127.0.0.1)',
+                    'http://127.0.0.1:8000',
+                  ),
                 ],
               ),
               const SizedBox(height: 10),
@@ -2100,7 +2646,11 @@ class _FarmerPageState extends State<FarmerPage> {
                         }
                       },
                 icon: _isTestingServer
-                    ? const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        height: 14,
+                        width: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Icon(Icons.wifi_tethering_rounded, size: 16),
                 label: const Text('Save & Test Connection'),
               ),
@@ -2111,7 +2661,9 @@ class _FarmerPageState extends State<FarmerPage> {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: _repo.isLiveConnected ? AppTheme.balanced : AppTheme.neutral600,
+                    color: _repo.isLiveConnected
+                        ? AppTheme.balanced
+                        : AppTheme.neutral600,
                   ),
                 ),
               ],
@@ -2129,7 +2681,7 @@ class _FarmerPageState extends State<FarmerPage> {
             border: Border.all(color: AppTheme.cardBorder),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 10,
                 offset: const Offset(0, 3),
               ),
@@ -2163,14 +2715,20 @@ class _FarmerPageState extends State<FarmerPage> {
                 child: InkWell(
                   onTap: () => _confirmLogout(context),
                   borderRadius: BorderRadius.circular(16),
-                  splashColor: const Color(0xFFFCA5A5).withOpacity(0.3),
+                  splashColor: const Color(0xFFFCA5A5).withValues(alpha: 0.3),
                   highlightColor: const Color(0xFFFEE2E2),
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 14,
+                      horizontal: 16,
+                    ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFFECACA), width: 1.2),
+                      border: Border.all(
+                        color: const Color(0xFFFECACA),
+                        width: 1.2,
+                      ),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -2185,8 +2743,8 @@ class _FarmerPageState extends State<FarmerPage> {
                           _language == AppLanguage.si
                               ? 'පද්ධතියෙන් ඉවත් වන්න (Log Out)'
                               : _language == AppLanguage.ta
-                                  ? 'வெளியேறு (Log Out)'
-                                  : 'Log Out of GoviSense',
+                              ? 'வெளியேறு (Log Out)'
+                              : 'Log Out of GoviSense',
                           style: const TextStyle(
                             color: Color(0xFFB91C1C),
                             fontWeight: FontWeight.w700,
@@ -2209,26 +2767,26 @@ class _FarmerPageState extends State<FarmerPage> {
     final title = _language == AppLanguage.si
         ? 'පද්ධතියෙන් ඉවත් වන්නද?'
         : _language == AppLanguage.ta
-            ? 'வெளியேற விரும்புகிறீர்களா?'
-            : 'Confirm Log Out';
+        ? 'வெளியேற விரும்புகிறீர்களா?'
+        : 'Confirm Log Out';
 
     final message = _language == AppLanguage.si
         ? 'ඔබගේ ගිණුමෙන් ඉවත් වීමට අවශ්‍යද? ඔබ වාර්තා කළ සියලු වගා දත්ත ආරක්ෂිතව පවතිනු ඇත.'
         : _language == AppLanguage.ta
-            ? 'உங்கள் கணக்கிலிருந்து வெளியேற விரும்புகிறீர்களா? உங்கள் பதிவு செய்யப்பட்ட தரவு பாதுகாப்பாக இருக்கும்.'
-            : 'Are you sure you want to log out of your GoviSense profile? Your planting declarations will remain saved.';
+        ? 'உங்கள் கணக்கிலிருந்து வெளியேற விரும்புகிறீர்களா? உங்கள் பதிவு செய்யப்பட்ட தரவு பாதுகாப்பாக இருக்கும்.'
+        : 'Are you sure you want to log out of your GoviSense profile? Your planting declarations will remain saved.';
 
     final confirmText = _language == AppLanguage.si
         ? 'ඉවත් වන්න'
         : _language == AppLanguage.ta
-            ? 'வெளியேறு'
-            : 'Log Out';
+        ? 'வெளியேறு'
+        : 'Log Out';
 
     final cancelText = _language == AppLanguage.si
         ? 'අවලංගු කරන්න'
         : _language == AppLanguage.ta
-            ? 'ரத்துசெய்'
-            : 'Cancel';
+        ? 'ரத்துசெய்'
+        : 'Cancel';
 
     PremiumConfirmDialog.show(
       context,

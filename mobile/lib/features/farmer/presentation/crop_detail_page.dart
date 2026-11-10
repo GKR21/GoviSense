@@ -4,7 +4,6 @@ import '../../../core/localization/app_translations.dart';
 import '../models/crop_item.dart';
 import 'widgets/mini_gauge_widget.dart';
 import 'widgets/water_drops_widget.dart';
-import 'widgets/why_advice_bottom_sheet.dart';
 
 class CropDetailPage extends StatelessWidget {
   const CropDetailPage({
@@ -39,9 +38,9 @@ class CropDetailPage extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          Colors.black.withOpacity(0.6),
+                          Colors.black.withValues(alpha: 0.6),
                           Colors.transparent,
-                          Colors.black.withOpacity(0.8),
+                          Colors.black.withValues(alpha: 0.8),
                         ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
@@ -130,7 +129,7 @@ class CropDetailPage extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: AppTheme.primaryTint,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+                          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -282,7 +281,7 @@ class CropDetailPage extends StatelessWidget {
           border: Border(top: BorderSide(color: AppTheme.cardBorder)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 10,
               offset: const Offset(0, -4),
             ),

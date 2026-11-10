@@ -24,7 +24,7 @@ class DigitalFarmerCardWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0A5C36).withOpacity(0.3),
+            color: const Color(0xFF0A5C36).withValues(alpha: 0.3),
             blurRadius: 18,
             offset: const Offset(0, 6),
           ),
@@ -42,7 +42,7 @@ class DigitalFarmerCardWidget extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
+                      color: Colors.white.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.workspace_premium, color: AppTheme.accent, size: 20),
@@ -75,9 +75,9 @@ class DigitalFarmerCardWidget extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
+                  color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withOpacity(0.2)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                 ),
                 child: const Row(
                   children: [
@@ -135,9 +135,9 @@ class DigitalFarmerCardWidget extends StatelessWidget {
                 height: 56,
                 width: 56,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.12),
+                  color: Colors.white.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white.withOpacity(0.25)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
                 ),
                 child: const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 40),
               ),
@@ -148,7 +148,7 @@ class DigitalFarmerCardWidget extends StatelessWidget {
           Container(
             padding: const EdgeInsets.only(top: 14),
             decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: Colors.white.withOpacity(0.15))),
+              border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.15))),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

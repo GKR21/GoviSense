@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../core/theme/app_theme.dart';
 
 class PremiumConfirmDialog extends StatelessWidget {
@@ -41,7 +42,7 @@ class PremiumConfirmDialog extends StatelessWidget {
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Dismiss',
-      barrierColor: Colors.black.withOpacity(0.5),
+      barrierColor: Colors.black.withValues(alpha: 0.5),
       transitionDuration: const Duration(milliseconds: 220),
       pageBuilder: (ctx, anim1, anim2) => PremiumConfirmDialog(
         title: title,
@@ -55,7 +56,10 @@ class PremiumConfirmDialog extends StatelessWidget {
         onConfirm: onConfirm,
       ),
       transitionBuilder: (ctx, anim1, anim2, child) {
-        final curved = CurvedAnimation(parent: anim1, curve: Curves.easeOutBack);
+        final curved = CurvedAnimation(
+          parent: anim1,
+          curve: Curves.easeOutBack,
+        );
         return ScaleTransition(
           scale: Tween<double>(begin: 0.9, end: 1.0).animate(curved),
           child: FadeTransition(opacity: anim1, child: child),
@@ -67,8 +71,12 @@ class PremiumConfirmDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primaryAccent = isDestructive ? const Color(0xFFDC2626) : AppTheme.primary;
-    final primaryTint = isDestructive ? const Color(0xFFFEF2F2) : AppTheme.primaryTint;
+    final primaryAccent = isDestructive
+        ? const Color(0xFFDC2626)
+        : AppTheme.primary;
+    final primaryTint = isDestructive
+        ? const Color(0xFFFEF2F2)
+        : AppTheme.primaryTint;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -81,7 +89,7 @@ class PremiumConfirmDialog extends StatelessWidget {
           border: Border.all(color: AppTheme.cardBorder, width: 1.2),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.12),
+              color: Colors.black.withValues(alpha: 0.12),
               blurRadius: 28,
               offset: const Offset(0, 10),
             ),
@@ -102,24 +110,18 @@ class PremiumConfirmDialog extends StatelessWidget {
                 border: Border.all(
                   color: isDestructive
                       ? const Color(0xFFFECACA)
-                      : AppTheme.primary.withOpacity(0.2),
+                      : AppTheme.primary.withValues(alpha: 0.2),
                   width: 1.5,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: primaryAccent.withOpacity(0.15),
+                    color: primaryAccent.withValues(alpha: 0.15),
                     blurRadius: 14,
                     offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              child: Center(
-                child: Icon(
-                  icon,
-                  color: primaryAccent,
-                  size: 26,
-                ),
-              ),
+              child: Center(child: Icon(icon, color: primaryAccent, size: 26)),
             ),
             const SizedBox(height: 18),
 
@@ -152,7 +154,10 @@ class PremiumConfirmDialog extends StatelessWidget {
               const SizedBox(height: 16),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.background,
                   borderRadius: BorderRadius.circular(14),
@@ -164,7 +169,9 @@ class PremiumConfirmDialog extends StatelessWidget {
                       width: 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: isDestructive ? const Color(0xFFF59E0B) : AppTheme.primary,
+                        color: isDestructive
+                            ? const Color(0xFFF59E0B)
+                            : AppTheme.primary,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -182,7 +189,10 @@ class PremiumConfirmDialog extends StatelessWidget {
                     ),
                     if (roleBadge != null)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: AppTheme.primaryTint,
                           borderRadius: BorderRadius.circular(8),
@@ -212,7 +222,10 @@ class PremiumConfirmDialog extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppTheme.neutral700,
                       backgroundColor: Colors.white,
-                      side: const BorderSide(color: AppTheme.cardBorder, width: 1.2),
+                      side: const BorderSide(
+                        color: AppTheme.cardBorder,
+                        width: 1.2,
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
@@ -237,7 +250,7 @@ class PremiumConfirmDialog extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: primaryAccent.withOpacity(0.3),
+                          color: primaryAccent.withValues(alpha: 0.3),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -276,4 +289,3 @@ class PremiumConfirmDialog extends StatelessWidget {
     );
   }
 }
-

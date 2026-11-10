@@ -24,6 +24,6 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify officer workspace loaded
-    expect(find.text('Anuradhapura Workstation'), findsOneWidget);
+    expect(find.text('DOA Command'), findsOneWidget);
   });
 }

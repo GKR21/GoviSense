@@ -111,7 +111,7 @@ class AppTheme {
           foregroundColor: Colors.white,
           minimumSize: const Size.fromHeight(50),
           elevation: 2,
-          shadowColor: primary.withOpacity(0.3),
+          shadowColor: primary.withValues(alpha: 0.3),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
