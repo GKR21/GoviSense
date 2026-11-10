@@ -5,43 +5,52 @@ Team DARKBITE · ModelX 2.0 Proposal Specification
 
 import pytest
 from datetime import datetime, date, timezone
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
+from govisense.db.lookups import (
+    ensure_crop_exists,
+    ensure_farmer_profile,
+    ensure_forecast_model,
+    ensure_officer,
+    ensure_pipeline_run,
+    normalize_alert_type,
+    normalize_data_quality,
+    normalize_decision_action,
+    normalize_irrigation_code,
+    normalize_sale_channel,
+    normalize_soil_code,
+    parse_month_date,
+    resolve_district_id,
+    resolve_division_id,
+    resolve_season_id,
+)
 from govisense.db.models import (
+    AlertModel,
+    AlertQuestionModel,
+    AlertStatusModel,
+    AlertTranslationModel,
     Base,
-    compute_sha256_hash,
-    PipelineRunModel,
+    DataCatalogueModel,
     DecisionRecordModel,
     FarmerProfileModel,
-    OfficerModel,
-    UserModel,
-    PlantingReportModel,
-    HarvestReportModel,
     ForecastSnapshotModel,
-    DataCatalogueModel,
+    HarvestReportModel,
+    HarvestReportProblemModel,
     MonthlyDataModel,
-    AlertModel,
-    AlertStatusModel,
+    OfficerModel,
+    PipelineRunModel,
+    PlantingReportModel,
+    UserModel,
+    compute_sha256_hash,
 )
 from govisense.db.session import _normalize_db_url, init_db, get_session, get_active_dialect
 from govisense.db.history import DecisionHistoryStore, DecisionRecord
 from govisense.feedback.planting_reports import PlantingReportStore, PlantingReport
 
 
-@pytest.fixture(scope="module")
-def test_engine():
-    """Create in-memory SQLite engine to test SQLAlchemy models and queries."""
-    engine = create_engine("sqlite:///:memory:", echo=False)
-    Base.metadata.create_all(bind=engine)
-    return engine
-
-
 @pytest.fixture
-def test_session(test_engine):
-    """Provide a transactional session for testing."""
-    Session = sessionmaker(bind=test_engine)
-    session = Session()
+def test_session():
+    """Provide a PostgreSQL session backed by the isolated test DB initialized from db.sql."""
+    session = get_session()
     yield session
     session.rollback()
     session.close()
@@ -55,69 +64,66 @@ def test_url_normalization():
     raw_pg2 = "postgresql://user:pass@localhost:5432/govisense"
     assert _normalize_db_url(raw_pg2).startswith("postgresql+psycopg2://")
 
-    sqlite = "sqlite:///:memory:"
-    assert _normalize_db_url(sqlite) == sqlite
-
 
 def test_runs_and_decision_hash_audit(test_session):
     """Verify runs table and real SHA-256 audit hash generation on decisions."""
     run = PipelineRunModel(
         run_id="RUN-TEST-001",
-        trigger="officer",
+        trigger_type="manual",
         model_version="LightGBM-v2.1+HiGHS-LP",
         data_version="CBSL-HARTI-DOA-2024.12",
         assumptions={"loss_pct": 0.15, "lead_time_weeks": 7},
         git_commit="c74caf1",
     )
-    officer = OfficerModel(
-        officer_id="OFF-TEST-01",
-        name="Officer Bandara",
-        district="Anuradhapura",
-    )
-    test_session.add_all([run, officer])
-    test_session.commit()
+    officer = ensure_officer(test_session, officer_id="OFF-TEST-01", name="Officer Bandara", district="Anuradhapura")
+    test_session.add(run)
+    test_session.flush()
+
+    cid = ensure_crop_exists(test_session, "big_onion")
+    sid = resolve_season_id(test_session, "Maha 2025/2026")
+    action_code = normalize_decision_action("STORE") or "HOLD_STORAGE"
+    rec_hash = compute_sha256_hash({"decision_id": "DEC-TEST-001", "crop_id": cid, "action": action_code})
 
     decision = DecisionRecordModel(
         decision_id="DEC-TEST-001",
         run_id=run.run_id,
-        crop_id="big_onion",
-        season="Maha 2025/2026",
+        record_hash=rec_hash,
+        crop_id=cid,
+        season_id=sid,
         officer_id=officer.officer_id,
-        model_recommended_action="STORE",
+        model_recommended_action=action_code,
         officer_response="accepted",
-        action_type="STORE",
+        action_type=action_code,
         quantity=3000.0,
         unit="MT",
         rationale="Buffer storage defense for floor price",
-        model_version="LightGBM-v2.1+HiGHS-LP",
-        data_version="CBSL-HARTI-DOA-2024.12",
-        assumptions={"loss_pct": 0.15, "fair_floor": 120.0},
     )
     test_session.add(decision)
     test_session.commit()
 
     retrieved = test_session.query(DecisionRecordModel).filter_by(decision_id="DEC-TEST-001").first()
     assert retrieved is not None
-    assert len(retrieved.record_hash) == 64  # Real SHA-256 hash length
-    assert retrieved.model_recommended_action == "STORE"
+    assert len(retrieved.hash) == 64  # Real SHA-256 hash length
+    assert retrieved.model_recommended_action == "HOLD_STORAGE"
     assert retrieved.officer_response == "accepted"
-    assert retrieved.action_type == "STORE"
+    assert retrieved.action_type == "HOLD_STORAGE"
     assert retrieved.run.git_commit == "c74caf1"
 
 
 def test_pseudonymous_farmer_profiles(test_session):
     """Verify strict privacy: No name, No phone; pseudonymous_id is the primary key."""
+    dist_id = resolve_district_id(test_session, "Anuradhapura")
+    div_id = resolve_division_id(test_session, dist_id, "Galnewa")
     farmer = FarmerProfileModel(
         pseudonymous_id="LK-AP-999",
-        district="Anuradhapura",
-        divisional_secretariat="Galnewa",
+        district_id=dist_id,
+        division_id=div_id,
         total_land_ha=2.8,
-        irrigation_type="irrigated",
-        irrigation_subtype="major",
-        soil_type="Reddish Brown Earths (RBE)",
+        irrigation_code=normalize_irrigation_code("irrigated", "major"),
+        soil_code=normalize_soil_code("Reddish Brown Earths (RBE)"),
         soil_ph=6.7,
         consent_given=True,
-        language="si",
+        lang_code="si",
     )
     test_session.add(farmer)
     test_session.commit()
@@ -125,36 +131,35 @@ def test_pseudonymous_farmer_profiles(test_session):
     retrieved = test_session.query(FarmerProfileModel).filter_by(pseudonymous_id="LK-AP-999").first()
     assert retrieved is not None
     assert retrieved.pseudonymous_id == "LK-AP-999"
-    assert retrieved.irrigation_type == "irrigated"
+    assert retrieved.irrigation_code == "major_irrigation"
     assert retrieved.consent_given is True
-    # Ensure no name or phone attributes exist on model
     assert not hasattr(farmer, "name")
     assert not hasattr(farmer, "phone")
 
 
 def test_two_stage_feedback_planting_and_harvest(test_session):
     """Verify Stage 1 (Planting) and Stage 2 (Harvest) feedback tables with constraints."""
-    farmer = FarmerProfileModel(
+    farmer = ensure_farmer_profile(
+        test_session,
         pseudonymous_id="LK-AP-STAGE-TEST",
         district="Anuradhapura",
         total_land_ha=3.0,
         irrigation_type="irrigated",
+        consent_given=True,
     )
-    test_session.add(farmer)
-    test_session.commit()
+    cid = ensure_crop_exists(test_session, "chilli")
+    sid = resolve_season_id(test_session, "Maha 2025/2026")
 
     # Stage 1: Planting Report
     planting = PlantingReportModel(
         report_id="REP-STG1-001",
         pseudonymous_id=farmer.pseudonymous_id,
-        crop_id="chilli",
-        season="Maha 2025/2026",
+        crop_id=cid,
+        season_id=sid,
         planned_area_ha=2.0,
-        actual_area_ha=None,  # Nullable before planting is complete
-        district="Anuradhapura",
-        irrigation_type="irrigated",
-        recommended_crop_shown="chilli",
-        followed_recommendation="yes",
+        actual_area_ha=None,
+        irrigation_code="irrigated",
+        recommended_crop_shown=cid,
         expected_price_rs_kg=400.0,
         consent_given=True,
     )
@@ -165,36 +170,40 @@ def test_two_stage_feedback_planting_and_harvest(test_session):
     harvest = HarvestReportModel(
         harvest_id="HVST-STG2-001",
         planting_report_id=planting.report_id,
-        pseudonymous_id=farmer.pseudonymous_id,
-        crop_id="chilli",
-        season="Maha 2025/2026",
         area_harvested_ha=2.0,
         harvest_quantity_kg=10400.0,
         loss_kg=400.0,
         quantity_sold_kg=8000.0,
         quantity_stored_kg=2000.0,
         sale_price_rs_kg=425.0,
-        sale_channel="Dambulla DEC",
-        problems=["minor_leaf_curl"],
+        channel_code=normalize_sale_channel("Dambulla DEC"),
     )
     test_session.add(harvest)
+    test_session.flush()
+    test_session.add(HarvestReportProblemModel(harvest_id="HVST-STG2-001", problem_code="minor_leaf_curl"))
     test_session.commit()
 
     h_out = test_session.query(HarvestReportModel).filter_by(harvest_id="HVST-STG2-001").first()
     assert h_out is not None
     # Realized yield MT/ha = (10400 / 1000) / 2.0 = 5.2 MT/ha
     assert h_out.yield_mt_per_ha == 5.2
-    assert h_out.sale_channel == "Dambulla DEC"
+    assert h_out.sale_channel == "DAMBULLA_DEC"
     assert h_out.planting_report.crop_id == "chilli"
 
 
 def test_forecast_snapshot_with_ratio_spi(test_session):
-    """Verify forecast snapshots store ratio SPI with 0.8/1.2 bands and probabilistic prices."""
+    """Verify forecast snapshots store ratio SPI and probabilistic prices in 3NF schema."""
+    run_id = ensure_pipeline_run(test_session, run_id="RUN-SNAP-TEST", trigger_type="api")
+    cid = ensure_crop_exists(test_session, "big_onion")
+    dist_id = resolve_district_id(test_session, "Anuradhapura")
+    p_mod = ensure_forecast_model(test_session, "SARIMAX-Ensemble", model_kind="price")
+    s_mod = ensure_forecast_model(test_session, "A1-VolumeForecaster", model_kind="supply")
+
     snap = ForecastSnapshotModel(
-        crop_id="big_onion",
-        district="Anuradhapura",
-        season="Maha 2025/2026",
-        forecast_for_month="2026-04",
+        run_id=run_id,
+        crop_id=cid,
+        district_id=dist_id,
+        forecast_for_month=parse_month_date("2026-04"),
         horizon_months=3,
         price_p10=115.0,
         price_p50=138.0,
@@ -204,27 +213,25 @@ def test_forecast_snapshot_with_ratio_spi(test_session):
         supply_mid_mt=32000.0,
         supply_high_mt=38000.0,
         demand_mt=25000.0,
-        # Ratio SPI: Supply / Demand
         spi_ratio_low=0.96,
-        spi_ratio_mid=1.28,   # > 1.2 => GLUT
+        spi_ratio_mid=1.28,
         spi_ratio_high=1.52,
-        spi_label="GLUT",
         gap_best_mt=-1000.0,
         gap_worst_mt=13000.0,
         import_lead_weeks=7,
-        price_model_used="SARIMAX-Ensemble",
-        supply_model_used="A1-VolumeForecaster",
-        confidence_badge="high",
+        price_model_used=p_mod,
+        supply_model_used=s_mod,
         confidence_score=85.0,
+        data_quality=normalize_data_quality("verified"),
         is_demo=False,
     )
     test_session.add(snap)
     test_session.commit()
 
-    retrieved = test_session.query(ForecastSnapshotModel).filter_by(forecast_for_month="2026-04").first()
+    retrieved = test_session.query(ForecastSnapshotModel).filter_by(run_id=run_id).first()
     assert retrieved is not None
     assert retrieved.spi_ratio_mid == 1.28
-    assert retrieved.spi_label == "GLUT"
+    assert retrieved.spi_label == "Glut"
     assert retrieved.price_p50 == 138.0
     assert retrieved.import_lead_weeks == 7
 
@@ -241,10 +248,12 @@ def test_data_catalogue_and_monthly_data(test_session):
     test_session.add(cat)
     test_session.commit()
 
+    cid = ensure_crop_exists(test_session, "big_onion")
+    dist_id = resolve_district_id(test_session, "Anuradhapura")
     monthly = MonthlyDataModel(
-        crop_id="big_onion",
-        district="Anuradhapura",
-        month="2024-06",
+        crop_id=cid,
+        district_id=dist_id,
+        month=parse_month_date("2099-06"),
         planted_area_ha=1200.0,
         harvested_area_ha=1150.0,
         production_mt=18000.0,
@@ -255,47 +264,56 @@ def test_data_catalogue_and_monthly_data(test_session):
     test_session.add(monthly)
     test_session.commit()
 
-    m_out = test_session.query(MonthlyDataModel).filter_by(month="2024-06").first()
+    m_out = test_session.query(MonthlyDataModel).filter_by(dataset_id="cbsl_prices_2024").first()
     assert m_out.source_type == "real"
     assert m_out.dataset_id == "cbsl_prices_2024"
 
 
 def test_alerts_and_status(test_session):
-    """Verify in-app alerts and acknowledge/ask-officer tracking."""
+    """Verify in-app alerts, status tracking, and ask-officer questions in 3NF schema."""
+    fp = ensure_farmer_profile(test_session, pseudonymous_id="LK-ANURA-01", consent_given=True)
     user = UserModel(
         user_id="USR-FARMER-01",
         username="farmer_anura",
         password_hash="pbkdf2_sha256$test$hashedpassword",
-        role="farmer",
+        role_code="farmer",
+        pseudonymous_id=fp.pseudonymous_id,
     )
     test_session.add(user)
-    test_session.commit()
+    test_session.flush()
 
+    dist_id = resolve_district_id(test_session, "Anuradhapura")
     alert = AlertModel(
         alert_id="ALT-GLUT-001",
-        crop_id="big_onion",
-        district="Anuradhapura",
-        type="GLUT_WARNING",
+        crop_id=ensure_crop_exists(test_session, "big_onion"),
+        district_id=dist_id,
+        type_code=normalize_alert_type("GLUT_WARNING"),
         severity="critical",
         message_key="alert.glut.delay_planting",
         params={"spi": 1.35, "month": "2026-05"},
     )
     test_session.add(alert)
-    test_session.commit()
+    test_session.flush()
+    test_session.add(AlertTranslationModel(alert_id="ALT-GLUT-001", lang_code="en", title="Glut Alert", message="Hold stock."))
 
-    status = AlertStatusModel(
+    status_row = AlertStatusModel(
         alert_id=alert.alert_id,
         user_id=user.user_id,
         acknowledged_at=datetime.now(timezone.utc),
-        ask_officer=True,
-        officer_note="Can I hold big onion in storage for 4 weeks?",
     )
-    test_session.add(status)
+    test_session.add(status_row)
+    test_session.add(
+        AlertQuestionModel(
+            alert_id=alert.alert_id,
+            user_id=user.user_id,
+            question="Can I hold big onion in storage for 4 weeks?",
+        )
+    )
     test_session.commit()
 
-    s_out = test_session.query(AlertStatusModel).filter_by(alert_id=alert.alert_id).first()
-    assert s_out.ask_officer is True
-    assert "storage" in s_out.officer_note
+    q_out = test_session.query(AlertQuestionModel).filter_by(alert_id=alert.alert_id).first()
+    assert q_out is not None
+    assert "storage" in q_out.question
 
 
 def test_decision_history_store_db_persistence(tmp_path):

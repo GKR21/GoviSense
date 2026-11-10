@@ -17,14 +17,13 @@ from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, HTTPException, Header, Depends, status
 from pydantic import BaseModel
 
-from govisense.db.session import get_session, init_db
+from govisense.db.lookups import ensure_farmer_profile, ensure_officer
 from govisense.db.models import (
     UserModel,
-    OfficerModel,
-    FarmerProfileModel,
     hash_password,
     verify_password,
 )
+from govisense.db.session import get_session, init_db
 
 router = APIRouter(prefix="", tags=["Authentication"])
 
@@ -60,43 +59,39 @@ SEED_USERS = [
 
 
 def ensure_seed_users() -> None:
-    """Ensure baseline user accounts exist in the database with bcrypt hashes."""
+    """Ensure baseline user accounts exist in PostgreSQL obeying db.sql constraints."""
     try:
         init_db()
         with get_session() as session:
             for u in SEED_USERS:
                 existing = session.query(UserModel).filter(UserModel.username == u["username"]).first()
                 if not existing:
-                    # Create associated profile if needed
-                    if u["role"] == "officer" and u.get("officer_id"):
-                        off = session.query(OfficerModel).filter(OfficerModel.officer_id == u["officer_id"]).first()
-                        if not off:
-                            off = OfficerModel(
-                                officer_id=u["officer_id"],
-                                name=u["name"],
-                                district=u["district"],
-                                role="Agricultural Extension Officer",
-                            )
-                            session.add(off)
+                    if u["role"] in ("officer", "admin") and u.get("officer_id"):
+                        ensure_officer(
+                            session,
+                            officer_id=u["officer_id"],
+                            name=u["name"],
+                            district=u["district"],
+                            role="Agricultural Extension Officer" if u["role"] == "officer" else "Crop Forecaster",
+                        )
 
                     if u["role"] == "farmer" and u.get("pseudonymous_id"):
-                        fp = session.query(FarmerProfileModel).filter(FarmerProfileModel.pseudonymous_id == u["pseudonymous_id"]).first()
-                        if not fp:
-                            fp = FarmerProfileModel(
-                                pseudonymous_id=u["pseudonymous_id"],
-                                district=u["district"],
-                                total_land_ha=1.5,
-                                irrigation_type="irrigated",
-                                consent_given=True,
-                            )
-                            session.add(fp)
+                        ensure_farmer_profile(
+                            session,
+                            pseudonymous_id=u["pseudonymous_id"],
+                            district=u["district"],
+                            total_land_ha=1.5,
+                            irrigation_type="irrigated",
+                            consent_given=True,
+                        )
 
                     new_user = UserModel(
                         username=u["username"],
                         password_hash=hash_password(u["password"]),
-                        role=u["role"],
+                        role_code=u["role"],
                         officer_id=u.get("officer_id"),
                         pseudonymous_id=u.get("pseudonymous_id"),
+                        full_name=u.get("name"),
                     )
                     session.add(new_user)
             session.commit()

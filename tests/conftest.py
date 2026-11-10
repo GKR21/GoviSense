@@ -1,51 +1,77 @@
 import os
-import tempfile
 import shutil
+import tempfile
+import urllib.parse
+import uuid
 from pathlib import Path
+
 import pytest
+from sqlalchemy import create_engine, text
+
 from govisense.config import settings
 import govisense.db.session as session_mod
-from govisense.db.session import init_db
-from govisense.feedback.planting_reports import PlantingReportStore
+from govisense.db.session import _normalize_db_url, init_db
+
+
+def _build_db_url(base_url: str, db_name: str) -> str:
+    parsed = urllib.parse.urlsplit(base_url)
+    return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, f"/{db_name}", parsed.query, parsed.fragment))
 
 
 @pytest.fixture(scope="session", autouse=True)
 def isolate_test_database():
     """
-    Ensures all tests execute against an isolated temporary SQLite database and JSON store.
-    Guarantees tests NEVER write to production data/database/govisense.db or planting_reports.json.
+    Configures all tests to run strictly against an isolated PostgreSQL database
+    initialized from data/database/db.sql (no SQLite fallback).
     """
-    temp_dir = tempfile.mkdtemp(prefix="govisense_test_db_")
-    temp_db_path = Path(temp_dir) / "test_isolated.db"
-    temp_json_path = Path(temp_dir) / "test_planting_reports.json"
+    base_url = _normalize_db_url(os.getenv("TEST_DATABASE_URL") or settings.database_url)
+    if "postgresql" not in base_url:
+        raise RuntimeError(f"Tests require PostgreSQL DATABASE_URL (got '{base_url}').")
 
-    # Seed initial test json from live json if exists so tests have initial reports
+    parsed = urllib.parse.urlsplit(base_url)
+    admin_db = parsed.path.lstrip("/") or "postgres"
+    test_db_name = f"govisense_test_{uuid.uuid4().hex[:8]}"
+
+    admin_url = _build_db_url(base_url, admin_db)
+    isolated_url = _build_db_url(base_url, test_db_name)
+
+    admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT", connect_args={"connect_timeout": 10})
+    with admin_engine.connect() as conn:
+        conn.execute(text(f'CREATE DATABASE "{test_db_name}"'))
+
+    temp_dir = tempfile.mkdtemp(prefix="govisense_test_json_")
+    temp_json_path = Path(temp_dir) / "test_planting_reports.json"
     live_json = Path("data/processed/planting_reports.json")
     if live_json.exists():
         shutil.copy(live_json, temp_json_path)
 
-    # Point settings to temp DB
     orig_db_url = settings.database_url
-    orig_fallback_url = settings.fallback_sqlite_url
-    orig_json_path = PlantingReportStore.DEFAULT_STORAGE_PATH if hasattr(PlantingReportStore, "DEFAULT_STORAGE_PATH") else None
-
-    isolated_url = f"sqlite:///{temp_db_path}"
     settings.database_url = isolated_url
-    settings.fallback_sqlite_url = isolated_url
 
-    # Reset engine and factory to bind to isolated DB
     session_mod._ENGINE = None
     session_mod._SESSION_FACTORY = None
-    session_mod._ACTIVE_DIALECT = "sqlite"
+    session_mod._ACTIVE_DIALECT = "postgresql"
 
-    init_db()
+    try:
+        init_db()
+        yield isolated_url
+    finally:
+        if session_mod._ENGINE is not None:
+            session_mod._ENGINE.dispose()
+        session_mod._ENGINE = None
+        session_mod._SESSION_FACTORY = None
+        settings.database_url = orig_db_url
 
-    yield temp_db_path
-
-    # Teardown
-    session_mod._ENGINE = None
-    session_mod._SESSION_FACTORY = None
-    settings.database_url = orig_db_url
-    settings.fallback_sqlite_url = orig_fallback_url
-    shutil.rmtree(temp_dir, ignore_errors=True)
-
+        try:
+            with admin_engine.connect() as conn:
+                conn.execute(
+                    text(
+                        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                        "WHERE datname = :db AND pid <> pg_backend_pid()"
+                    ),
+                    {"db": test_db_name},
+                )
+                conn.execute(text(f'DROP DATABASE IF EXISTS "{test_db_name}"'))
+        finally:
+            admin_engine.dispose()
+            shutil.rmtree(temp_dir, ignore_errors=True)
