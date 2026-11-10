@@ -17,6 +17,10 @@ export function FarmerSuccess({
 }: FarmerSuccessProps) {
   const t = getTranslations(language)
 
+  if (!report || report.status !== "verified" || !report.id.trim() || !/^[a-fA-F0-9]{64}$/.test(report.receiptHash)) {
+    return <div role="status" className="p-5"><h2>Receipt not available</h2><p>No server-confirmed receipt is available.</p><button type="button" onClick={onGoHome}>{t.success.backHome}</button></div>
+  }
+
   return (
     <div className="flex min-h-full flex-col justify-between p-5 pb-16">
       <div className="space-y-6 pt-4 text-center">
@@ -28,7 +32,7 @@ export function FarmerSuccess({
         <div>
           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-0.5 text-xs font-bold text-emerald-800 mb-1">
             <ShieldCheck size={12} />
-            DOA Verified
+            Server receipt received
           </span>
           <h2 className="text-2xl font-extrabold tracking-tight text-stone-900">
             {t.success.title}
@@ -48,7 +52,7 @@ export function FarmerSuccess({
               </span>
             </div>
             <span className="font-mono text-xs font-bold text-emerald-800">
-              {report?.id || "REP-2026-M-0891"}
+              {report.id}
             </span>
           </div>
 
@@ -58,7 +62,7 @@ export function FarmerSuccess({
                 {t.success.crop}
               </span>
               <div className="font-bold text-stone-900 mt-0.5">
-                {report?.cropName[language] || "Green Gram"}
+                {report.cropName[language]}
               </div>
             </div>
 
@@ -67,7 +71,7 @@ export function FarmerSuccess({
                 Area Recorded
               </span>
               <div className="font-bold text-stone-900 mt-0.5">
-                {report?.areaAcres || 1.5} {t.onboarding.landUnit}
+                {report.areaAcres} {t.onboarding.landUnit}
               </div>
             </div>
 
@@ -76,7 +80,7 @@ export function FarmerSuccess({
                 {t.success.district}
               </span>
               <div className="font-bold text-stone-900 mt-0.5">
-                Anuradhapura (Rajanganaya)
+                {report.district || "Not available"}
               </div>
             </div>
 
@@ -85,14 +89,14 @@ export function FarmerSuccess({
                 Water System
               </span>
               <div className="font-bold text-stone-900 mt-0.5">
-                {report?.irrigationType || "Minor Tank"}
+                {report.irrigationType}
               </div>
             </div>
           </div>
 
           <div className="border-t border-stone-100 pt-3 flex items-center justify-between text-[11px] text-stone-500">
-            <span>Security Hash: <strong className="font-mono text-stone-700">{report?.receiptHash || "0x8F94...B31A"}</strong></span>
-            <span className="text-emerald-700 font-semibold">Verified</span>
+            <span>Receipt checksum: <strong className="font-mono text-stone-700 break-all">{report.receiptHash}</strong></span>
+            <span className="text-emerald-700 font-semibold">Server confirmed</span>
           </div>
         </div>
 

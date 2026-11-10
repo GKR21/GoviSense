@@ -31,6 +31,45 @@ async function readApi(path: string, params: Record<string, string | number | un
   return data
 }
 
+export function serverId(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value : null
+}
+
+export function isReceiptHash(value: unknown): value is string {
+  return typeof value === "string" && /^[a-fA-F0-9]{64}$/.test(value)
+}
+
+export interface ServerIdentity {
+  farmerId: string | null
+  officerId: string | null
+  name: string
+  district: string
+}
+
+export async function fetchServerIdentity(): Promise<ServerIdentity> {
+  const response = await readApi("/api/auth/me")
+  const user = response.user && typeof response.user === "object" ? response.user : response
+  const role = typeof user.role === "string" ? user.role.toLowerCase() : ""
+  return {
+    farmerId: role === "farmer" ? serverId(user.pseudonymous_id) || serverId(user.farmer_id) : null,
+    officerId: role === "officer" || role === "admin" ? serverId(user.officer_id) : null,
+    name: typeof user.full_name === "string" ? user.full_name : typeof user.name === "string" ? user.name : "",
+    district: typeof user.district === "string" ? user.district : "",
+  }
+}
+
+async function postApi(path: string, payload: unknown) {
+  const response = await fetch(apiUrl(path).toString(), {
+    method: "POST",
+    headers: getAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(payload),
+  })
+  if (!response.ok) throw new Error(`Submission failed (HTTP ${response.status}). Check server records before retrying.`)
+  const data = await response.json()
+  if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Submission could not be confirmed. Check server records before retrying.")
+  return data
+}
+
 export interface CropForecastData {
   crop: string
   crop_name: string
@@ -106,18 +145,18 @@ export async function fetchFarmerTop3(params: {
   const land = params.land_ha || 1.0
   const month = params.month || 10
   const ph = params.soil_ph || 6.5
-  const fid = params.farmer_id || "FARMER-LIVE"
+  const fid = serverId(params.farmer_id)
 
   try {
-    const url = new URL(`${API_BASE_URL}/api/farmer/top3`)
-    url.searchParams.set("farmer_id", fid)
+    const url = apiUrl("/api/farmer/top3")
+    if (fid) url.searchParams.set("farmer_id", fid)
     url.searchParams.set("land_ha", String(land))
     url.searchParams.set("current_month", String(month))
     url.searchParams.set("is_rainfed", String(isRainfed))
     url.searchParams.set("soil_ph", String(ph))
     url.searchParams.set("zone", "dry")
 
-    const res = await fetch(url.toString())
+    const res = await fetch(url.toString(), { headers: getAuthHeaders() })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return await res.json()
   } catch (err) {
@@ -135,19 +174,17 @@ export async function submitPlantingReportApi(payload: {
   sale_channel?: string
   consent_given: boolean
   pseudonymous_id: string
+  planting_date?: string
+  district?: string
+  irrigation_type?: string
   notes?: string
 }) {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/feedback/planting-report`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return await res.json()
-  } catch (err) {
-    return { status: "ACCEPTED_OFFLINE", ...payload }
+  if (!serverId(payload.pseudonymous_id)) throw new Error("Backend farmer identity is unavailable.")
+  const data = await postApi("/api/feedback/planting-report", payload)
+  if (data.status !== "ACCEPTED" || !serverId(data.report_id) || !isReceiptHash(data.receipt_hash)) {
+    throw new Error("Planting receipt could not be confirmed. Check server records before retrying.")
   }
+  return data as { status: "ACCEPTED"; report_id: string; receipt_hash: string; timestamp?: string }
 }
 
 export async function submitHarvestReportApi(payload: {
@@ -164,24 +201,16 @@ export async function submitHarvestReportApi(payload: {
   pseudonymous_id?: string
   notes?: string
 }) {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/feedback/harvest-report`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        season: "Maha 2025/2026",
-        loss_kg: 0,
-        quantity_sold_kg: 0,
-        quantity_stored_kg: 0,
-        pseudonymous_id: "FARMER-ANON-001",
-        ...payload,
-      }),
-    })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return await res.json()
-  } catch (err) {
-    return { status: "ACCEPTED_OFFLINE", ...payload }
-  }
+  if (!serverId(payload.pseudonymous_id)) throw new Error("Backend farmer identity is unavailable.")
+  const data = await postApi("/api/feedback/harvest-report", {
+    season: "Maha 2025/2026",
+    loss_kg: 0,
+    quantity_sold_kg: 0,
+    quantity_stored_kg: 0,
+    ...payload,
+  })
+  if (data.status !== "ACCEPTED" || !serverId(data.harvest_id)) throw new Error("Harvest receipt could not be confirmed. Check server records before retrying.")
+  return data as { status: "ACCEPTED"; harvest_id: string }
 }
 
 export interface PlantingReportApi {
@@ -373,6 +402,7 @@ export interface DecisionRecordApi {
   decision_id: string
   timestamp: string
   record_hash?: string
+  hash?: string
   run_id?: string
 }
 
@@ -396,27 +426,17 @@ export async function fetchDecisionHistory(cropId?: string, season?: string, lim
     season, limit,
   })
   const records = Array.isArray(data) ? data : data.records
-  if (!Array.isArray(records)) throw new Error('Invalid decision history response')
+  if (!Array.isArray(records) || records.some((record: any) => !record || !serverId(record.decision_id))) throw new Error('Invalid decision history response')
   return { records, isLive: true }
 }
 
-export async function logDecisionActionApi(
-  payload: DecisionLogPayloadApi,
-): Promise<{ status: string; decision_id?: string; record_hash?: string; run_id?: string }> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/history/log-action`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return await res.json()
-  } catch (err) {
-    return {
-      status: "ERROR",
-      decision_id: undefined,
-    }
+export async function logDecisionActionApi(payload: DecisionLogPayloadApi): Promise<{ status: "RECORDED"; decision_id: string; record_hash: string; run_id: string }> {
+  if (!serverId(payload.officer_id)) throw new Error("Backend officer identity is unavailable.")
+  const data = await postApi("/api/history/log-action", payload)
+  if (data.status !== "RECORDED" || !serverId(data.decision_id) || !serverId(data.run_id) || !isReceiptHash(data.record_hash)) {
+    throw new Error("Decision receipt could not be confirmed. Check the server ledger before retrying.")
   }
+  return data
 }
 
 export function mapApiRecordToPolicyDecision(r: DecisionRecordApi): {
@@ -465,7 +485,7 @@ export function mapApiRecordToPolicyDecision(r: DecisionRecordApi): {
     category = "Price alert"
   }
 
-  const sha256 = r.record_hash || (r as any).sha256Hash || "UNVERIFIED"
+  const sha256 = isReceiptHash(r.record_hash) ? r.record_hash : isReceiptHash(r.hash) ? r.hash : ""
 
   const assumptionsStr =
     typeof r.assumptions === "object" && r.assumptions !== null
@@ -478,7 +498,7 @@ export function mapApiRecordToPolicyDecision(r: DecisionRecordApi): {
   const actionDisplay = `${r.action_type.replace(/_/g, " ")}${r.quantity ? ` (${r.quantity.toLocaleString()} ${r.unit})` : ""}`
 
   return {
-    id: r.decision_id || "DEC-UNSAVED",
+    id: serverId(r.decision_id) || "",
     date: dateStr,
     timestamp: timeStr,
     crop: cropName,
@@ -489,7 +509,7 @@ export function mapApiRecordToPolicyDecision(r: DecisionRecordApi): {
     leadTime: r.assumptions?.lead_time_weeks || 7,
     action: actionDisplay,
     category,
-    officer: r.officer_id || "Officer OFF-7710",
+    officer: serverId(r.officer_id) || "Not available",
     designation: "Authorized Agricultural Decision Maker",
     status: "Active",
     notes: r.rationale || (r.assumptions?.notes as string) || "System recorded policy directive.",

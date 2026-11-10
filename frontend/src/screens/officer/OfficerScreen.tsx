@@ -54,6 +54,7 @@ import {
 import { SupplyChart } from "../../components/charts"
 import {
   logDecisionActionApi,
+  fetchServerIdentity,
   getStoredAuthUser,
   clearAuthSession,
   simulateScenarioApi,
@@ -117,7 +118,8 @@ export function OfficerScreen({
   const [screenState, setScreenState] = useState<ScreenState>("ready")
   const [lastReport, setLastReport] = useState<GroundReport | null>(null)
   const [decision, setDecision] = useState("")
-  const [decisionHistory, setDecisionHistory] = useState<PolicyDecision[]>([])
+  const [decisionError, setDecisionError] = useState<string | null>(null)
+  const [decisionReceipt, setDecisionReceipt] = useState<Awaited<ReturnType<typeof logDecisionActionApi>> | null>(null)
   const { data: forecastData, loading: forecastLoading, error: forecastError, refetch: reloadForecasts } = useLatestForecasts()
   const isLiveApi = forecastData?.isLive === true
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => getStoredAuthUser())
@@ -156,62 +158,31 @@ export function OfficerScreen({
   }
 
   const recordDecision = async (value: string, details?: Partial<PolicyDecision>) => {
-    setDecision(value)
-
-    const normCrop = selectedCrop.toLowerCase().includes("chilli") ? "chilli" : "big_onion"
-    let apiRes: { status: string; decision_id?: string; record_hash?: string; run_id?: string } | null = null
+    setSaved(false)
+    setDecisionError(null)
+    setDecisionReceipt(null)
     try {
-      apiRes = await logDecisionActionApi({
-        crop_id: normCrop,
+      const identity = await fetchServerIdentity()
+      if (!identity.officerId) throw new Error("The backend has not provided an officer identifier. The decision was not submitted.")
+      const receipt = await logDecisionActionApi({
+        crop_id: cropApiKey,
         season: "Maha 2025/2026",
-        officer_id: details?.officer || "Officer OFF-7710",
+        officer_id: identity.officerId,
         action_type: value.toUpperCase().replace(/\s+/g, "_"),
         quantity: 1200,
         unit: "MT",
         rationale: details?.impactEstimate || details?.notes || `Policy directive: ${value}`,
-        model_version: "LightGBM-v2.1+HiGHS-LP",
-        data_version: "CBSL-HARTI-DOA-2024.12",
-        assumptions: {
-          lead_time_weeks: details?.leadTime || 7,
-          loss_pct: 0.15,
-          district: selectedDistrict,
-          notes: details?.notes,
-        },
+        assumptions: { district: selectedDistrict, notes: details?.notes },
         notes: details?.notes,
       })
-    } catch {
-      // offline fallback handled by logDecisionActionApi
+      setDecision(value)
+      setDecisionReceipt(receipt)
+      setSaved(true)
+      window.setTimeout(() => { setSaved(false); setPage("Decision history") }, 1200)
+    } catch (error) {
+      setDecision("")
+      setDecisionError(error instanceof Error ? error.message : "Decision could not be confirmed. Check the server ledger before retrying.")
     }
-
-    const recHash = apiRes?.record_hash || "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    const recId = apiRes?.decision_id || `DEC-${Date.now().toString(16).toUpperCase()}`
-
-    const newEntry: PolicyDecision = {
-      id: recId,
-      date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
-      timestamp: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) + " UTC",
-      crop: selectedCrop,
-      district: selectedDistrict,
-      modelVersion: "LightGBM-v2.1+HiGHS-LP",
-      dataVersion: "CBSL-HARTI-DOA-2024.12",
-      assumptions: details?.assumptions || `Loss 15% · Lead ${details?.leadTime || 7}w`,
-      leadTime: details?.leadTime || 7,
-      action: value,
-      category: details?.category || "Import quota",
-      officer: details?.officer || "Officer OFF-7710",
-      designation: details?.designation || "Authorized Agricultural Decision Maker",
-      status: "Active",
-      notes: details?.notes || `Executive directive recorded from Gap & Import Timeline for ${selectedCrop} in ${selectedDistrict}.`,
-      confidence: "High (94%)",
-      sha256Hash: recHash,
-      impactEstimate: details?.impactEstimate || "Dynamic buffer adjustment deployed to prevent retail price divergence.",
-    }
-    setDecisionHistory((prev) => [newEntry, ...prev])
-    setSaved(true)
-    window.setTimeout(() => {
-      setSaved(false)
-      setPage("Decision history")
-    }, 1200)
   }
 
   return (
@@ -412,6 +383,7 @@ export function OfficerScreen({
         </header>
 
         <main className="officer-content">
+          {decisionError && <div className="alert-banner" role="alert">{decisionError}</div>}
           {screenState !== "ready" ? (
             <ScreenStateView
               state={screenState}
@@ -477,7 +449,6 @@ export function OfficerScreen({
           ) : page === "Decision history" ? (
             <HistoryScreen
               decision={decision}
-              decisionHistory={decisionHistory}
               crop={selectedCrop}
               isLiveApi={isLiveApi}
             />
@@ -913,6 +884,7 @@ export function OfficerScreen({
           <CheckCircle2 size={19} />
           <div>
             <strong>{decision ? "Decision recorded" : "Scenario saved"}</strong>
+            {decisionReceipt && <p>Decision: {decisionReceipt.decision_id} | Run: {decisionReceipt.run_id}<br /><code style={{ overflowWrap: "anywhere" }}>{decisionReceipt.record_hash}</code></p>}
             <span>
               {decision
                 ? `${decision} will appear in Decision History.`

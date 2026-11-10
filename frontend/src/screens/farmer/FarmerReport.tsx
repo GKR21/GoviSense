@@ -23,7 +23,7 @@ export function FarmerReport({
 
   const [step, setStep] = useState(1)
   const [selectedCropId, setSelectedCropId] = useState(
-    preselectedCrop?.id || crops[0]?.id || "crop-greengram",
+    preselectedCrop?.id || crops[0]?.id || "",
   )
   const [areaAcres, setAreaAcres] = useState(1.5)
   const [plantingDate, setPlantingDate] = useState("2026-10-25")
@@ -34,6 +34,7 @@ export function FarmerReport({
     "Certified DOA Seed" | "Farmer Saved Seed" | "Registered Private"
   >("Certified DOA Seed")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submissionError, setSubmissionError] = useState<string | null>(null)
 
   const activeCrop = crops.find((c) => c.id === selectedCropId) || crops[0]
 
@@ -47,6 +48,7 @@ export function FarmerReport({
 
   const handleSubmit = async () => {
     setIsSubmitting(true)
+    setSubmissionError(null)
     try {
       const res = await farmerService.submitPlantingReport({
         cropId: selectedCropId,
@@ -60,6 +62,7 @@ export function FarmerReport({
       }
     } catch (err) {
       console.error("Submission failed", err)
+      setSubmissionError(err instanceof Error ? err.message : "The report could not be confirmed. Check server records before retrying.")
     } finally {
       setIsSubmitting(false)
     }
@@ -67,6 +70,7 @@ export function FarmerReport({
 
   return (
     <div className="flex min-h-full flex-col justify-between p-4 pb-20">
+      {submissionError && <p role="alert" className="p-3 text-red-800">{submissionError}</p>}
       <div className="space-y-5">
         {/* Step Indicator Header */}
         <div className="space-y-2">

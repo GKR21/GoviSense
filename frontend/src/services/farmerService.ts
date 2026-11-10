@@ -11,22 +11,14 @@ import {
   fetchAlerts,
   submitPlantingReportApi,
   submitHarvestReportApi,
-  API_BASE_URL,
+  fetchServerIdentity,
+  type ServerIdentity,
 } from "../api"
 
-// Default verified profile for Anuradhapura pilot smallholder
+// Identity is populated only from an authenticated backend response.
 export const initialFarmerProfile: FarmerProfileData = {
-  id: "FARMER-AP-0842",
-  pseudonymousId: "ANON-LK-26-8812",
-  name: "K. B. Somapala",
-  phone: "+94 77 348 9201",
-  district: "Anuradhapura",
-  divisionalSecretariat: "Thalawa",
-  agrarianCenter: "Katiyawa ASC",
-  landAcres: 2.5,
-  soilType: "Reddish Brown Earths (RBE)",
-  irrigationSource: "Minor Tank",
-  consentToShare: true,
+  farmerId: "", name: "", district: "", division: "", totalLandAcres: 0,
+  primaryCropInterest: "", pseudonymousConsent: false, dataVersion: "", lastSyncTime: "",
 }
 
 const CROP_IMAGE_MAP: Record<string, { image: string; photoCredit: string; scientificName: string }> = {
@@ -97,7 +89,7 @@ function mapApiCropToCropItem(raw: any, landAcres: number): CropItem {
   const maxProfit = Math.round(p90 * 600 * landAcres)
 
   return {
-    id: `crop-${cropId}`,
+    id: cropId,
     name: { en: nameEn, si: nameSi, ta: nameTa },
     scientificName: meta.scientificName,
     image: meta.image,
@@ -171,11 +163,16 @@ function mapApiCropToCropItem(raw: any, landAcres: number): CropItem {
   }
 }
 
-class FarmerService {
+export class FarmerService {
   private profile: FarmerProfileData = { ...initialFarmerProfile }
   private reports: PlantingReportData[] = []
   private alerts: AlertItem[] = []
-  private officerDecisions: Array<{ id: string; decision: string; date: string; runId: string }> = []
+  private identityRequest: Promise<ServerIdentity> | null = null
+
+  private loadIdentity(): Promise<ServerIdentity> {
+    if (!this.identityRequest) this.identityRequest = fetchServerIdentity().finally(() => { this.identityRequest = null })
+    return this.identityRequest
+  }
   private listeners: Set<() => void> = new Set()
 
   subscribe(listener: () => void): () => void {
@@ -195,29 +192,21 @@ class FarmerService {
     })
   }
 
-  async getRecommendedCrops(district = "Anuradhapura", landSize = 2.5): Promise<CropItem[]> {
+  async getRecommendedCrops(district = this.profile.district, landSize = this.profile.totalLandAcres): Promise<CropItem[]> {
     try {
+      const profile = await this.getProfile()
       const top3Res = await fetchFarmerTop3({
-        farmer_id: this.profile.id,
-        season: "Maha",
-        land_ha: landSize * 0.404686,
-        is_rainfed: this.profile.irrigationSource === "Rainfed",
+        farmer_id: profile.farmerId || undefined,
+        district: district || profile.district || undefined,
+        land_ha: landSize > 0 ? landSize * 0.404686 : undefined,
       })
-
-      if (top3Res && Array.isArray(top3Res.top3) && top3Res.top3.length > 0) {
-        return top3Res.top3.map((c) => mapApiCropToCropItem(c, landSize))
+      if (top3Res && Array.isArray(top3Res.top3)) {
+        return top3Res.top3.filter((crop: any) => typeof crop?.crop_id === "string" && crop.crop_id.trim()).map((crop: any) => mapApiCropToCropItem(crop, landSize))
       }
     } catch (err) {
-      console.warn("fetchFarmerTop3 network request failed, falling back to local cache", err)
+      console.warn("Could not load backend crop recommendations", err)
     }
-
-    // Default baseline crops from DoA catalog if offline
-    const fallbackCatalog = [
-      { crop_id: "green_gram", crop_name: "Green Gram", fit_score: 92, water_need_mm_season: 350, spi_band_at_harvest: "Balanced" },
-      { crop_id: "chilli", crop_name: "Green Chilli", fit_score: 86, water_need_mm_season: 450, spi_band_at_harvest: "Shortage" },
-      { crop_id: "big_onion", crop_name: "Big Onion", fit_score: 79, water_need_mm_season: 600, spi_band_at_harvest: "Oversupply" },
-    ]
-    return fallbackCatalog.map((c) => mapApiCropToCropItem(c, landSize))
+    return []
   }
 
   async getAlerts(lang: "en" | "si" | "ta" = "si"): Promise<AlertItem[]> {
@@ -263,11 +252,25 @@ class FarmerService {
   }
 
   async getProfile(): Promise<FarmerProfileData> {
+    try {
+      const identity = await this.loadIdentity()
+      const farmerId = identity.farmerId || ""
+      if (farmerId !== this.profile.farmerId) {
+        this.profile = { ...initialFarmerProfile }
+        this.reports = []
+        this.alerts = []
+      }
+      this.profile = { ...this.profile, farmerId, name: identity.name, district: identity.district || this.profile.district }
+    } catch (error) {
+      this.profile = { ...initialFarmerProfile }
+      console.warn("Backend farmer identity is unavailable", error)
+    }
     return { ...this.profile }
   }
 
   async updateProfile(updates: Partial<FarmerProfileData>): Promise<FarmerProfileData> {
-    this.profile = { ...this.profile, ...updates }
+    // Local form edits must never assign a backend identity.
+    this.profile = { ...this.profile, ...updates, farmerId: this.profile.farmerId }
     this.notify()
     return { ...this.profile }
   }
@@ -286,86 +289,41 @@ class FarmerService {
     plantingDate: string
     irrigationType: "Rainfed" | "Minor Tank" | "Major Irrigation" | "Agro-well"
     seedSource: "Certified DOA Seed" | "Farmer Saved Seed" | "Registered Private"
-  }): Promise<{ success: boolean; report: PlantingReportData; offlineQueued?: boolean }> {
+  }): Promise<{ success: true; report: PlantingReportData }> {
+    const profile = await this.getProfile()
+    if (!profile.farmerId) throw new Error("The backend has not provided a farmer identifier. The report was not submitted.")
     const rawCropId = reportData.cropId.replace(/^crop-/, "")
+    if (!rawCropId) throw new Error("Select a crop returned by the backend.")
     const areaHa = Number((reportData.areaAcres * 0.404686).toFixed(2))
-
-    let reportId = `REP-${Date.now()}`
-    let isOffline = false
-
-    try {
-      const res = await submitPlantingReportApi({
-        crop_id: rawCropId,
-        season: "Maha 2025/2026",
-        planned_area_ha: areaHa,
-        actual_area_ha: areaHa,
-        consent_given: true,
-        pseudonymous_id: this.profile.pseudonymousId || this.profile.id,
-      })
-
-      if (res && res.report_id) {
-        reportId = res.report_id
-      } else if (res && res.status === "ACCEPTED_OFFLINE") {
-        isOffline = true
-      }
-    } catch {
-      isOffline = true
-    }
-
-    const cropNameEn = rawCropId === "big_onion" ? "Big Onion" : rawCropId === "chilli" ? "Chilli" : rawCropId.replace(/_/g, " ")
-
-    const newReport: PlantingReportData = {
-      id: reportId,
-      cropId: reportData.cropId,
-      cropName: {
-        en: cropNameEn,
-        si: rawCropId.includes("onion") ? "ලොකු ලූනු" : rawCropId.includes("chilli") ? "අමු මිරිස්" : "මුං ඇට",
-        ta: rawCropId.includes("onion") ? "பெரிய வெங்காயம்" : rawCropId.includes("chilli") ? "பச்சை மிளகாய்" : "பச்சைப் பயறு",
-      },
-      district: this.profile.district,
+    const response = await submitPlantingReportApi({
+      crop_id: rawCropId,
+      season: "Maha 2025/2026",
+      planned_area_ha: areaHa,
+      actual_area_ha: areaHa,
+      consent_given: this.profile.pseudonymousConsent,
+      pseudonymous_id: profile.farmerId,
+      planting_date: reportData.plantingDate,
+      district: profile.district,
+      irrigation_type: reportData.irrigationType.toLowerCase().replace(/ /g, "_").replace("-", "_"),
+      notes: `Seed source: ${reportData.seedSource}`,
+    })
+    const cropName = rawCropId.replace(/_/g, " ")
+    const report: PlantingReportData = {
+      id: response.report_id,
+      receiptHash: response.receipt_hash,
+      status: "verified",
+      cropId: rawCropId,
+      cropName: { en: cropName, si: cropName, ta: cropName },
+      district: profile.district,
       areaAcres: reportData.areaAcres,
       plantingDate: reportData.plantingDate,
       irrigationType: reportData.irrigationType,
       seedSource: reportData.seedSource,
-      timestamp: new Date().toISOString().replace("T", " ").substring(0, 16),
-      receiptHash: `REC-${reportId.replace(/[^A-Za-z0-9]/g, "").slice(0, 16)}`,
-      status: isOffline ? "pending" : "verified",
+      timestamp: response.timestamp || new Date().toISOString(),
     }
-
-    this.reports.unshift(newReport)
-
-    // Append confirmation alert
-    const newAlert: AlertItem = {
-      id: `alert-${Date.now()}`,
-      type: "success",
-      priority: "medium",
-      isRead: false,
-      timestamp: "Just now",
-      title: {
-        en: isOffline ? `Planting Declaration Queued Offline` : `Planting Declaration Logged (${cropNameEn})`,
-        si: isOffline ? `වගා වාර්තාව නොබැඳිව සුරැකිණි` : `වගා වාර්තාව ලියාපදිංචි විය`,
-        ta: isOffline ? `நடவு அறிக்கை ஆஃப்லைனில் சேமிக்கப்பட்டது` : `நடவு அறிக்கை பதிவு செய்யப்பட்டது`,
-      },
-      message: {
-        en: isOffline
-          ? `Saved locally on device (${reportData.areaAcres} acres). Will sync automatically when connection restores.`
-          : `Successfully submitted ${reportData.areaAcres} acres for Maha. Receipt ID: ${newReport.id}.`,
-        si: isOffline
-          ? `උපාංගයේ සුරැකිණි (${reportData.areaAcres} අක්කර). අන්තර්ජාලය සක්‍රිය වූ විට ස්වයංක්‍රීයව යැවෙනු ඇත.`
-          : `අක්කර ${reportData.areaAcres}ක් සාර්ථකව වාර්තා කරන ලදී. රිසිට්පත් අංකය: ${newReport.id}.`,
-        ta: isOffline
-          ? `சாதனத்தில் சேமிக்கப்பட்டது (${reportData.areaAcres} ஏக்கர்). இணைப்பு கிடைத்தவுடன் பதிவேற்றப்படும்.`
-          : `மகா பருவத்திற்கு ${reportData.areaAcres} ஏக்கர் பதிவு செய்யப்பட்டது. ரசீது எண்: ${newReport.id}.`,
-      },
-    }
-    this.alerts.unshift(newAlert)
+    this.reports.unshift(report)
     this.notify()
-
-    return {
-      success: !isOffline,
-      report: newReport,
-      offlineQueued: isOffline,
-    }
+    return { success: true, report }
   }
 
   async submitHarvestReport(harvestData: {
@@ -380,6 +338,8 @@ class FarmerService {
   }): Promise<{ success: boolean; harvestId?: string }> {
     const rawCropId = harvestData.cropId.replace(/^crop-/, "")
     try {
+      const profile = await this.getProfile()
+      if (!profile.farmerId) throw new Error("Backend farmer identity is unavailable.")
       const res = await submitHarvestReportApi({
         crop_id: rawCropId,
         area_harvested_ha: harvestData.areaHarvestedHa,
@@ -389,7 +349,7 @@ class FarmerService {
         quantity_stored_kg: harvestData.quantityStoredKg || 0,
         sale_price_rs_kg: harvestData.salePriceRsKg,
         sale_channel: harvestData.saleChannel,
-        pseudonymous_id: this.profile.pseudonymousId || this.profile.id,
+        pseudonymous_id: profile.farmerId,
       })
       if (res && res.harvest_id) {
         return { success: true, harvestId: res.harvest_id }
@@ -398,46 +358,6 @@ class FarmerService {
       console.warn("Harvest report submission failed", err)
     }
     return { success: false }
-  }
-
-  recordOfficerDecision(decision: string, crop = "Big onion"): void {
-    const runId = `RUN-${Date.now()}`
-    this.officerDecisions.unshift({
-      id: `DEC-${Date.now()}`,
-      decision,
-      date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
-      runId,
-    })
-
-    const decisionAlert: AlertItem = {
-      id: `officer-decision-${Date.now()}`,
-      type: "market",
-      priority: "high",
-      isRead: false,
-      timestamp: "Just now",
-      title: {
-        en: `Agrarian Decision: ${decision} (${crop})`,
-        si: `කෘෂිකාර්මික නිල තීරණය: ${decision} (${crop})`,
-        ta: `விவசாய உத்தியோகபூர்வ முடிவு: ${decision} (${crop})`,
-      },
-      message: {
-        en: `District Planning Officer registered decision "${decision}". National import windows adjusted to safeguard local farmgate prices.`,
-        si: `දිස්ත්‍රික් සැලසුම් නිලධාරී විසින් "${decision}" තීරණය අනුමත කරන ලදී. දේශීය ගොවිපළ මිල සුරැකීමට ආනයන කාලසීමා සංශෝධනය විය.`,
-        ta: `மாவட்ட திட்டமிடல் அதிகாரி "${decision}" முடிவை அங்கீகரித்தார். உள்ளூர் விலையைப் பாதுகாக்க இறக்குமதி அட்டவணை மாற்றப்பட்டது.`,
-      },
-      officerContact: {
-        name: "D. Nimal",
-        role: "District Planning Officer (DOA)",
-        phone: "+94 25 226 7100",
-      },
-    }
-
-    this.alerts.unshift(decisionAlert)
-    this.notify()
-  }
-
-  getOfficerDecisions() {
-    return [...this.officerDecisions]
   }
 
   getExtraReportedHectares(cropSearch: string): number {
