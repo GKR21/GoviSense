@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kDebugMode, kReleaseMode;
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AppConfig {
@@ -9,12 +9,11 @@ class AppConfig {
       'https://govisense-production.up.railway.app';
   static const String localEmulatorUrl = 'http://10.0.2.2:8000';
 
-  // Override with: --dart-define=API_BASE_URL=http://<host>:8000
-  // Otherwise: release builds use the deployed backend, debug builds the
-  // local backend as seen from the Android emulator.
+  // Every build uses the deployed Railway backend by default.
+  // For a local backend: --dart-define=API_BASE_URL=http://10.0.2.2:8000
   static const String _defaultUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: kReleaseMode ? deployedUrl : localEmulatorUrl,
+    defaultValue: deployedUrl,
   );
 
   static const String _prefKeyBaseUrl = 'govisense_api_base_url';

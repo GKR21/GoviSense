@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mobile/core/config/app_config.dart';
@@ -15,9 +14,7 @@ void main() {
     await AppConfig.init();
     const expected = String.fromEnvironment(
       'API_BASE_URL',
-      defaultValue: kReleaseMode
-          ? AppConfig.deployedUrl
-          : AppConfig.localEmulatorUrl,
+      defaultValue: AppConfig.deployedUrl,
     );
     expect(AppConfig.apiBaseUrl, AppConfig.validateBaseUrl(expected));
   });
@@ -65,9 +62,7 @@ void main() {
     await AppConfig.init();
     const expected = String.fromEnvironment(
       'API_BASE_URL',
-      defaultValue: kReleaseMode
-          ? AppConfig.deployedUrl
-          : AppConfig.localEmulatorUrl,
+      defaultValue: AppConfig.deployedUrl,
     );
     expect(AppConfig.apiBaseUrl, AppConfig.validateBaseUrl(expected));
   });
