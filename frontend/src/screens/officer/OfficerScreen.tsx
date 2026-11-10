@@ -124,51 +124,17 @@ export function OfficerScreen({
   const [screenState, setScreenState] = useState<ScreenState>("ready")
   const [lastReport, setLastReport] = useState<GroundReport | null>(null)
   const [decision, setDecision] = useState("")
-  const [decisionHistory, setDecisionHistory] = useState<PolicyDecision[]>([])
-  const [forecastData, setForecastData] = useState<LatestForecastsWithMeta | null>(null)
-  const [isLiveApi, setIsLiveApi] = useState(false)
-  const [forecastLoading, setForecastLoading] = useState(true)
+  const [decisionError, setDecisionError] = useState<string | null>(null)
+  const [decisionReceipt, setDecisionReceipt] = useState<Awaited<ReturnType<typeof logDecisionActionApi>> | null>(null)
   const [simulatedMetrics, setSimulatedMetrics] = useState<any>(null)
   const [alertsOpen, setAlertsOpen] = useState(false)
   const [officerNoteText, setOfficerNoteText] = useState<Record<string, string>>({})
   const [noteStatus, setNoteStatus] = useState<Record<string, string>>({})
   const { data: alertResponse, refetch: reloadAlerts } = useAlerts()
   const alertsData = Array.isArray(alertResponse) ? alertResponse : alertResponse?.alerts
-
-  useEffect(() => {
-    let active = true
-    setForecastLoading(true)
-    fetchLatestForecasts()
-      .then((res) => {
-        if (!active) return
-        setForecastData(res)
-        setIsLiveApi(res.isLive)
-        setForecastLoading(false)
-      })
-      .catch(() => {
-        if (!active) return
-        setForecastLoading(false)
-      })
-
-    fetchDecisionHistory()
-      .then((res) => {
-        if (!active) return
-        if (res.isLive && res.records.length > 0) {
-          setDecisionHistory(res.records.map(mapApiRecordToPolicyDecision))
-        }
-      })
-      .catch(() => setDecisionHistory([]))
-
-    return () => {
-      active = false
-    }
-  }, [])
-
-  const cropApiKey = selectedCrop.toLowerCase().includes("onion")
-    ? "big_onion"
-    : selectedCrop.toLowerCase().includes("chilli")
-      ? "chilli"
-      : selectedCrop.toLowerCase().replace(/\s+/g, "_")
+  const cropApiKey = cropApiId(selectedCrop)
+  const { data: forecastData, loading: forecastLoading, error: forecastError, refetch: reloadForecasts } = useLatestForecasts(cropApiKey)
+  const isLiveApi = forecastData?.isLive === true
   const currentApiCropData: CropForecastData | undefined = forecastData?.crops[cropApiKey]
   const changed = area !== currentProfile.baselineArea || yieldValue !== currentProfile.baselineYield
 
@@ -202,63 +168,30 @@ export function OfficerScreen({
     try {
       const identity = await fetchServerIdentity()
       if (!identity.officerId) throw new Error("The backend has not provided an officer identifier. The decision was not submitted.")
+      if (details?.quantity == null || !Number.isFinite(details.quantity) || details.quantity < 0 || !details.unit?.trim() || !details.season?.trim() || !details.notes?.trim()) {
+        throw new Error("Enter a season, non-negative quantity, unit and rationale before submitting.")
+      }
       const receipt = await logDecisionActionApi({
         crop_id: cropApiKey,
-        season: "Maha 2025/2026",
-        officer_id: details?.officer || currentUser?.username || "",
-        action_type: value.toUpperCase().replace(/\s+/g, "_"),
-        quantity: 1200,
-        unit: "MT",
-        rationale: details?.impactEstimate || details?.notes || `Policy directive: ${value}`,
-        model_version: currentApiCropData?.ai2_price_forecast.selected_model,
-        data_version: currentApiCropData?.ai2_price_forecast.forecast_source,
+        season: details.season.trim(),
+        officer_id: identity.officerId,
+        action_type: value,
+        quantity: details.quantity,
+        unit: details.unit.trim(),
+        rationale: details.notes.trim(),
         assumptions: {
-          lead_time_weeks: details?.leadTime || 7,
-          loss_pct: 0.15,
           district: selectedDistrict,
-          notes: details?.notes,
+          ...(details.leadTime != null ? { lead_time_weeks: details.leadTime } : {}),
         },
-        notes: details?.notes,
       })
       setDecision(value)
       setDecisionReceipt(receipt)
       setSaved(true)
-      window.setTimeout(() => { setSaved(false); setPage("Decision history") }, 1200)
-    } catch (error) {
-      setDecision("")
-      setDecisionError(error instanceof Error ? error.message : "Decision could not be confirmed. Check the server ledger before retrying.")
-    }
-
-    if (!apiRes?.record_hash || !apiRes.decision_id) return
-    const recHash = apiRes.record_hash
-    const recId = apiRes.decision_id
-
-    const newEntry: PolicyDecision = {
-      id: recId,
-      date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
-      timestamp: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) + " UTC",
-      crop: selectedCrop,
-      district: selectedDistrict,
-      modelVersion: currentApiCropData?.ai2_price_forecast.selected_model || "",
-      dataVersion: currentApiCropData?.ai2_price_forecast.forecast_source || "",
-      assumptions: details?.assumptions || `Loss 15% · Lead ${details?.leadTime || 7}w`,
-      leadTime: details?.leadTime || 7,
-      action: value,
-      category: details?.category || "Import quota",
-      officer: details?.officer || currentUser?.username || "",
-      designation: details?.designation || "Authorized Agricultural Decision Maker",
-      status: "Active",
-      notes: details?.notes || `Executive directive recorded from Gap & Import Timeline for ${selectedCrop} in ${selectedDistrict}.`,
-      confidence: "High (94%)",
-      sha256Hash: recHash,
-      impactEstimate: details?.impactEstimate || "Dynamic buffer adjustment deployed to prevent retail price divergence.",
-    }
-    setDecisionHistory((prev) => [newEntry, ...prev])
-    setSaved(true)
-    window.setTimeout(() => {
-      setSaved(false)
       setPage("Decision history")
-    }, 1200)
+    } catch (error) {
+      setDecisionError(error instanceof Error ? error.message : "Decision could not be confirmed. Check the server ledger before retrying.")
+      throw error
+    }
   }
 
   return (

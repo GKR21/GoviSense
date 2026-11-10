@@ -22,6 +22,10 @@ export interface GroundReport {
 
 export interface PolicyDecision {
   id: string
+  runId?: string
+  season?: string
+  quantity?: number
+  unit?: string
   date: string
   timestamp: string
   crop: string
@@ -29,12 +33,12 @@ export interface PolicyDecision {
   modelVersion: string
   dataVersion: string
   assumptions: string
-  leadTime: number
+  leadTime: number | null
   action: string
-  category: "Import quota" | "Storage buffer" | "Tariff adjustment" | "Price alert" | "Planting advisory"
+  category: "Import quota" | "Storage buffer" | "Tariff adjustment" | "Price alert" | "Planting advisory" | "Other"
   officer: string
   designation: string
-  status: "Active" | "Executed" | "Superseded"
+  status: "Active" | "Executed" | "Superseded" | "Not available"
   notes?: string
   confidence?: string
   sha256Hash: string

@@ -461,82 +461,38 @@ export async function logDecisionActionApi(payload: DecisionLogPayloadApi): Prom
   return data
 }
 
-export function mapApiRecordToPolicyDecision(r: DecisionRecordApi): {
-  id: string
-  date: string
-  timestamp: string
-  crop: string
-  district: string
-  modelVersion: string
-  dataVersion: string
-  assumptions: string
-  leadTime: number
-  action: string
-  category: "Import quota" | "Storage buffer" | "Tariff adjustment" | "Price alert"
-  officer: string
-  designation: string
-  status: "Active" | "Executed" | "Superseded"
-  notes?: string
-  confidence?: string
-  sha256Hash: string
-  impactEstimate?: string
-} {
+export function mapApiRecordToPolicyDecision(r: DecisionRecordApi): import("./types").PolicyDecision {
   const dt = new Date(r.timestamp)
-  const isValidDate = !isNaN(dt.getTime())
-  const dateStr = isValidDate
-    ? dt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
-    : r.timestamp.slice(0, 10)
-  const timeStr = isValidDate
-    ? dt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) + " UTC"
-    : r.timestamp.slice(11, 19) + " UTC"
-
-  const cropName =
-    r.crop_id === "big_onion"
-      ? "Big onion"
-      : r.crop_id === "chilli"
-        ? "Chilli"
-        : r.crop_id.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-
-  let category: "Import quota" | "Storage buffer" | "Tariff adjustment" | "Price alert" = "Import quota"
-  const act = (r.action_type || "").toUpperCase()
-  if (act.includes("STORAGE") || act.includes("HOLD") || act.includes("BUFFER")) {
-    category = "Storage buffer"
-  } else if (act.includes("TARIFF") || act.includes("DUTY") || act.includes("LEVY")) {
-    category = "Tariff adjustment"
-  } else if (act.includes("ADVISORY") || act.includes("PLANT")) {
-    category = "Price alert"
-  }
-
-  const sha256 = isReceiptHash(r.record_hash) ? r.record_hash : isReceiptHash(r.hash) ? r.hash : ""
-
-  const assumptionsStr =
-    typeof r.assumptions === "object" && r.assumptions !== null
-      ? Object.entries(r.assumptions)
-          .filter(([k]) => k !== "notes")
-          .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
-          .join(" · ")
-      : String(r.assumptions || "")
-
-  const actionDisplay = `${r.action_type.replace(/_/g, " ")}${r.quantity ? ` (${r.quantity.toLocaleString()} ${r.unit})` : ""}`
-
+  const validDate = Number.isFinite(dt.getTime())
+  const action = r.action_type || "Not available"
+  const act = action.toUpperCase()
+  const category = /STORAGE|HOLD|BUFFER/.test(act) ? "Storage buffer"
+    : /TARIFF|DUTY|LEVY/.test(act) ? "Tariff adjustment"
+    : /ADVISORY|PLANT/.test(act) ? "Planting advisory"
+    : /IMPORT/.test(act) ? "Import quota" : "Other"
+  const assumptions = r.assumptions || {}
+  const lead = assumptions.lead_time_weeks ?? assumptions.import_lead_time_weeks
   return {
     id: serverId(r.decision_id) || "",
-    date: dateStr,
-    timestamp: timeStr,
-    crop: cropName,
-    district: r.assumptions?.district || "Anuradhapura",
-    modelVersion: r.model_version || "LightGBM-v2.1+HiGHS-LP",
-    dataVersion: r.data_version || "CBSL-HARTI-DOA-2024.12",
-    assumptions: assumptionsStr || `Loss 15% · Target ${r.quantity} ${r.unit}`,
-    leadTime: r.assumptions?.lead_time_weeks || 7,
-    action: actionDisplay,
+    runId: serverId(r.run_id) || "",
+    season: r.season,
+    quantity: r.quantity,
+    unit: r.unit,
+    date: validDate ? dt.toLocaleDateString("en-GB", { timeZone: "UTC" }) : "Not available",
+    timestamp: validDate ? dt.toISOString() : "Not available",
+    crop: (r.crop_id || "Not available").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
+    district: assumptions.district || "Not available",
+    modelVersion: r.model_version || "Not available",
+    dataVersion: r.data_version || "Not available",
+    assumptions: Object.keys(assumptions).length ? JSON.stringify(assumptions) : "Not available",
+    leadTime: typeof lead === "number" && Number.isFinite(lead) ? lead : null,
+    action: `${action.replace(/_/g, " ")}${Number.isFinite(r.quantity) ? ` (${r.quantity} ${r.unit || ""})` : ""}`,
     category,
     officer: serverId(r.officer_id) || "Not available",
-    designation: "Authorized Agricultural Decision Maker",
-    status: "Active",
-    notes: r.rationale || (r.assumptions?.notes as string) || "System recorded policy directive.",
-    sha256Hash: sha256,
-    impactEstimate: r.rationale,
+    designation: "Not available",
+    status: "Not available",
+    notes: r.rationale || "",
+    sha256Hash: isReceiptHash(r.record_hash) ? r.record_hash : isReceiptHash(r.hash) ? r.hash : "",
   }
 }
 

@@ -181,6 +181,7 @@ function installMockApi() {
         : [
             {
               decision_id: "SERVER-DECISION-ONE",
+              run_id: "SERVER-HISTORY-RUN",
               crop_id: "big_onion",
               timestamp: "2026-11-10T12:00:00Z",
               action_type: "STORE",
@@ -384,23 +385,37 @@ try {
 
   await navigate("Gap & import timeline", "Record option")
   await click("Record option")
+  await evaluate(`(() => {
+    for (const [label, value] of [["Decision season", "Yala 2027"], ["Decision quantity", "42.5"], ["Decision unit", "MT"], ["Decision rationale", "Actual officer rationale"]]) {
+      const input = document.querySelector('[aria-label="' + label + '"]')
+      const prototype = input.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype
+      Object.getOwnPropertyDescriptor(prototype, "value").set.call(input, value)
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+    }
+  })()`)
+  await click("Submit decision")
   await until(async () => (await main()).includes("has not provided an officer identifier"), "missing officer identifier")
   assert.equal(await evaluate("window.__writes.length"), 0)
   assert.equal(await evaluate("document.body.innerText.includes('Decision recorded')"), false)
   await evaluate('window.__identity = { role: "officer", officer_id: "BACKEND-OFFICER-42" }; window.__receiptMode = "invalid"')
-  await click("Record option")
+  await click("Submit decision")
   await until(async () => (await main()).includes("receipt could not be confirmed"), "malformed receipt")
   assert.equal(await evaluate("document.body.innerText.includes('Decision recorded')"), false)
   await evaluate('window.__receiptMode = "failure"')
-  await click("Record option")
+  await click("Submit decision")
   await until(async () => (await main()).includes("HTTP 503"), "failed decision write")
   assert.equal(await evaluate("document.body.innerText.includes('Decision recorded')"), false)
   await evaluate('window.__receiptMode = "valid"')
-  await click("Record option")
+  await click("Submit decision")
   await until(() => evaluate("document.querySelector('.toast')?.innerText.includes('SERVER-DECISION-ACK')"), "actual server receipt")
   assert.equal(await evaluate("window.__writes.at(-1).officer_id"), "BACKEND-OFFICER-42")
   assert.ok(await evaluate("document.querySelector('.toast').innerText.includes('SERVER-RUN-ACK')"))
   assert.ok(await evaluate("document.querySelector('.toast').innerText.includes('c'.repeat(64))"))
+  assert.equal(await evaluate("window.__writes.at(-1).quantity"), 42.5)
+  assert.equal(await evaluate("window.__writes.at(-1).season"), "Yala 2027")
+  assert.equal(await evaluate("window.__writes.at(-1).rationale"), "Actual officer rationale")
+  await until(async () => (await main()).includes("SERVER-HISTORY-RUN"), "history run ID after save")
+  assert.ok((await main()).includes("a".repeat(64)))
   assert.deepEqual(errors, [], "no uncaught browser exceptions after writes")
   console.log("PASS: missing IDs and failed/malformed writes never show success; valid server IDs and hash are displayed unchanged")
 } catch (error) {

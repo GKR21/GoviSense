@@ -75,6 +75,8 @@ export function HistoryScreen({
       const matchesSearch =
         !q ||
         item.id.toLowerCase().includes(q) ||
+        (item.runId || "").toLowerCase().includes(q) ||
+        item.sha256Hash.toLowerCase().includes(q) ||
         item.action.toLowerCase().includes(q) ||
         item.crop.toLowerCase().includes(q) ||
         item.officer.toLowerCase().includes(q) ||
@@ -93,16 +95,19 @@ export function HistoryScreen({
   }, [allRuns])
 
   // Copy hash action
-  const handleCopyHash = (hash: string) => {
-    navigator.clipboard?.writeText(hash)
-    setCopiedHash(hash)
-    setTimeout(() => setCopiedHash(null), 2200)
+  const handleCopyHash = async (hash: string) => {
+    try {
+      await navigator.clipboard.writeText(hash)
+      setCopiedHash(hash)
+      setTimeout(() => setCopiedHash(null), 2200)
+    } catch { setCopiedHash(null) }
   }
 
   // Working CSV Export action
   const handleExportCSV = () => {
     const headers = [
       "Decision_ID",
+      "Run_ID",
       "Date",
       "Timestamp",
       "Crop",
@@ -118,27 +123,16 @@ export function HistoryScreen({
       "SHA256_Provenance_Hash",
       "Policy_Rationale",
     ]
-    const rows = filteredRuns.map((r) => [
-      r.id,
-      `"${r.date}"`,
-      `"${r.timestamp}"`,
-      `"${r.crop}"`,
-      `"${r.district}"`,
-      `"${r.action}"`,
-      `"${r.category}"`,
-      `"${r.modelVersion}"`,
-      `"${r.dataVersion}"`,
-      `"${r.assumptions}"`,
-      `"${r.officer}"`,
-      `"${r.designation}"`,
-      `"${r.status}"`,
-      `"${r.sha256Hash}"`,
-      `"${(r.notes || "").replace(/"/g, '""')}"`,
-    ])
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n")
-    const encodedUri = encodeURI(csvContent)
+    const csvCell = (value: unknown) => {
+      const text = String(value ?? "")
+      const safe = /^[=+@\-\t\r\n]/.test(text) ? "'" + text : text
+      return '"' + safe.replace(/"/g, '""') + '"'
+    }
+    const rows = filteredRuns.map(r => [r.id, r.runId, r.date, r.timestamp, r.crop,
+      r.district, r.action, r.category, r.modelVersion, r.dataVersion, r.assumptions,
+      r.officer, r.designation, r.status, r.sha256Hash, r.notes])
+    const csvContent = [headers, ...rows].map(row => row.map(csvCell).join(",")).join("\r\n")
+    const encodedUri = URL.createObjectURL(new Blob([csvContent], { type: "text/csv;charset=utf-8" }))
     const link = document.createElement("a")
     link.setAttribute("href", encodedUri)
     link.setAttribute(
@@ -148,6 +142,7 @@ export function HistoryScreen({
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+    setTimeout(() => URL.revokeObjectURL(encodedUri), 1000)
     setExportNotice(true)
     setTimeout(() => setExportNotice(false), 3000)
   }
@@ -165,7 +160,7 @@ export function HistoryScreen({
         eyebrow="Audit Trail & Model Governance"
         icon={History}
         title="Decision History & Directives"
-        description="Immutable audit trail recording every model run, assumption set, and signed officer action."
+        description="Decision records and provenance returned by the backend."
         actions={
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             <span
@@ -218,13 +213,13 @@ export function HistoryScreen({
         <div className="audit-kpi-tile">
           <small>RECORDED DIRECTIVES</small>
           <strong>{allRuns.length} Logged Runs</strong>
-          <p>Traceable to baseline dataset and model weights</p>
+          <p>Records returned by the history endpoint</p>
         </div>
 
         <div className="audit-kpi-tile">
           <small>ACTIVE IN-MARKET POLICIES</small>
           <strong style={{ color: "var(--primary)" }}>{activeCount} Active Directives</strong>
-          <p>Currently governing import licenses & storage quotas</p>
+          <p>Only explicitly reported active statuses are counted</p>
         </div>
 
         <div className="audit-kpi-tile">
@@ -235,8 +230,8 @@ export function HistoryScreen({
 
         <div className="audit-kpi-tile">
           <small>MODEL & DATA GOVERNANCE</small>
-          <strong style={{ color: "#34d399" }}>Versioned</strong>
-          <p>LightGBM v2.1 + CBSL-HARTI-DOA cutoffs recorded</p>
+          <strong style={{ color: "#34d399" }}>Backend metadata</strong>
+          <p>Missing model and data versions are shown as unavailable</p>
         </div>
       </div>
 
@@ -378,6 +373,8 @@ export function HistoryScreen({
                       <td>
                         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                           <span className="audit-hash-chip">{row.id}</span>
+                          <small>Run: {row.runId || "Not available"}</small>
+                          <code style={{ overflowWrap: "anywhere" }}>{row.sha256Hash || "Not available"}</code>
                           <button
                             type="button"
                             onClick={() => handleCopyHash(row.sha256Hash)}
@@ -577,6 +574,7 @@ export function HistoryScreen({
                   }}
                 >
                   {selectedRun.id}
+                  <small style={{ display: "block", overflowWrap: "anywhere" }}>Run: {selectedRun.runId || "Not available"}</small>
                 </h3>
               </div>
               <button
@@ -684,32 +682,9 @@ export function HistoryScreen({
                   <span style={{ color: "var(--ink-muted)", display: "block" }}>
                     Import Lead-Time
                   </span>
-                  <strong style={{ color: "var(--ink)" }}>{selectedRun.leadTime} Weeks</strong>
+                  <strong style={{ color: "var(--ink)" }}>{selectedRun.leadTime == null ? "Not available" : `${selectedRun.leadTime} Weeks`}</strong>
                 </div>
               </div>
-            </div>
-
-            <div className="drawer-section">
-              <h4>
-                <Database size={14} color="var(--primary)" />
-                Data Feeds Ingested at Run Time
-              </h4>
-              <ul
-                style={{
-                  margin: 0,
-                  paddingLeft: "18px",
-                  fontSize: "12px",
-                  color: "var(--ink)",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "6px",
-                }}
-              >
-                <li>HARTI Daily Wholesale Price Feed (DEC Spot Series)</li>
-                <li>Crop Production Programme 2026 (DoA Peradeniya Targets)</li>
-                <li>GoviSense Farmer Mobile Ground Truth Stream (Live Telemetry)</li>
-                <li>Central Bank Inflation & Special Commodity Levy Series</li>
-              </ul>
             </div>
 
             <div className="drawer-section">
@@ -757,7 +732,7 @@ export function HistoryScreen({
                 Close Drawer
               </Button>
               <Button icon={Download} onClick={handleExportCSV}>
-                Download Certification Slip
+                Download Audit CSV
               </Button>
             </div>
           </div>
