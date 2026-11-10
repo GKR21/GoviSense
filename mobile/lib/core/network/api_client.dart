@@ -28,7 +28,10 @@ class ApiClient {
   Options get _authOptions => Options(
     headers: {
       if (AuthRepository.instance.accessToken != null)
-        'Authorization': 'Bearer ${AuthRepository.instance.accessToken}',
+        'Authorization': [
+          'Bearer',
+          AuthRepository.instance.accessToken,
+        ].join(' '),
     },
   );
 

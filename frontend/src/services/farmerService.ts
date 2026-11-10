@@ -12,21 +12,22 @@ import {
   submitPlantingReportApi,
   submitHarvestReportApi,
   API_BASE_URL,
+  getStoredAuthUser,
 } from "../api"
 
-// Default verified profile for Anuradhapura pilot smallholder
-export const initialFarmerProfile: FarmerProfileData = {
-  id: "FARMER-AP-0842",
-  pseudonymousId: "ANON-LK-26-8812",
-  name: "K. B. Somapala",
-  phone: "+94 77 348 9201",
-  district: "Anuradhapura",
-  divisionalSecretariat: "Thalawa",
-  agrarianCenter: "Katiyawa ASC",
-  landAcres: 2.5,
-  soilType: "Reddish Brown Earths (RBE)",
-  irrigationSource: "Minor Tank",
-  consentToShare: true,
+function createFarmerProfile(): FarmerProfileData {
+  const user = getStoredAuthUser()
+  return {
+    farmerId: user?.officer_id || user?.email || "",
+    name: user?.name || "",
+    district: user?.district || "",
+    division: "",
+    totalLandAcres: 0,
+    primaryCropInterest: "",
+    pseudonymousConsent: false,
+    dataVersion: "",
+    lastSyncTime: "",
+  }
 }
 
 const CROP_IMAGE_MAP: Record<string, { image: string; photoCredit: string; scientificName: string }> = {
@@ -172,7 +173,7 @@ function mapApiCropToCropItem(raw: any, landAcres: number): CropItem {
 }
 
 class FarmerService {
-  private profile: FarmerProfileData = { ...initialFarmerProfile }
+  private profile: FarmerProfileData = createFarmerProfile()
   private reports: PlantingReportData[] = []
   private alerts: AlertItem[] = []
   private officerDecisions: Array<{ id: string; decision: string; date: string; runId: string }> = []
@@ -195,29 +196,25 @@ class FarmerService {
     })
   }
 
-  async getRecommendedCrops(district = "Anuradhapura", landSize = 2.5): Promise<CropItem[]> {
+  async getRecommendedCrops(district = "", landSize?: number): Promise<CropItem[]> {
+    const requestedLand = landSize ?? this.profile.totalLandAcres
+    if (requestedLand <= 0 || !this.profile.farmerId) return []
     try {
       const top3Res = await fetchFarmerTop3({
-        farmer_id: this.profile.id,
+        farmer_id: this.profile.farmerId,
         season: "Maha",
-        land_ha: landSize * 0.404686,
-        is_rainfed: this.profile.irrigationSource === "Rainfed",
+        land_ha: requestedLand * 0.404686,
+        is_rainfed: false,
       })
 
       if (top3Res && Array.isArray(top3Res.top3) && top3Res.top3.length > 0) {
-        return top3Res.top3.map((c) => mapApiCropToCropItem(c, landSize))
+        return top3Res.top3.map((c) => mapApiCropToCropItem(c, requestedLand))
       }
     } catch (err) {
       console.warn("fetchFarmerTop3 network request failed, falling back to local cache", err)
     }
 
-    // Default baseline crops from DoA catalog if offline
-    const fallbackCatalog = [
-      { crop_id: "green_gram", crop_name: "Green Gram", fit_score: 92, water_need_mm_season: 350, spi_band_at_harvest: "Balanced" },
-      { crop_id: "chilli", crop_name: "Green Chilli", fit_score: 86, water_need_mm_season: 450, spi_band_at_harvest: "Shortage" },
-      { crop_id: "big_onion", crop_name: "Big Onion", fit_score: 79, water_need_mm_season: 600, spi_band_at_harvest: "Oversupply" },
-    ]
-    return fallbackCatalog.map((c) => mapApiCropToCropItem(c, landSize))
+    return []
   }
 
   async getAlerts(lang: "en" | "si" | "ta" = "si"): Promise<AlertItem[]> {
@@ -300,7 +297,7 @@ class FarmerService {
         planned_area_ha: areaHa,
         actual_area_ha: areaHa,
         consent_given: true,
-        pseudonymous_id: this.profile.pseudonymousId || this.profile.id,
+        pseudonymous_id: this.profile.farmerId,
       })
 
       if (res && res.report_id) {
@@ -389,7 +386,7 @@ class FarmerService {
         quantity_stored_kg: harvestData.quantityStoredKg || 0,
         sale_price_rs_kg: harvestData.salePriceRsKg,
         sale_channel: harvestData.saleChannel,
-        pseudonymous_id: this.profile.pseudonymousId || this.profile.id,
+        pseudonymous_id: this.profile.farmerId,
       })
       if (res && res.harvest_id) {
         return { success: true, harvestId: res.harvest_id }

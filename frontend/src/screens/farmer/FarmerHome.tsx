@@ -1,11 +1,12 @@
 import { Sparkles, Calendar, ChevronRight, AlertCircle, Sprout, TrendingUp, HelpCircle } from "lucide-react"
-import type { CropItem, Language } from "../../types/farmer"
+import type { CropItem, FarmerProfileData, Language } from "../../types/farmer"
 import { getTranslations } from "../../i18n"
 import { WaterDrops } from "../../components/farmer/WaterDrops"
 import { MiniGauge } from "../../components/farmer/MiniGauge"
 
 interface FarmerHomeProps {
   crops: CropItem[]
+  profile: FarmerProfileData | null
   language: Language
   onCompare: () => void
   onSelectCrop: (crop: CropItem) => void
@@ -15,6 +16,7 @@ interface FarmerHomeProps {
 
 export function FarmerHome({
   crops,
+  profile,
   language,
   onCompare,
   onSelectCrop,
@@ -33,7 +35,7 @@ export function FarmerHome({
             {t.seasonPeriod}
           </span>
           <h2 className="text-xl font-extrabold tracking-tight text-white pt-1">
-            {t.home.greeting}
+            {profile?.name ? `Ayubowan, ${profile.name}` : "Welcome"}
           </h2>
           <p className="text-xs text-emerald-100 font-medium">
             {t.home.greetingSub}
@@ -99,7 +101,9 @@ export function FarmerHome({
               {t.home.topPicksHeader.title}
             </h3>
             <span className="text-[11px] font-medium text-stone-500">
-              {t.home.topPicksHeader.subtitle}
+              {profile?.totalLandAcres
+                ? `Calculated for ${profile.totalLandAcres} acres in ${profile.district}`
+                : "Live recommendations for your farm"}
             </span>
           </div>
 
@@ -115,7 +119,11 @@ export function FarmerHome({
 
         {/* Horizontal Scroll / Stack of Top 3 Cards */}
         <div className="space-y-3">
-          {crops.map((crop, idx) => (
+          {crops.length === 0 ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+              Live recommendations are unavailable. Connect to the GoviSense server and try again.
+            </div>
+          ) : crops.map((crop, idx) => (
             <div
               key={crop.id}
               onClick={() => onSelectCrop(crop)}
@@ -232,4 +240,3 @@ export function FarmerHome({
     </div>
   )
 }
-

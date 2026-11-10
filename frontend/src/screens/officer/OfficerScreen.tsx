@@ -47,7 +47,6 @@ import {
   SliderField,
   RiskBadge,
   ConfidenceBadge,
-  DemoRibbon,
   WorkspaceSwitcher,
   ScreenStateView,
 } from "../../components/common"
@@ -114,7 +113,14 @@ export function OfficerScreen({
   const [selectedMonth, setSelectedMonth] = useState(6)
   const [assumptionsOpen, setAssumptionsOpen] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [page, setPage] = useState<OfficerPage>(initialRole === "Admin" ? "Data sources" : initialPage)
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => getStoredAuthUser())
+  const [page, setPage] = useState<OfficerPage>(
+    initialRole === "Admin"
+      ? "Data sources"
+      : currentUser
+        ? initialPage
+        : "Login",
+  )
   const [screenState, setScreenState] = useState<ScreenState>("ready")
   const [lastReport, setLastReport] = useState<GroundReport | null>(null)
   const [decision, setDecision] = useState("")
@@ -122,7 +128,6 @@ export function OfficerScreen({
   const [forecastData, setForecastData] = useState<LatestForecastsWithMeta | null>(null)
   const [isLiveApi, setIsLiveApi] = useState(false)
   const [forecastLoading, setForecastLoading] = useState(true)
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => getStoredAuthUser())
   const [simulatedMetrics, setSimulatedMetrics] = useState<any>(null)
   const [alertsOpen, setAlertsOpen] = useState(false)
   const [officerNoteText, setOfficerNoteText] = useState<Record<string, string>>({})
@@ -151,9 +156,7 @@ export function OfficerScreen({
           setDecisionHistory(res.records.map(mapApiRecordToPolicyDecision))
         }
       })
-      .catch(() => {
-        // fallback to INITIAL_DECISION_HISTORY
-      })
+      .catch(() => setDecisionHistory([]))
 
     return () => {
       active = false
@@ -200,13 +203,13 @@ export function OfficerScreen({
       apiRes = await logDecisionActionApi({
         crop_id: normCrop,
         season: "Maha 2025/2026",
-        officer_id: details?.officer || "Officer OFF-7710",
+        officer_id: details?.officer || currentUser?.username || "",
         action_type: value.toUpperCase().replace(/\s+/g, "_"),
         quantity: 1200,
         unit: "MT",
         rationale: details?.impactEstimate || details?.notes || `Policy directive: ${value}`,
-        model_version: "LightGBM-v2.1+HiGHS-LP",
-        data_version: "CBSL-HARTI-DOA-2024.12",
+        model_version: currentApiCropData?.ai2_price_forecast.selected_model,
+        data_version: currentApiCropData?.ai2_price_forecast.forecast_source,
         assumptions: {
           lead_time_weeks: details?.leadTime || 7,
           loss_pct: 0.15,
@@ -219,8 +222,9 @@ export function OfficerScreen({
       // offline fallback handled by logDecisionActionApi
     }
 
-    const recHash = apiRes?.record_hash || "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    const recId = apiRes?.decision_id || `DEC-${Date.now().toString(16).toUpperCase()}`
+    if (!apiRes?.record_hash || !apiRes.decision_id) return
+    const recHash = apiRes.record_hash
+    const recId = apiRes.decision_id
 
     const newEntry: PolicyDecision = {
       id: recId,
@@ -228,13 +232,13 @@ export function OfficerScreen({
       timestamp: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) + " UTC",
       crop: selectedCrop,
       district: selectedDistrict,
-      modelVersion: "LightGBM-v2.1+HiGHS-LP",
-      dataVersion: "CBSL-HARTI-DOA-2024.12",
+      modelVersion: currentApiCropData?.ai2_price_forecast.selected_model || "",
+      dataVersion: currentApiCropData?.ai2_price_forecast.forecast_source || "",
       assumptions: details?.assumptions || `Loss 15% · Lead ${details?.leadTime || 7}w`,
       leadTime: details?.leadTime || 7,
       action: value,
       category: details?.category || "Import quota",
-      officer: details?.officer || "Officer OFF-7710",
+      officer: details?.officer || currentUser?.username || "",
       designation: details?.designation || "Authorized Agricultural Decision Maker",
       status: "Active",
       notes: details?.notes || `Executive directive recorded from Gap & Import Timeline for ${selectedCrop} in ${selectedDistrict}.`,
@@ -252,7 +256,6 @@ export function OfficerScreen({
 
   return (
     <div className="officer-app">
-      <DemoRibbon isLive={isLiveApi} />
       <aside className="sidebar">
         <div className="brand">
           <div className="brand__mark">

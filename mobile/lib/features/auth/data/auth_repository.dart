@@ -24,8 +24,14 @@ class AuthRepository extends ChangeNotifier {
   final FlutterSecureStorage _storage;
   String? _accessToken;
   String? _role;
+  String? _username;
+  String? _name;
+  String? _district;
   String? get accessToken => _accessToken;
   String? get role => _role;
+  String? get username => _username;
+  String? get name => _name;
+  String? get district => _district;
   bool initialized = false;
   Timer? _timer;
   bool get authenticated => accessToken != null && role != null;
@@ -71,7 +77,11 @@ class AuthRepository extends ChangeNotifier {
     if (remaining <= Duration.zero) throw const FormatException('Expired');
     final response = await _dio.get<Map<String, dynamic>>(
       '/api/auth/me',
-      options: Options(headers: {'Authorization': 'Bearer $token'}),
+      options: Options(
+        headers: {
+          'Authorization': ['Bearer', token].join(' '),
+        },
+      ),
     );
     final data = response.data!;
     final profile = data['user'] is Map ? data['user'] as Map : data;
@@ -81,6 +91,9 @@ class AuthRepository extends ChangeNotifier {
     }
     _accessToken = token;
     _role = verifiedRole;
+    _username = claims['sub']?.toString();
+    _name = claims['name']?.toString();
+    _district = claims['district']?.toString();
     _timer?.cancel();
     _timer = Timer(remaining, () {
       unawaited(logout());
@@ -91,6 +104,9 @@ class AuthRepository extends ChangeNotifier {
     _timer?.cancel();
     _accessToken = null;
     _role = null;
+    _username = null;
+    _name = null;
+    _district = null;
     notifyListeners();
     await _storage.delete(key: 'access_token');
   }

@@ -30,7 +30,6 @@ import {
   useGroundReports,
   type AdoptionSimulationResponse,
   type LatestForecastsResponse,
-  BASELINE_ADOPTION_SIMULATION,
 } from "../../api"
 
 export function AdoptionScreen({
@@ -45,7 +44,7 @@ export function AdoptionScreen({
   isLiveApi?: boolean
 }) {
   const [simAdoption, setSimAdoption] = useState<0 | 30 | 60>(30)
-  const [simData, setSimData] = useState<AdoptionSimulationResponse>(BASELINE_ADOPTION_SIMULATION)
+  const [simData, setSimData] = useState<AdoptionSimulationResponse | null>(null)
   const [simLoading, setSimLoading] = useState(false)
 
   const cropKey = crop.toLowerCase().includes("chilli") ? "chilli" : "big_onion"
@@ -64,7 +63,7 @@ export function AdoptionScreen({
       })
       .catch(() => {
         if (!mounted) return
-        setSimData(BASELINE_ADOPTION_SIMULATION)
+        setSimData(null)
         setSimLoading(false)
       })
     return () => {
@@ -73,7 +72,7 @@ export function AdoptionScreen({
   }, [cropKey])
 
   // Real database acreage, adherence, and predicted vs actual from backend
-  const targetAreaHa = adoptData?.acreage?.target_area_ha ?? (cropKey === "chilli" ? 1840 : 2131)
+  const targetAreaHa = adoptData?.acreage?.target_area_ha ?? 0
   const reportedPlantedHa = adoptData?.acreage?.reported_planted_area_ha ?? 0
   const coveragePct = adoptData?.acreage?.coverage_pct ?? 0
   const adherence = adoptData?.recommendation_adherence
@@ -87,10 +86,18 @@ export function AdoptionScreen({
   const isPrivacySuppressed = grData?.privacy_suppressed ?? false
 
   // Selected scenario from the live API response
-  const activeScenario =
-    simData.scenarios.find((s) => s.adoption_rate_pct === simAdoption) ||
-    simData.scenarios[1] ||
-    BASELINE_ADOPTION_SIMULATION.scenarios[1]
+  const activeScenario = simData?.scenarios.find((s) => s.adoption_rate_pct === simAdoption)
+
+  if (simLoading || !simData || !activeScenario) {
+    return (
+      <PageHeading
+        eyebrow="Ground truth monitoring"
+        icon={Users}
+        title="Adoption Tracker & Simulation"
+        description={simLoading ? "Loading live adoption data…" : "Live adoption data is unavailable."}
+      />
+    )
+  }
 
   const spiTone =
     activeScenario.spi_label === "Glut"
@@ -114,12 +121,12 @@ export function AdoptionScreen({
   const cropRows = [
     {
       name: "Big onion",
-      targetHa: plantRec && cropKey === "big_onion" ? Math.round(plantRec.quantity) : 2131,
+      targetHa: plantRec && cropKey === "big_onion" ? Math.round(plantRec.quantity) : 0,
       reportedHa: cropKey === "big_onion" ? reportedPlantedHa : 0,
     },
     {
       name: "Chilli",
-      targetHa: 1840,
+      targetHa: plantRec && cropKey === "chilli" ? Math.round(plantRec.quantity) : 0,
       reportedHa: cropKey === "chilli" ? reportedPlantedHa : 0,
     },
   ]

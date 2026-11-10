@@ -1,5 +1,7 @@
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
+
 import '../../../core/network/api_client.dart';
 import '../models/crop_item.dart';
 import '../models/farmer_profile.dart';
@@ -42,14 +44,18 @@ class FarmerApiService {
       );
 
       if (response.statusCode == 200 && response.data != null) {
-        final data = response.data is String ? jsonDecode(response.data) : response.data;
+        final data = response.data is String
+            ? jsonDecode(response.data)
+            : response.data;
         final list = data['top3'] as List<dynamic>?;
         if (list != null && list.isNotEmpty) {
-          return list.map((item) => _mapJsonToCropItem(item as Map<String, dynamic>)).toList();
+          return list
+              .map((item) => _mapJsonToCropItem(item as Map<String, dynamic>))
+              .toList();
         }
       }
     } catch (e) {
-      debugPrint('GoviSense API connection fallback to calibrated data: $e');
+      debugPrint('GoviSense API connection failed: $e');
     }
     return null;
   }
@@ -70,7 +76,7 @@ class FarmerApiService {
   }
 
   /// Fetches live wholesale & retail market price bulletin from FastAPI backend (/api/market-prices)
-  /// Falls back to null if unreachable, allowing UI to gracefully use calibrated offline data.
+  /// Returns null when the live backend is unavailable.
   Future<List<MarketPriceItem>?> getMarketPrices({String? category}) async {
     try {
       final Map<String, dynamic> query = {};
@@ -83,16 +89,21 @@ class FarmerApiService {
       );
 
       if (response.statusCode == 200 && response.data != null) {
-        final data = response.data is String ? jsonDecode(response.data) : response.data;
+        final data = response.data is String
+            ? jsonDecode(response.data)
+            : response.data;
         final list = data['prices'] as List<dynamic>?;
         if (list != null && list.isNotEmpty) {
           return list
-              .map((item) => MarketPriceItem.fromJson(item as Map<String, dynamic>))
+              .map(
+                (item) =>
+                    MarketPriceItem.fromJson(item as Map<String, dynamic>),
+              )
               .toList();
         }
       }
     } catch (e) {
-      debugPrint('Market prices API connection fallback: $e');
+      debugPrint('Market prices API connection failed: $e');
     }
     return null;
   }
@@ -106,24 +117,25 @@ class FarmerApiService {
       );
       return response.statusCode == 200;
     } catch (e) {
-      debugPrint('Acknowledge alert API fallback: $e');
+      debugPrint('Acknowledge alert API request failed: $e');
       return false;
     }
   }
 
   /// Sends farmer inquiry to the agricultural extension officer (/api/alerts/{id}/ask)
-  Future<bool> askOfficer(String alertId, String farmerId, String question) async {
+  Future<bool> askOfficer(
+    String alertId,
+    String farmerId,
+    String question,
+  ) async {
     try {
       final response = await _client.post(
         '/api/alerts/$alertId/ask',
-        data: {
-          'farmer_id': farmerId,
-          'question': question,
-        },
+        data: {'farmer_id': farmerId, 'question': question},
       );
       return response.statusCode == 200;
     } catch (e) {
-      debugPrint('Ask officer API fallback: $e');
+      debugPrint('Ask officer API request failed: $e');
       return false;
     }
   }
@@ -131,12 +143,17 @@ class FarmerApiService {
   CropItem _mapJsonToCropItem(Map<String, dynamic> json) {
     final cropId = (json['crop_id'] as String? ?? 'unknown').toLowerCase();
     final fitScore = (json['fit_score'] as num?)?.toInt() ?? 80;
-    final spiBand = (json['spi_band_at_harvest'] as String? ?? 'Balanced').toLowerCase();
+    final spiBand = (json['spi_band_at_harvest'] as String? ?? 'Balanced')
+        .toLowerCase();
     final priceRange = json['profit_range_rs_kg'] as Map<String, dynamic>?;
     final p10 = (priceRange?['p10_rs_kg'] as num?)?.toDouble() ?? 200.0;
     final p90 = (priceRange?['p90_rs_kg'] as num?)?.toDouble() ?? 350.0;
     final waterMm = (json['water_need_mm_season'] as num?)?.toInt() ?? 500;
-    final reasons = (json['suitability_reasons'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
+    final reasons =
+        (json['suitability_reasons'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        [];
 
     MarketRisk risk = MarketRisk.balanced;
     if (spiBand.contains('shortage')) {
@@ -149,7 +166,9 @@ class FarmerApiService {
     if (waterMm <= 400) waterDrops = 1;
     if (waterMm >= 600) waterDrops = 3;
 
-    final firstReason = reasons.isNotEmpty ? reasons.first : 'Optimal conditions in Anuradhapura';
+    final firstReason = reasons.isNotEmpty
+        ? reasons.first
+        : 'Optimal conditions in Anuradhapura';
 
     if (cropId.contains('onion')) {
       return CropItem(
@@ -168,8 +187,10 @@ class FarmerApiService {
         risk: risk,
         spiScore: 1.38,
         riskTextEn: 'Watch supply · Risk of peak harvest congestion & imports',
-        riskTextSi: 'සැපයුම ගැන විමසිලිමත් වන්න · අස්වනු සමයේ තොග තදබද අවදානමක්',
-        riskTextTa: 'வழங்கலைக் கவனிக்கவும் · அறுவடைக் காலத்தில் விலை சரிவு அபாயம்',
+        riskTextSi:
+            'සැපයුම ගැන විමසිලිමත් වන්න · අස්වනු සමයේ තොග තදබද අවදානමක්',
+        riskTextTa:
+            'வழங்கலைக் கவனிக்கவும் · அறுவடைக் காலத்தில் விலை சரிவு அபாயம்',
         waterNeed: waterDrops,
         plantWindowEn: 'Nov 01 – Nov 25',
         plantWindowSi: 'නොවැ 01 – නොවැ 25',
@@ -274,4 +295,3 @@ class FarmerApiService {
     }
   }
 }
-

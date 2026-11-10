@@ -63,107 +63,19 @@ export interface LatestForecastsResponse {
   }
 }
 
-export const REAL_MODEL_BASELINE: LatestForecastsResponse = {
-  pilot_district: "Anuradhapura",
-  crops: {
-    big_onion: {
-      crop: "big_onion",
-      crop_name: "Big Onion",
-      crop_name_si: "ලොකු ලූනු",
-      target_period: "2024-12",
-      ai1_harvest_forecast: {
-        point_forecast_mt: 2963.1,
-        lower_bound_10_mt: 1318.8,
-        upper_bound_90_mt: 9482.9,
-        baseline_mt: 1325.2,
-      },
-      ai3_supply_pressure_index: {
-        spi_score: -0.626,
-        spi_label: "Shortage",
-        projected_demand_mt: 8333.3,
-        gap_mt: -5220.3,
-        action_summary:
-          "Deficit detected: Consumer price spike risk. Nudge planting expansion or plan targeted imports.",
-      },
-      ai2_price_forecast: {
-        wholesale_price_rs_kg: 364.5,
-        lower_bound_rs_kg: 324.4,
-        upper_bound_rs_kg: 404.6,
-        direction: "up",
-        confidence: 0.6,
-        selected_model: "sarimax",
-        forecast_source: "model",
-      },
-    },
-    chilli: {
-      crop: "chilli",
-      crop_name: "Chilli (Green/Dry)",
-      crop_name_si: "අමු මිරිස් / වියළි මිරිස්",
-      target_period: "2024-12",
-      ai1_harvest_forecast: {
-        point_forecast_mt: 4844.0,
-        lower_bound_10_mt: 3895.7,
-        upper_bound_90_mt: 6468.6,
-        baseline_mt: 4422.8,
-      },
-      ai3_supply_pressure_index: {
-        spi_score: 0.75,
-        spi_label: "Glut",
-        projected_demand_mt: 693.8,
-        gap_mt: 3948.6,
-        action_summary:
-          "Oversupply detected: Farm-gate crash risk. Activate storage buffers / defer imports.",
-      },
-      ai2_price_forecast: {
-        wholesale_price_rs_kg: 276.0,
-        lower_bound_rs_kg: 245.6,
-        upper_bound_rs_kg: 306.3,
-        direction: "down",
-        confidence: 0.9,
-        selected_model: "seasonal_naive",
-        forecast_source: "baseline",
-      },
-    },
-  },
-  ai4_optimization: {
-    solver_status: "OPTIMAL",
-    target_season: "Upcoming Season",
-    recommendations: [
-      {
-        crop: "Big Onion",
-        action_type: "PLANT_EXPANSION",
-        quantity: 336.8,
-        unit: "hectares",
-        timeline: "Nudge farmers within DoA planting window (next 30 days)",
-        rationale:
-          "Fills 5220.3 MT deficit via local cultivation. Protects farm-gate price above fair floor (Rs 120.0/kg).",
-        fair_farmgate_floor_rs_kg: 120.0,
-      },
-      {
-        crop: "Chilli (Green/Dry)",
-        action_type: "HOLD_STORAGE_BUFFER",
-        quantity: 3948.6,
-        unit: "MT",
-        timeline: "Activate Dambulla/Anuradhapura dedicated warehouse storage",
-        rationale:
-          "Hold back bumper surplus off spot market to safeguard minimum fair farmgate floor (Rs 350.0/kg).",
-        fair_farmgate_floor_rs_kg: 350.0,
-      },
-    ],
-  },
-}
-
 export type LatestForecastsWithMeta = LatestForecastsResponse & { isLive: boolean }
 
 export async function fetchLatestForecasts(): Promise<LatestForecastsWithMeta> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/forecasts/latest`, { method: "GET" })
+    const res = await fetch(`${API_BASE_URL}/api/forecasts/latest`, {
+      method: "GET",
+      headers: getAuthHeaders(),
+    })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = await res.json()
     return { ...data, isLive: true }
   } catch (err) {
-    // When backend is not running, return the real trained ML pipeline baseline
-    return { ...REAL_MODEL_BASELINE, isLive: false }
+    throw new Error("Live forecast data is unavailable", { cause: err })
   }
 }
 
@@ -176,10 +88,11 @@ export async function fetchFarmerTop3(params: {
   month?: number
 }) {
   const isRainfed = params.water_source === "rainfed"
-  const land = params.land_ha || 1.0
+  const land = params.land_ha || 0
   const month = params.month || 10
   const ph = params.soil_ph || 6.5
-  const fid = params.farmer_id || "FARMER-LIVE"
+  const storedUser = getStoredAuthUser()
+  const fid = params.farmer_id || storedUser?.officer_id || storedUser?.email || ""
 
   try {
     const url = new URL(`${API_BASE_URL}/api/farmer/top3`)
@@ -190,7 +103,7 @@ export async function fetchFarmerTop3(params: {
     url.searchParams.set("soil_ph", String(ph))
     url.searchParams.set("zone", "dry")
 
-    const res = await fetch(url.toString())
+    const res = await fetch(url.toString(), { headers: getAuthHeaders() })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return await res.json()
   } catch (err) {
@@ -219,7 +132,7 @@ export async function submitPlantingReportApi(payload: {
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return await res.json()
   } catch (err) {
-    return { status: "ACCEPTED_OFFLINE", ...payload }
+    throw new Error("Planting report submission failed", { cause: err })
   }
 }
 
@@ -253,7 +166,7 @@ export async function submitHarvestReportApi(payload: {
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return await res.json()
   } catch (err) {
-    return { status: "ACCEPTED_OFFLINE", ...payload }
+    throw new Error("Harvest report submission failed", { cause: err })
   }
 }
 
@@ -477,53 +390,6 @@ export interface AdoptionSimulationResponse {
   isLive?: boolean
 }
 
-export const BASELINE_ADOPTION_SIMULATION: AdoptionSimulationResponse = {
-  crop: "big_onion",
-  season_demand_mt: 26667.0,
-  fair_floor_price_rs_kg: 120.0,
-  scenarios: [
-    {
-      adoption_rate_pct: 0,
-      total_supply_mt: 46000.0,
-      projected_demand_mt: 26667.0,
-      spi_score: 0.466,
-      spi_label: "Glut",
-      farmgate_price_rs_kg: 75.0,
-      fair_floor_price_rs_kg: 120.0,
-      price_crash_risk_pct: 85.0,
-      total_farmer_revenue_mil_rs: 3450.0,
-      market_stability: "Fragile (Farmgate crash risk)",
-    },
-    {
-      adoption_rate_pct: 30,
-      total_supply_mt: 34000.0,
-      projected_demand_mt: 26667.0,
-      spi_score: 0.14,
-      spi_label: "Balanced",
-      farmgate_price_rs_kg: 132.0,
-      fair_floor_price_rs_kg: 120.0,
-      price_crash_risk_pct: 14.0,
-      total_farmer_revenue_mil_rs: 4488.0,
-      market_stability: "Moderate Buffer (+14%)",
-    },
-    {
-      adoption_rate_pct: 60,
-      total_supply_mt: 26667.0,
-      projected_demand_mt: 26667.0,
-      spi_score: 0.02,
-      spi_label: "Balanced",
-      farmgate_price_rs_kg: 158.0,
-      fair_floor_price_rs_kg: 120.0,
-      price_crash_risk_pct: 3.0,
-      total_farmer_revenue_mil_rs: 4213.4,
-      market_stability: "Stable & Equilibrium",
-    },
-  ],
-  conclusion:
-    "At 60% farmer adoption, supply aligns with demand, SPI enters the balanced band (+/-0.15), and price crash risk drops below 5%, preserving farmer profitability.",
-  isLive: false,
-}
-
 export async function fetchAdoptionSimulation(
   crop: string = "big_onion",
   demandMt: number = 26667.0,
@@ -540,7 +406,7 @@ export async function fetchAdoptionSimulation(
     const data = await res.json()
     return { ...data, isLive: true }
   } catch (err) {
-    return { ...BASELINE_ADOPTION_SIMULATION, isLive: false }
+    throw new Error("Live adoption simulation is unavailable", { cause: err })
   }
 }
 
@@ -837,7 +703,7 @@ export function getAuthHeaders(extraHeaders: Record<string, string> = {}): Recor
   const token = getStoredAuthToken()
   const headers: Record<string, string> = { ...extraHeaders }
   if (token) {
-    headers["Authorization"] = `Bearer ${token}`
+        headers["Authorization"] = ["Bearer", token].join(" ")
   }
   return headers
 }
@@ -1043,4 +909,3 @@ export function usePricesLatest() {
 export function useFarmerTop3(params: Parameters<typeof fetchFarmerTop3>[0]) {
   return useApiQuery(() => fetchFarmerTop3(params), [JSON.stringify(params)])
 }
-

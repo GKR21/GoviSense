@@ -119,7 +119,7 @@ export function OverviewScreen({
                 color: isLiveApi ? "var(--primary)" : "#60a5fa",
                 border: `1px solid ${isLiveApi ? "var(--balanced-border)" : "rgba(59, 130, 246, 0.35)"}`,
               }}>
-                {isLiveApi ? "● LIVE ML PIPELINE" : "🔵 DEMO · TRAINED BASELINE"}
+                {isLiveApi ? "● LIVE ML PIPELINE" : "● LIVE DATA UNAVAILABLE"}
               </span>
               <span style={{
                 padding: "4px 12px",
@@ -172,11 +172,6 @@ export function OverviewScreen({
           meta={
             <span>
               {spiAction || `Confidence: ${priceConfidence}%`}
-              {!isLiveApi && (
-                <span style={{ marginLeft: "6px", color: "#60a5fa", fontSize: "10px", fontWeight: "700" }}>
-                  (Demo)
-                </span>
-              )}
             </span>
           }
           icon={spiLabel === "Glut" ? ArrowUpCircle : ArrowDownCircle}
@@ -188,11 +183,6 @@ export function OverviewScreen({
           meta={
             <span>
               Fair floor: Rs. {profile.fairFloorPrice} / kg (AI 2)
-              {!isLiveApi && (
-                <span style={{ marginLeft: "6px", color: "#60a5fa", fontSize: "10px", fontWeight: "700" }}>
-                  (Demo)
-                </span>
-              )}
             </span>
           }
           icon={CircleDollarSign}
@@ -324,4 +314,3 @@ export function OverviewScreen({
     </>
   )
 }
-

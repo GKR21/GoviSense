@@ -1,4 +1,5 @@
 import '../../auth/data/auth_repository.dart';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -157,7 +158,7 @@ class _FarmerPageState extends State<FarmerPage> {
                         color: AppTheme.primaryTint,
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Maha 2026',
                         style: TextStyle(
                           fontSize: 9,
@@ -404,8 +405,10 @@ class _FarmerPageState extends State<FarmerPage> {
                       color: AppTheme.accent,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Text(
-                      '11 Days Left',
+                    child: Text(
+                      _repo.profile.name.isEmpty
+                          ? 'Live data'
+                          : _repo.profile.district,
                       style: TextStyle(
                         color: Color(0xFF073820),
                         fontSize: 10,
@@ -417,7 +420,9 @@ class _FarmerPageState extends State<FarmerPage> {
               ),
               const SizedBox(height: 10),
               Text(
-                AppTranslations.t(_language, 'greeting'),
+                _repo.profile.name.isEmpty
+                    ? AppTranslations.t(_language, 'greeting')
+                    : 'Ayubowan, ${_repo.profile.name}',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 20,
@@ -639,7 +644,9 @@ class _FarmerPageState extends State<FarmerPage> {
                   ),
                 ),
                 Text(
-                  AppTranslations.t(_language, 'topPicksSub'),
+                  _repo.profile.totalLandAcres > 0
+                      ? 'Calculated for ${_repo.profile.totalLandAcres} acres in ${_repo.profile.district}'
+                      : 'Live recommendations for your farm',
                   style: const TextStyle(
                     fontSize: 11,
                     color: AppTheme.neutral600,
@@ -649,8 +656,8 @@ class _FarmerPageState extends State<FarmerPage> {
             ),
             TextButton(
               onPressed: () => setState(() => _selectedIndex = 1),
-              child: const Text(
-                'View All (3)',
+              child: Text(
+                'View All (${crops.length})',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
               ),
             ),
@@ -658,11 +665,16 @@ class _FarmerPageState extends State<FarmerPage> {
         ),
         const SizedBox(height: 8),
 
-        // Offline Fallback Recommendations Banner
-        _buildOfflineRecommendationsBanner(),
-
         // Top 3 Crop Snippets
-        ...crops.map((crop) => _buildCropHomeSnippet(crop)),
+        if (crops.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Text(
+              'Live recommendations are unavailable. Connect to the GoviSense server and try again.',
+            ),
+          )
+        else
+          ...crops.map((crop) => _buildCropHomeSnippet(crop)),
         const SizedBox(height: 14),
 
         // Mini 6-Month Harvest Pressure Ribbon
@@ -755,111 +767,6 @@ class _FarmerPageState extends State<FarmerPage> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildOfflineRecommendationsBanner() {
-    if (!_repo.isUsingOfflineFallback) return const SizedBox.shrink();
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEB), // amber-50
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFDE68A)), // amber-200
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 2),
-            child: Icon(
-              Icons.cloud_off_rounded,
-              color: Color(0xFFD97706),
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      _language == AppLanguage.si
-                          ? 'නොබැඳි නිර්දේශ මාදිලිය'
-                          : _language == AppLanguage.ta
-                          ? 'ஆஃப்லைன் பரிந்துரை முறை'
-                          : 'Offline Baseline Recommendations',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF92400E),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEF3C7),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        '_initialCrops',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontFamily: 'monospace',
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFFB45309),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  _language == AppLanguage.si
-                      ? 'පෙන්වනු ලබන්නේ පූර්ව-ක්‍රමාංකිත මූලික නිර්දේශයන්ය (_initialCrops). සජීවී AI අනාවැකි සඳහා සබඳතාව යාවත්කාලීන කරන්න.'
-                      : _language == AppLanguage.ta
-                      ? 'முன்கூட்டியே கணிக்கப்பட்ட மாதிரி பரிந்துரைகள் காட்டப்படுகின்றன (_initialCrops). நேரலை முன்னறிவிப்புகளுக்கு மீண்டும் முயற்சிக்கவும்.'
-                      : 'Showing pre-calibrated baseline recommendations (_initialCrops). Reconnect to sync live market forecasts from Anuradhapura Agrarian Ledger.',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFFB45309),
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            icon: _repo.isLoadingApi
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Color(0xFFD97706),
-                    ),
-                  )
-                : const Icon(
-                    Icons.refresh_rounded,
-                    color: Color(0xFFD97706),
-                    size: 20,
-                  ),
-            tooltip: 'Retry Live Connection',
-            onPressed: _repo.isLoadingApi
-                ? null
-                : () => _repo.refreshRecommendations(),
-          ),
-        ],
-      ),
     );
   }
 
@@ -1037,8 +944,6 @@ class _FarmerPageState extends State<FarmerPage> {
         const SizedBox(height: 14),
 
         // Offline Fallback Recommendations Banner
-        _buildOfflineRecommendationsBanner(),
-
         ...crops.map((crop) => _buildFullCropCard(crop)),
       ],
     );
@@ -1250,6 +1155,31 @@ class _FarmerPageState extends State<FarmerPage> {
     }
 
     final crops = _repo.crops;
+    if (crops.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off_rounded, size: 48),
+              const SizedBox(height: 12),
+              const Text(
+                'Live recommendations are unavailable.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: _repo.isLoadingApi
+                    ? null
+                    : () => _repo.refreshRecommendations(),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     final selectedCrop = crops.firstWhere(
       (c) => c.id == _selectedCropId,
       orElse: () => crops.first,
@@ -2798,7 +2728,9 @@ class _FarmerPageState extends State<FarmerPage> {
       confirmText: confirmText,
       cancelText: cancelText,
       icon: Icons.logout_rounded,
-      onConfirm: () async { await AuthRepository.instance.logout(); },
+      onConfirm: () async {
+        await AuthRepository.instance.logout();
+      },
     );
   }
 

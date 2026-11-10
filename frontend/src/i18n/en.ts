@@ -3,7 +3,6 @@ export const en = {
   tagline: "Empowering Sri Lankan Cultivators",
   seasonBadge: "Maha 2026 · Anuradhapura",
   seasonPeriod: "Maha Season 2026/27",
-  demoDataBadge: "OFFICIAL AGRARIAN SAMPLE DATA",
   syncStatus: "Updated 20m ago · DOA Target v2.4",
   offlineMode: "Offline mode · Saved advice ready",
 
@@ -213,4 +212,3 @@ export const en = {
     emptyDesc: "Try adjusting your district or soil specifications in profile.",
   },
 } as const
-

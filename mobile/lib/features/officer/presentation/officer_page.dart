@@ -726,7 +726,11 @@ class _OfficerPageState extends State<OfficerPage> {
             style: Theme.of(context).textTheme.titleLarge,
           ),
           Text(_repo.forecastNote ?? 'Monthly model estimates'),
-          Text('${points.first.month} to ${points.last.month}'),
+          Text(
+            points.isEmpty
+                ? 'Live forecast data unavailable'
+                : '${points.first.month} to ${points.last.month}',
+          ),
           if (_repo.loadingForecast) const LinearProgressIndicator(),
           if (_repo.forecastError != null)
             Text('${_repo.forecastError} Showing previously loaded estimates.'),
