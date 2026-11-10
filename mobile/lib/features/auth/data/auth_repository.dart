@@ -1,3 +1,5 @@
+import '../../../core/network/transport_policy.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -9,16 +11,24 @@ import '../../../core/config/app_config.dart';
 
 class AuthRepository extends ChangeNotifier {
   AuthRepository({Dio? dio, FlutterSecureStorage? storage})
-    : _dio =
-          dio ??
-          Dio(
-            BaseOptions(
-              baseUrl: AppConfig.apiBaseUrl,
-              connectTimeout: const Duration(seconds: 10),
-              receiveTimeout: const Duration(seconds: 10),
+    : _customDio = dio != null,
+      _dio = secureApiDio(
+        dio ??
+            Dio(
+              BaseOptions(
+                baseUrl: AppConfig.apiBaseUrl,
+                connectTimeout: const Duration(seconds: 10),
+                receiveTimeout: const Duration(seconds: 10),
+              ),
             ),
-          ),
+      ),
       _storage = storage ?? const FlutterSecureStorage();
+  final bool _customDio;
+  Dio get _client {
+    if (!_customDio) _dio.options.baseUrl = AppConfig.apiBaseUrl;
+    return _dio;
+  }
+
   static final instance = AuthRepository();
   final Dio _dio;
   final FlutterSecureStorage _storage;
@@ -49,7 +59,7 @@ class AuthRepository extends ChangeNotifier {
   }
 
   Future<void> login(String username, String password) async {
-    final response = await _dio.post<Map<String, dynamic>>(
+    final response = await _client.post<Map<String, dynamic>>(
       '/api/auth/login',
       data: {'username': username.trim(), 'password': password},
     );
@@ -103,7 +113,7 @@ class AuthRepository extends ChangeNotifier {
     final remaining = DateTime.fromMillisecondsSinceEpoch((exp * 1000).toInt())
         .difference(DateTime.now());
     if (remaining <= Duration.zero) throw const FormatException('Expired');
-    final response = await _dio.get<Map<String, dynamic>>(
+    final response = await _client.get<Map<String, dynamic>>(
       '/api/auth/me',
       options: Options(
         headers: {

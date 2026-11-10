@@ -52,20 +52,20 @@ import {
 } from "../../components/common"
 import { SupplyChart } from "../../components/charts"
 import {
-  fetchLatestForecasts,
-  fetchDecisionHistory,
   logDecisionActionApi,
-  mapApiRecordToPolicyDecision,
+  fetchServerIdentity,
   getStoredAuthUser,
   clearAuthSession,
   simulateScenarioApi,
   useAlerts,
   addOfficerNoteApi,
   acknowledgeAlertApi,
-  type LatestForecastsWithMeta,
+  useLatestForecasts,
+  cropApiId,
   type CropForecastData,
   type AuthUser,
 } from "../../api"
+import { ApiDataState } from "../../components/common/ApiDataState"
 
 import { OverviewScreen } from "./OverviewScreen"
 import { GapTimelineScreen } from "./GapTimelineScreen"
@@ -132,7 +132,8 @@ export function OfficerScreen({
   const [alertsOpen, setAlertsOpen] = useState(false)
   const [officerNoteText, setOfficerNoteText] = useState<Record<string, string>>({})
   const [noteStatus, setNoteStatus] = useState<Record<string, string>>({})
-  const { data: alertsData, reload: reloadAlerts } = useAlerts()
+  const { data: alertResponse, refetch: reloadAlerts } = useAlerts()
+  const alertsData = Array.isArray(alertResponse) ? alertResponse : alertResponse?.alerts
 
   useEffect(() => {
     let active = true
@@ -195,13 +196,14 @@ export function OfficerScreen({
   }
 
   const recordDecision = async (value: string, details?: Partial<PolicyDecision>) => {
-    setDecision(value)
-
-    const normCrop = selectedCrop.toLowerCase().includes("chilli") ? "chilli" : "big_onion"
-    let apiRes: { status: string; decision_id?: string; record_hash?: string; run_id?: string } | null = null
+    setSaved(false)
+    setDecisionError(null)
+    setDecisionReceipt(null)
     try {
-      apiRes = await logDecisionActionApi({
-        crop_id: normCrop,
+      const identity = await fetchServerIdentity()
+      if (!identity.officerId) throw new Error("The backend has not provided an officer identifier. The decision was not submitted.")
+      const receipt = await logDecisionActionApi({
+        crop_id: cropApiKey,
         season: "Maha 2025/2026",
         officer_id: details?.officer || currentUser?.username || "",
         action_type: value.toUpperCase().replace(/\s+/g, "_"),
@@ -218,8 +220,13 @@ export function OfficerScreen({
         },
         notes: details?.notes,
       })
-    } catch {
-      // offline fallback handled by logDecisionActionApi
+      setDecision(value)
+      setDecisionReceipt(receipt)
+      setSaved(true)
+      window.setTimeout(() => { setSaved(false); setPage("Decision history") }, 1200)
+    } catch (error) {
+      setDecision("")
+      setDecisionError(error instanceof Error ? error.message : "Decision could not be confirmed. Check the server ledger before retrying.")
     }
 
     if (!apiRes?.record_hash || !apiRes.decision_id) return
@@ -451,6 +458,7 @@ export function OfficerScreen({
         </header>
 
         <main className="officer-content">
+          {decisionError && <div className="alert-banner" role="alert">{decisionError}</div>}
           {screenState !== "ready" ? (
             <ScreenStateView
               state={screenState}
@@ -476,6 +484,9 @@ export function OfficerScreen({
               }}
             />
           ) : page === "Overview" ? (
+            forecastLoading || forecastError || !currentApiCropData ? (
+              <ApiDataState loading={forecastLoading} error={forecastError} empty={!currentApiCropData} onRetry={reloadForecasts} />
+            ) : (
             <OverviewScreen
               crop={selectedCrop}
               district={selectedDistrict}
@@ -483,9 +494,11 @@ export function OfficerScreen({
               scenario={scenario}
               onOpenSupply={() => setPage("Supply pressure")}
               onOpenGap={() => setPage("Gap & import timeline")}
+              onRefresh={reloadForecasts}
               apiCropData={currentApiCropData}
               isLiveApi={isLiveApi}
             />
+            )
           ) : page === "Gap & import timeline" ? (
             <GapTimelineScreen
               crop={selectedCrop}
@@ -511,7 +524,6 @@ export function OfficerScreen({
           ) : page === "Decision history" ? (
             <HistoryScreen
               decision={decision}
-              decisionHistory={decisionHistory}
               crop={selectedCrop}
               isLiveApi={isLiveApi}
             />
@@ -522,6 +534,8 @@ export function OfficerScreen({
             />
           ) : page === "Settings" ? (
             <SettingsScreen />
+          ) : forecastLoading || forecastError || !currentApiCropData ? (
+            <ApiDataState loading={forecastLoading} error={forecastError} empty={!currentApiCropData} onRetry={reloadForecasts} />
           ) : (
             <>
               <div className="page-heading">
@@ -945,6 +959,7 @@ export function OfficerScreen({
           <CheckCircle2 size={19} />
           <div>
             <strong>{decision ? "Decision recorded" : "Scenario saved"}</strong>
+            {decisionReceipt && <p>Decision: {decisionReceipt.decision_id} | Run: {decisionReceipt.run_id}<br /><code style={{ overflowWrap: "anywhere" }}>{decisionReceipt.record_hash}</code></p>}
             <span>
               {decision
                 ? `${decision} will appear in Decision History.`

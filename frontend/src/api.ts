@@ -8,7 +8,67 @@ import type { GroundReport } from "./types"
 
 // Use the browser's origin in production so Nginx can proxy /api to FastAPI.
 // Set VITE_API_URL only when the API is hosted on a different origin.
-export const API_BASE_URL = import.meta.env.VITE_API_URL || ""
+export const API_BASE_URL = import.meta.env?.VITE_API_URL || ""
+
+export function cropApiId(crop: string): string {
+  return crop.trim().toLowerCase().replace(/\s+/g, "_")
+}
+
+export function apiUrl(path: string): URL {
+  const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost"
+  return new URL(`${API_BASE_URL.replace(/\/$/, "")}${path}`, origin)
+}
+
+async function readApi(path: string, params: Record<string, string | number | undefined> = {}) {
+  const url = apiUrl(path)
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) url.searchParams.set(key, String(value))
+  }
+  const response = await fetch(url.toString(), { headers: getAuthHeaders() })
+  if (!response.ok) throw new Error(`Could not load ${path} (HTTP ${response.status})`)
+  const data = await response.json()
+  if (data === null || typeof data !== "object") throw new Error(`Invalid response from ${path}`)
+  return data
+}
+
+export function serverId(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value : null
+}
+
+export function isReceiptHash(value: unknown): value is string {
+  return typeof value === "string" && /^[a-fA-F0-9]{64}$/.test(value)
+}
+
+export interface ServerIdentity {
+  farmerId: string | null
+  officerId: string | null
+  name: string
+  district: string
+}
+
+export async function fetchServerIdentity(): Promise<ServerIdentity> {
+  const response = await readApi("/api/auth/me")
+  const user = response.user && typeof response.user === "object" ? response.user : response
+  const role = typeof user.role === "string" ? user.role.toLowerCase() : ""
+  return {
+    farmerId: role === "farmer" ? serverId(user.pseudonymous_id) || serverId(user.farmer_id) : null,
+    officerId: role === "officer" || role === "admin" ? serverId(user.officer_id) : null,
+    name: typeof user.full_name === "string" ? user.full_name : typeof user.name === "string" ? user.name : "",
+    district: typeof user.district === "string" ? user.district : "",
+  }
+}
+
+async function postApi(path: string, payload: unknown) {
+  const response = await fetch(apiUrl(path).toString(), {
+    method: "POST",
+    headers: getAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(payload),
+  })
+  if (!response.ok) throw new Error(`Submission failed (HTTP ${response.status}). Check server records before retrying.`)
+  const data = await response.json()
+  if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Submission could not be confirmed. Check server records before retrying.")
+  return data
+}
 
 export interface CropForecastData {
   crop: string
@@ -77,6 +137,7 @@ export async function fetchLatestForecasts(): Promise<LatestForecastsWithMeta> {
   } catch (err) {
     throw new Error("Live forecast data is unavailable", { cause: err })
   }
+  return { ...data, isLive: true }
 }
 
 export async function fetchFarmerTop3(params: {
@@ -95,8 +156,8 @@ export async function fetchFarmerTop3(params: {
   const fid = params.farmer_id || storedUser?.officer_id || storedUser?.email || ""
 
   try {
-    const url = new URL(`${API_BASE_URL}/api/farmer/top3`)
-    url.searchParams.set("farmer_id", fid)
+    const url = apiUrl("/api/farmer/top3")
+    if (fid) url.searchParams.set("farmer_id", fid)
     url.searchParams.set("land_ha", String(land))
     url.searchParams.set("current_month", String(month))
     url.searchParams.set("is_rainfed", String(isRainfed))
@@ -121,6 +182,9 @@ export async function submitPlantingReportApi(payload: {
   sale_channel?: string
   consent_given: boolean
   pseudonymous_id: string
+  planting_date?: string
+  district?: string
+  irrigation_type?: string
   notes?: string
 }) {
   try {
@@ -134,6 +198,7 @@ export async function submitPlantingReportApi(payload: {
   } catch (err) {
     throw new Error("Planting report submission failed", { cause: err })
   }
+  return data as { status: "ACCEPTED"; report_id: string; receipt_hash: string; timestamp?: string }
 }
 
 export async function submitHarvestReportApi(payload: {
@@ -185,30 +250,13 @@ export interface PlantingReportApi {
   timestamp: string
 }
 
-export async function fetchPlantingReports(
-  cropId?: string,
-  season?: string,
-): Promise<{ reports: PlantingReportApi[]; isLive: boolean }> {
-  try {
-    const url = new URL(`${API_BASE_URL}/api/feedback/planting-reports`)
-    if (cropId && cropId !== "all" && cropId !== "All crops") {
-      const normCrop = cropId.toLowerCase().includes("chilli")
-        ? "chilli"
-        : cropId.toLowerCase().includes("onion")
-          ? "big_onion"
-          : cropId.toLowerCase().replace(/\s+/g, "_")
-      url.searchParams.set("crop_id", normCrop)
-    }
-    if (season) {
-      url.searchParams.set("season", season)
-    }
-    const res = await fetch(url.toString())
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data: PlantingReportApi[] = await res.json()
-    return { reports: data, isLive: true }
-  } catch (err) {
-    return { reports: [], isLive: false }
-  }
+export async function fetchPlantingReports(cropId?: string, season?: string): Promise<{ reports: PlantingReportApi[]; isLive: boolean }> {
+  const data = await readApi('/api/feedback/planting-reports', {
+    crop_id: cropId && cropId !== 'all' && cropId !== 'All crops' ? cropApiId(cropId) : undefined,
+    season,
+  })
+  if (!Array.isArray(data)) throw new Error('Invalid planting reports response')
+  return { reports: data, isLive: true }
 }
 
 export function mapPlantingReportToGroundReport(r: PlantingReportApi): GroundReport {
@@ -263,75 +311,39 @@ export async function simulateScenarioApi(payload: {
 }
 
 export async function fetchGapTimeline(cropId?: string, season?: string, leadWeeks?: number) {
-  try {
-    const url = new URL(`${API_BASE_URL}/api/forecasts/gap-timeline`)
-    if (cropId) url.searchParams.set("crop_id", cropId)
-    if (season) url.searchParams.set("season", season)
-    if (leadWeeks) url.searchParams.set("lead_weeks", String(leadWeeks))
-    const res = await fetch(url.toString(), { headers: getAuthHeaders() })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return await res.json()
-  } catch (err) {
-    return null
-  }
+  const data = await readApi('/api/forecasts/gap-timeline', { crop_id: cropId, season, lead_weeks: leadWeeks })
+  if (!Array.isArray(data.timelines)) throw new Error('Invalid gap timeline response')
+  return data
 }
 
 export async function fetchPriceOutlook(cropId?: string) {
-  try {
-    const url = new URL(`${API_BASE_URL}/api/forecasts/price-outlook`)
-    if (cropId) url.searchParams.set("crop_id", cropId)
-    const res = await fetch(url.toString())
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return await res.json()
-  } catch (err) {
-    return null
-  }
+  const data = await readApi('/api/forecasts/price-outlook', { crop_id: cropId })
+  if (!data.crops || typeof data.crops !== 'object' || Array.isArray(data.crops)) throw new Error('Invalid price outlook response')
+  return data
 }
 
 export async function fetchAdoptionSummary(cropId?: string, season?: string) {
-  try {
-    const url = new URL(`${API_BASE_URL}/api/adoption/summary`)
-    if (cropId) url.searchParams.set("crop_id", cropId)
-    if (season) url.searchParams.set("season", season)
-    const res = await fetch(url.toString())
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return await res.json()
-  } catch (err) {
-    return null
-  }
+  const data = await readApi('/api/adoption/summary', { crop_id: cropId, season })
+
+  return data
 }
 
 export async function fetchGroundReports(cropId?: string, district?: string) {
-  try {
-    const url = new URL(`${API_BASE_URL}/api/feedback/ground-reports`)
-    if (cropId) url.searchParams.set("crop_id", cropId)
-    if (district) url.searchParams.set("district", district)
-    const res = await fetch(url.toString())
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return await res.json()
-  } catch (err) {
-    return null
-  }
+  const data = await readApi('/api/feedback/ground-reports', { crop_id: cropId, district })
+  if (!Array.isArray(data.ground_reports)) throw new Error('Invalid ground reports response')
+  return data
 }
 
 export async function fetchDataCatalogue() {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/catalogue`)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return await res.json()
-  } catch (err) {
-    return null
-  }
+  const data = await readApi('/api/catalogue', {})
+  if (!Array.isArray(data)) throw new Error('Invalid catalogue response')
+  return data
 }
 
 export async function fetchSourcesSummary() {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/catalogue/sources-summary`)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return await res.json()
-  } catch (err) {
-    return null
-  }
+  const data = await readApi('/api/catalogue/sources-summary', {})
+
+  return data
 }
 
 export async function fetchPipelineRuns() {
@@ -390,29 +402,13 @@ export interface AdoptionSimulationResponse {
   isLive?: boolean
 }
 
-export async function fetchAdoptionSimulation(
-  crop: string = "big_onion",
-  demandMt: number = 26667.0,
-  uncoordinatedSupplyMt: number = 46000.0,
-): Promise<AdoptionSimulationResponse> {
-  const normCrop = crop.toLowerCase().includes("chilli") ? "chilli" : "big_onion"
-  try {
-    const url = new URL(`${API_BASE_URL}/api/simulation/adoption`)
-    url.searchParams.set("crop_id", normCrop)
-    url.searchParams.set("season_demand_mt", String(demandMt))
-    url.searchParams.set("uncoordinated_supply_mt", String(uncoordinatedSupplyMt))
-    const res = await fetch(url.toString())
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = await res.json()
-    return { ...data, isLive: true }
-  } catch (err) {
-    throw new Error("Live adoption simulation is unavailable", { cause: err })
-  }
+export async function fetchAdoptionSimulation(crop: string = 'big_onion', demandMt?: number, uncoordinatedSupplyMt?: number): Promise<AdoptionSimulationResponse> {
+  const data = await readApi('/api/simulation/adoption', {
+    crop_id: cropApiId(crop), season_demand_mt: demandMt, uncoordinated_supply_mt: uncoordinatedSupplyMt,
+  })
+  if (!Array.isArray(data.scenarios)) throw new Error('Invalid adoption simulation response')
+  return { ...data, isLive: true }
 }
-
-// ---------------------------------------------------------------------------
-// Item 8: Decision History & Audit Ledger API
-// ---------------------------------------------------------------------------
 
 export interface DecisionRecordApi {
   crop_id: string
@@ -427,6 +423,9 @@ export interface DecisionRecordApi {
   assumptions: Record<string, any>
   decision_id: string
   timestamp: string
+  record_hash?: string
+  hash?: string
+  run_id?: string
 }
 
 export interface DecisionLogPayloadApi {
@@ -443,51 +442,23 @@ export interface DecisionLogPayloadApi {
   notes?: string
 }
 
-export async function fetchDecisionHistory(
-  cropId?: string,
-  season?: string,
-  limit: number = 50,
-): Promise<{ records: DecisionRecordApi[]; isLive: boolean }> {
-  try {
-    const url = new URL(`${API_BASE_URL}/api/history/decisions`)
-    if (cropId && cropId !== "all" && cropId !== "All crops") {
-      const normCrop = cropId.toLowerCase().includes("chilli")
-        ? "chilli"
-        : cropId.toLowerCase().includes("onion")
-          ? "big_onion"
-          : cropId.toLowerCase().replace(/\s+/g, "_")
-      url.searchParams.set("crop_id", normCrop)
-    }
-    if (season) {
-      url.searchParams.set("season", season)
-    }
-    url.searchParams.set("limit", String(limit))
-    const res = await fetch(url.toString())
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data: DecisionRecordApi[] = await res.json()
-    return { records: data, isLive: true }
-  } catch (err) {
-    return { records: [], isLive: false }
-  }
+export async function fetchDecisionHistory(cropId?: string, season?: string, limit: number = 50): Promise<{ records: DecisionRecordApi[]; isLive: boolean }> {
+  const data = await readApi('/api/history/decisions', {
+    crop_id: cropId && cropId !== 'all' && cropId !== 'All crops' ? cropApiId(cropId) : undefined,
+    season, limit,
+  })
+  const records = Array.isArray(data) ? data : data.records
+  if (!Array.isArray(records) || records.some((record: any) => !record || !serverId(record.decision_id))) throw new Error('Invalid decision history response')
+  return { records, isLive: true }
 }
 
-export async function logDecisionActionApi(
-  payload: DecisionLogPayloadApi,
-): Promise<{ status: string; decision_id?: string; record_hash?: string; run_id?: string }> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/history/log-action`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return await res.json()
-  } catch (err) {
-    return {
-      status: "ERROR",
-      decision_id: undefined,
-    }
+export async function logDecisionActionApi(payload: DecisionLogPayloadApi): Promise<{ status: "RECORDED"; decision_id: string; record_hash: string; run_id: string }> {
+  if (!serverId(payload.officer_id)) throw new Error("Backend officer identity is unavailable.")
+  const data = await postApi("/api/history/log-action", payload)
+  if (data.status !== "RECORDED" || !serverId(data.decision_id) || !serverId(data.run_id) || !isReceiptHash(data.record_hash)) {
+    throw new Error("Decision receipt could not be confirmed. Check the server ledger before retrying.")
   }
+  return data
 }
 
 export function mapApiRecordToPolicyDecision(r: DecisionRecordApi): {
@@ -536,7 +507,7 @@ export function mapApiRecordToPolicyDecision(r: DecisionRecordApi): {
     category = "Price alert"
   }
 
-  const sha256 = r.record_hash || (r as any).sha256Hash || "UNVERIFIED"
+  const sha256 = isReceiptHash(r.record_hash) ? r.record_hash : isReceiptHash(r.hash) ? r.hash : ""
 
   const assumptionsStr =
     typeof r.assumptions === "object" && r.assumptions !== null
@@ -549,7 +520,7 @@ export function mapApiRecordToPolicyDecision(r: DecisionRecordApi): {
   const actionDisplay = `${r.action_type.replace(/_/g, " ")}${r.quantity ? ` (${r.quantity.toLocaleString()} ${r.unit})` : ""}`
 
   return {
-    id: r.decision_id || "DEC-UNSAVED",
+    id: serverId(r.decision_id) || "",
     date: dateStr,
     timestamp: timeStr,
     crop: cropName,
@@ -560,7 +531,7 @@ export function mapApiRecordToPolicyDecision(r: DecisionRecordApi): {
     leadTime: r.assumptions?.lead_time_weeks || 7,
     action: actionDisplay,
     category,
-    officer: r.officer_id || "Officer OFF-7710",
+    officer: serverId(r.officer_id) || "Not available",
     designation: "Authorized Agricultural Decision Maker",
     status: "Active",
     notes: r.rationale || (r.assumptions?.notes as string) || "System recorded policy directive.",
@@ -812,42 +783,33 @@ export interface UseApiQueryResult<T> {
   refetch: () => void
 }
 
-export function useApiQuery<T>(
-  fetcher: () => Promise<T>,
-  deps: any[] = [],
-): UseApiQueryResult<T> {
+export function useApiQuery<T>(fetcher: () => Promise<T>, deps: unknown[] = []): UseApiQueryResult<T> {
   const [data, setData] = useState<T | null>(null)
-  const [loading, setLoading] = useState<boolean>(true)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  const execute = useCallback(() => {
-    let active = true
-    setLoading(true)
-    setError(null)
-    fetcher()
-      .then((res) => {
-        if (active) {
-          setData(res)
-          setLoading(false)
-        }
-      })
-      .catch((err) => {
-        if (active) {
-          setError(err?.message || "Failed to load data from server")
-          setLoading(false)
-        }
-      })
-    return () => {
-      active = false
-    }
-  }, deps)
+  const [revision, setRevision] = useState(0)
+  const refetch = useCallback(() => setRevision((value) => value + 1), [])
 
   useEffect(() => {
-    const cleanup = execute()
-    return cleanup
-  }, [execute])
+    let active = true
+    setData(null)
+    setLoading(true)
+    setError(null)
+    Promise.resolve().then(fetcher).then((result) => {
+      if (!active) return
+      if (result === null || result === undefined) throw new Error('No response from server')
+      setData(result)
+      setLoading(false)
+    }).catch((failure: unknown) => {
+      if (!active) return
+      setData(null)
+      setError(failure instanceof Error ? failure.message : 'Failed to load data from server')
+      setLoading(false)
+    })
+    return () => { active = false }
+  }, [...deps, revision])
 
-  return { data, loading, error, refetch: execute }
+  return { data, loading, error, refetch }
 }
 
 export function useHealth() {
@@ -855,7 +817,7 @@ export function useHealth() {
 }
 
 export function useLatestForecasts(cropId?: string) {
-  return useApiQuery(fetchLatestForecasts, [cropId])
+  return useApiQuery(() => fetchLatestForecasts(cropId), [cropId])
 }
 
 export function useGapTimeline(cropId?: string, season?: string) {

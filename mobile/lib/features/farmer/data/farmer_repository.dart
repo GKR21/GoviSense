@@ -18,6 +18,8 @@ class FarmerRepository extends ChangeNotifier {
   static final FarmerRepository instance = FarmerRepository();
 
   final FarmerApiService _apiService;
+  final Set<String> _syncingIds = {};
+  int _localReportSequence = 0;
 
   late List<CropItem> _crops;
   late List<PlantingReport> _reports;
@@ -139,13 +141,12 @@ class FarmerRepository extends ChangeNotifier {
       (c) => c.id == cropId,
       orElse: () => _crops.first,
     );
-    final rng = Random();
-    final recordNum = 1000 + rng.nextInt(9000);
-    final hexCode = rng.nextInt(0xFFFFFF).toRadixString(16).toUpperCase();
+    final localId =
+        'LOCAL-${DateTime.now().microsecondsSinceEpoch}-${++_localReportSequence}';
 
-    // 1. Initial report created with 'pending' status
+    // A local queue key is not a server receipt or verified report ID.
     PlantingReport report = PlantingReport(
-      id: 'REP-2026-M-$recordNum',
+      id: localId,
       cropId: cropId,
       cropNameEn: crop.nameEn,
       cropNameSi: crop.nameSi,
@@ -164,23 +165,27 @@ class FarmerRepository extends ChangeNotifier {
       saleChannel: saleChannel,
       consentGiven: consentGiven,
       pseudonymousId: _profile.farmerId,
+      season: _seasonForPlantingDate(plantingDate),
     );
 
+    _syncingIds.add(report.clientId);
     _reports.insert(0, report);
     notifyListeners();
 
     // 2. Attempt live transmission to backend (FastAPI closed-loop feedback)
-    bool isSuccess = false;
+    PlantingReceipt? receipt;
     try {
-      isSuccess = await _apiService.submitPlantingReport(report);
+      receipt = await _apiService.submitPlantingReport(report);
     } catch (e) {
       debugPrint('Planting report submission exception: $e');
-      isSuccess = false;
+      receipt = null;
+    } finally {
+      _syncingIds.remove(report.clientId);
     }
 
-    if (isSuccess) {
+    if (receipt != null) {
       // Confirmed by backend -> mark verified
-      report = report.copyWith(status: 'verified');
+      report = report.withReceipt(receipt);
       _updateReportInList(report);
 
       _alerts.insert(
@@ -192,7 +197,7 @@ class FarmerRepository extends ChangeNotifier {
           titleSi: 'වගා වාර්තාව තහවුරු විය (${crop.nameSi})',
           titleTa: 'நடவு அறிக்கை உறுதிப்படுத்தப்பட்டது (${crop.nameTa})',
           messageEn:
-              'Successfully submitted $areaAcres acres for Maha 2026. Receipt ID: ${report.id}. Telemetry synced with Anuradhapura Agrarian Ledger.',
+              'Successfully submitted $areaAcres acres for ${report.season}. Receipt ID: ${report.id}. Telemetry synced with Anuradhapura Agrarian Ledger.',
           messageSi:
               'අක්කර $areaAcres ක් සාර්ථකව වාර්තා කරන ලදී. රිසිට්පත් අංකය: ${report.id}. දත්ත අනුරාධපුර ගොවිජන ලේඛනය සමඟ සමමුහුර්ත විය.',
           messageTa:
@@ -215,7 +220,7 @@ class FarmerRepository extends ChangeNotifier {
           titleSi: 'වාර්තාව සමමුහුර්ත වීම පොරොත්තුයි (${crop.nameSi})',
           titleTa: 'அறிக்கை ஒத்திசைவு நிலுவையில் உள்ளது (${crop.nameTa})',
           messageEn:
-              'Unable to reach Anuradhapura Agrarian Ledger. Report ${report.id} saved locally as "Pending" and will retry automatically when connection is restored.',
+              'Unable to reach Anuradhapura Agrarian Ledger. Report ${report.id} kept pending in this app session. Retry when connected; durable offline saving is not available yet.',
           messageSi:
               'අනුරාධපුර ගොවිජන ලේඛනය වෙත සම්බන්ධ විය නොහැක. වාර්තාව ${report.id} "පොරොත්තු" ලෙස දේශීයව සුරකින ලද අතර සබඳතාව යථා තත්ත්වයට පත් වූ විට ස්වයංක්‍රීයව නැවත උත්සාහ කරනු ඇත.',
           messageTa:
@@ -237,10 +242,11 @@ class FarmerRepository extends ChangeNotifier {
 
     int syncedCount = 0;
     for (final rep in pending) {
+      if (!_syncingIds.add(rep.clientId)) continue;
       try {
-        final success = await _apiService.submitPlantingReport(rep);
-        if (success) {
-          final updated = rep.copyWith(status: 'verified');
+        final receipt = await _apiService.submitPlantingReport(rep);
+        if (receipt != null) {
+          final updated = rep.withReceipt(receipt);
           _updateReportInList(updated);
           syncedCount++;
 
@@ -253,7 +259,7 @@ class FarmerRepository extends ChangeNotifier {
               titleSi: 'පොරොත්තු වාර්තාව සමමුහුර්ත විය (${rep.cropNameSi})',
               titleTa: 'நிலுவை அறிக்கை ஒத்திசைக்கப்பட்டது (${rep.cropNameTa})',
               messageEn:
-                  'Report ${rep.id} has been successfully synced with Anuradhapura Agrarian Ledger.',
+                  'Report ${updated.id} has been successfully synced with Anuradhapura Agrarian Ledger.',
               messageSi:
                   'වාර්තාව ${rep.id} අනුරාධපුර ගොවිජන ලේඛනය සමඟ සාර්ථකව සමමුහුර්ත විය.',
               messageTa:
@@ -265,6 +271,8 @@ class FarmerRepository extends ChangeNotifier {
         }
       } catch (e) {
         debugPrint('Retry sync failed for ${rep.id}: $e');
+      } finally {
+        _syncingIds.remove(rep.clientId);
       }
     }
 
@@ -274,8 +282,17 @@ class FarmerRepository extends ChangeNotifier {
     return syncedCount;
   }
 
+  static String _seasonForPlantingDate(String value) {
+    final date = DateTime.parse(value);
+    if (date.month >= 10) return 'Maha ${date.year}/${date.year + 1}';
+    if (date.month <= 3) return 'Maha ${date.year - 1}/${date.year}';
+    return 'Yala ${date.year}';
+  }
+
   void _updateReportInList(PlantingReport updated) {
-    _reports = _reports.map((r) => r.id == updated.id ? updated : r).toList();
+    _reports = _reports
+        .map((r) => r.clientId == updated.clientId ? updated : r)
+        .toList();
   }
 
   void markAlertRead(String alertId) {

@@ -101,9 +101,13 @@ class _AuthPageState extends State<AuthPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const Align(
+              alignment: Alignment.centerRight,
+              child: LanguagePicker(),
+            ),
             const BrandMark(),
             const SizedBox(height: 46),
-            Text(
+            LocalizedText(
               'Decisions grounded in supply, demand and uncertainty.',
               style: Theme.of(context).textTheme.headlineLarge,
             ),
@@ -181,8 +185,8 @@ class _AuthPageState extends State<AuthPage> {
                         enabled: !_loading,
                         autocorrect: false,
                         autofillHints: const [AutofillHints.username],
-                        decoration: const InputDecoration(
-                          labelText: 'Username / email',
+                        decoration: InputDecoration(
+                          labelText: context.tr('Username / email'),
                           prefixIcon: Icon(Icons.person_outline),
                         ),
                         validator: (v) {
@@ -206,12 +210,12 @@ class _AuthPageState extends State<AuthPage> {
                         ],
                         onFieldSubmitted: (_) => _submit(),
                         decoration: InputDecoration(
-                          labelText: 'Password',
+                          labelText: context.tr('Password'),
                           prefixIcon: const Icon(Icons.lock_outline),
                           suffixIcon: IconButton(
-                            tooltip: _obscure
-                                ? 'Show password'
-                                : 'Hide password',
+                            tooltip: context.tr(
+                              _obscure ? 'Show password' : 'Hide password',
+                            ),
                             onPressed: () =>
                                 setState(() => _obscure = !_obscure),
                             icon: Icon(
@@ -259,7 +263,7 @@ class _AuthPageState extends State<AuthPage> {
                       if (_error != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 12),
-                          child: Text(
+                          child: LocalizedText(
                             _error!,
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.error,

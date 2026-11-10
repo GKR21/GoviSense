@@ -1,23 +1,33 @@
+import '../../../../core/localization/localized_text.dart';
+import '../../models/planting_report.dart';
+import 'planting_receipt_widget.dart';
+
 import 'package:flutter/material.dart';
+
 import '../../../../core/theme/app_theme.dart';
 import '../../models/farmer_profile.dart';
 
 class DigitalFarmerCardWidget extends StatelessWidget {
-  const DigitalFarmerCardWidget({super.key, required this.profile});
+  const DigitalFarmerCardWidget({
+    super.key,
+    required this.profile,
+    this.report,
+  });
 
   final FarmerProfile profile;
+  final PlantingReport? report;
 
   @override
   Widget build(BuildContext context) {
+    final safeReport = report?.pseudonymousId == profile.farmerId
+        ? report
+        : null;
+    final verified = safeReport?.hasVerifiedReceipt ?? false;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFF073820),
-            Color(0xFF0A5C36),
-            Color(0xFF0F4D2E),
-          ],
+          colors: [Color(0xFF073820), Color(0xFF0A5C36), Color(0xFF0F4D2E)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -34,8 +44,10 @@ class DigitalFarmerCardWidget extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            spacing: 12,
+            runSpacing: 10,
+            alignment: WrapAlignment.spaceBetween,
             children: [
               Row(
                 children: [
@@ -45,13 +57,17 @@ class DigitalFarmerCardWidget extends StatelessWidget {
                       color: Colors.white.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.workspace_premium, color: AppTheme.accent, size: 20),
+                    child: const Icon(
+                      Icons.workspace_premium,
+                      color: AppTheme.accent,
+                      size: 20,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      LocalizedText(
                         'AGRARIAN SERVICES DEPT',
                         style: TextStyle(
                           color: AppTheme.accent,
@@ -60,7 +76,7 @@ class DigitalFarmerCardWidget extends StatelessWidget {
                           letterSpacing: 1.1,
                         ),
                       ),
-                      Text(
+                      LocalizedText(
                         'Govijana Seva Pass',
                         style: TextStyle(
                           color: Colors.white,
@@ -77,15 +93,25 @@ class DigitalFarmerCardWidget extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.2),
+                  ),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.verified, color: AppTheme.accent, size: 12),
+                    Icon(
+                      verified ? Icons.verified : Icons.pending_outlined,
+                      color: AppTheme.accent,
+                      size: 12,
+                    ),
                     SizedBox(width: 4),
-                    Text(
-                      'Verified',
-                      style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    LocalizedText(
+                      verified ? 'Receipt verified' : 'Not verified',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
@@ -100,7 +126,7 @@ class DigitalFarmerCardWidget extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  const LocalizedText(
                     'FARMER IDENTIFIER',
                     style: TextStyle(
                       color: Colors.white70,
@@ -110,7 +136,7 @@ class DigitalFarmerCardWidget extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
+                  LocalizedText(
                     profile.farmerId,
                     style: const TextStyle(
                       color: Colors.white,
@@ -121,7 +147,7 @@ class DigitalFarmerCardWidget extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
+                  LocalizedText(
                     profile.name,
                     style: const TextStyle(
                       color: Colors.white,
@@ -137,9 +163,15 @@ class DigitalFarmerCardWidget extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.25),
+                  ),
                 ),
-                child: const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 40),
+                child: const Icon(
+                  Icons.badge_outlined,
+                  color: Colors.white,
+                  size: 40,
+                ),
               ),
             ],
           ),
@@ -148,44 +180,71 @@ class DigitalFarmerCardWidget extends StatelessWidget {
           Container(
             padding: const EdgeInsets.only(top: 14),
             decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.15))),
+              border: Border(
+                top: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+              ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 10,
+              alignment: WrapAlignment.spaceBetween,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('AGRARIAN DIVISION', style: TextStyle(color: Colors.white70, fontSize: 9)),
-                    Text(
+                    const LocalizedText(
+                      'AGRARIAN DIVISION',
+                      style: TextStyle(color: Colors.white70, fontSize: 9),
+                    ),
+                    LocalizedText(
                       profile.division,
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const Text('LAND EXTENT', style: TextStyle(color: Colors.white70, fontSize: 9)),
-                    Text(
+                    const LocalizedText(
+                      'LAND EXTENT',
+                      style: TextStyle(color: Colors.white70, fontSize: 9),
+                    ),
+                    LocalizedText(
                       '${profile.totalLandAcres} Ac (${profile.isRainfed ? "Rainfed" : "Irrigated"})',
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Text('SOIL pH', style: TextStyle(color: Colors.white70, fontSize: 9)),
-                    Text(
+                    const LocalizedText(
+                      'SOIL pH',
+                      style: TextStyle(color: Colors.white70, fontSize: 9),
+                    ),
+                    LocalizedText(
                       '${profile.soilPh.toStringAsFixed(1)} pH',
-                      style: const TextStyle(color: AppTheme.accent, fontSize: 11, fontWeight: FontWeight.w900),
+                      style: const TextStyle(
+                        color: AppTheme.accent,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          PlantingReceiptWidget(report: safeReport),
         ],
       ),
     );

@@ -1,3 +1,5 @@
+import '../../core/localization/localized_text.dart';
+
 import 'package:flutter/material.dart';
 
 class ProfilePage extends StatelessWidget {
@@ -5,6 +7,6 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: Text('Profile')));
+    return const Scaffold(body: Center(child: LocalizedText('Profile')));
   }
 }

@@ -98,7 +98,7 @@ function mapApiCropToCropItem(raw: any, landAcres: number): CropItem {
   const maxProfit = Math.round(p90 * 600 * landAcres)
 
   return {
-    id: `crop-${cropId}`,
+    id: cropId,
     name: { en: nameEn, si: nameSi, ta: nameTa },
     scientificName: meta.scientificName,
     image: meta.image,
@@ -172,11 +172,16 @@ function mapApiCropToCropItem(raw: any, landAcres: number): CropItem {
   }
 }
 
-class FarmerService {
-  private profile: FarmerProfileData = createFarmerProfile()
+export class FarmerService {
+  private profile: FarmerProfileData = { ...initialFarmerProfile }
   private reports: PlantingReportData[] = []
   private alerts: AlertItem[] = []
-  private officerDecisions: Array<{ id: string; decision: string; date: string; runId: string }> = []
+  private identityRequest: Promise<ServerIdentity> | null = null
+
+  private loadIdentity(): Promise<ServerIdentity> {
+    if (!this.identityRequest) this.identityRequest = fetchServerIdentity().finally(() => { this.identityRequest = null })
+    return this.identityRequest
+  }
   private listeners: Set<() => void> = new Set()
 
   subscribe(listener: () => void): () => void {
@@ -200,6 +205,7 @@ class FarmerService {
     const requestedLand = landSize ?? this.profile.totalLandAcres
     if (requestedLand <= 0 || !this.profile.farmerId) return []
     try {
+      const profile = await this.getProfile()
       const top3Res = await fetchFarmerTop3({
         farmer_id: this.profile.farmerId,
         season: "Maha",
@@ -211,7 +217,7 @@ class FarmerService {
         return top3Res.top3.map((c) => mapApiCropToCropItem(c, requestedLand))
       }
     } catch (err) {
-      console.warn("fetchFarmerTop3 network request failed, falling back to local cache", err)
+      console.warn("Could not load backend crop recommendations", err)
     }
 
     return []
@@ -260,11 +266,25 @@ class FarmerService {
   }
 
   async getProfile(): Promise<FarmerProfileData> {
+    try {
+      const identity = await this.loadIdentity()
+      const farmerId = identity.farmerId || ""
+      if (farmerId !== this.profile.farmerId) {
+        this.profile = { ...initialFarmerProfile }
+        this.reports = []
+        this.alerts = []
+      }
+      this.profile = { ...this.profile, farmerId, name: identity.name, district: identity.district || this.profile.district }
+    } catch (error) {
+      this.profile = { ...initialFarmerProfile }
+      console.warn("Backend farmer identity is unavailable", error)
+    }
     return { ...this.profile }
   }
 
   async updateProfile(updates: Partial<FarmerProfileData>): Promise<FarmerProfileData> {
-    this.profile = { ...this.profile, ...updates }
+    // Local form edits must never assign a backend identity.
+    this.profile = { ...this.profile, ...updates, farmerId: this.profile.farmerId }
     this.notify()
     return { ...this.profile }
   }
@@ -283,8 +303,11 @@ class FarmerService {
     plantingDate: string
     irrigationType: "Rainfed" | "Minor Tank" | "Major Irrigation" | "Agro-well"
     seedSource: "Certified DOA Seed" | "Farmer Saved Seed" | "Registered Private"
-  }): Promise<{ success: boolean; report: PlantingReportData; offlineQueued?: boolean }> {
+  }): Promise<{ success: true; report: PlantingReportData }> {
+    const profile = await this.getProfile()
+    if (!profile.farmerId) throw new Error("The backend has not provided a farmer identifier. The report was not submitted.")
     const rawCropId = reportData.cropId.replace(/^crop-/, "")
+    if (!rawCropId) throw new Error("Select a crop returned by the backend.")
     const areaHa = Number((reportData.areaAcres * 0.404686).toFixed(2))
 
     let reportId = `REP-${Date.now()}`
@@ -324,45 +347,11 @@ class FarmerService {
       plantingDate: reportData.plantingDate,
       irrigationType: reportData.irrigationType,
       seedSource: reportData.seedSource,
-      timestamp: new Date().toISOString().replace("T", " ").substring(0, 16),
-      receiptHash: `REC-${reportId.replace(/[^A-Za-z0-9]/g, "").slice(0, 16)}`,
-      status: isOffline ? "pending" : "verified",
+      timestamp: response.timestamp || new Date().toISOString(),
     }
-
-    this.reports.unshift(newReport)
-
-    // Append confirmation alert
-    const newAlert: AlertItem = {
-      id: `alert-${Date.now()}`,
-      type: "success",
-      priority: "medium",
-      isRead: false,
-      timestamp: "Just now",
-      title: {
-        en: isOffline ? `Planting Declaration Queued Offline` : `Planting Declaration Logged (${cropNameEn})`,
-        si: isOffline ? `වගා වාර්තාව නොබැඳිව සුරැකිණි` : `වගා වාර්තාව ලියාපදිංචි විය`,
-        ta: isOffline ? `நடவு அறிக்கை ஆஃப்லைனில் சேமிக்கப்பட்டது` : `நடவு அறிக்கை பதிவு செய்யப்பட்டது`,
-      },
-      message: {
-        en: isOffline
-          ? `Saved locally on device (${reportData.areaAcres} acres). Will sync automatically when connection restores.`
-          : `Successfully submitted ${reportData.areaAcres} acres for Maha. Receipt ID: ${newReport.id}.`,
-        si: isOffline
-          ? `උපාංගයේ සුරැකිණි (${reportData.areaAcres} අක්කර). අන්තර්ජාලය සක්‍රිය වූ විට ස්වයංක්‍රීයව යැවෙනු ඇත.`
-          : `අක්කර ${reportData.areaAcres}ක් සාර්ථකව වාර්තා කරන ලදී. රිසිට්පත් අංකය: ${newReport.id}.`,
-        ta: isOffline
-          ? `சாதனத்தில் சேமிக்கப்பட்டது (${reportData.areaAcres} ஏக்கர்). இணைப்பு கிடைத்தவுடன் பதிவேற்றப்படும்.`
-          : `மகா பருவத்திற்கு ${reportData.areaAcres} ஏக்கர் பதிவு செய்யப்பட்டது. ரசீது எண்: ${newReport.id}.`,
-      },
-    }
-    this.alerts.unshift(newAlert)
+    this.reports.unshift(report)
     this.notify()
-
-    return {
-      success: !isOffline,
-      report: newReport,
-      offlineQueued: isOffline,
-    }
+    return { success: true, report }
   }
 
   async submitHarvestReport(harvestData: {
@@ -377,6 +366,8 @@ class FarmerService {
   }): Promise<{ success: boolean; harvestId?: string }> {
     const rawCropId = harvestData.cropId.replace(/^crop-/, "")
     try {
+      const profile = await this.getProfile()
+      if (!profile.farmerId) throw new Error("Backend farmer identity is unavailable.")
       const res = await submitHarvestReportApi({
         crop_id: rawCropId,
         area_harvested_ha: harvestData.areaHarvestedHa,
@@ -395,46 +386,6 @@ class FarmerService {
       console.warn("Harvest report submission failed", err)
     }
     return { success: false }
-  }
-
-  recordOfficerDecision(decision: string, crop = "Big onion"): void {
-    const runId = `RUN-${Date.now()}`
-    this.officerDecisions.unshift({
-      id: `DEC-${Date.now()}`,
-      decision,
-      date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
-      runId,
-    })
-
-    const decisionAlert: AlertItem = {
-      id: `officer-decision-${Date.now()}`,
-      type: "market",
-      priority: "high",
-      isRead: false,
-      timestamp: "Just now",
-      title: {
-        en: `Agrarian Decision: ${decision} (${crop})`,
-        si: `කෘෂිකාර්මික නිල තීරණය: ${decision} (${crop})`,
-        ta: `விவசாய உத்தியோகபூர்வ முடிவு: ${decision} (${crop})`,
-      },
-      message: {
-        en: `District Planning Officer registered decision "${decision}". National import windows adjusted to safeguard local farmgate prices.`,
-        si: `දිස්ත්‍රික් සැලසුම් නිලධාරී විසින් "${decision}" තීරණය අනුමත කරන ලදී. දේශීය ගොවිපළ මිල සුරැකීමට ආනයන කාලසීමා සංශෝධනය විය.`,
-        ta: `மாவட்ட திட்டமிடல் அதிகாரி "${decision}" முடிவை அங்கீகரித்தார். உள்ளூர் விலையைப் பாதுகாக்க இறக்குமதி அட்டவணை மாற்றப்பட்டது.`,
-      },
-      officerContact: {
-        name: "D. Nimal",
-        role: "District Planning Officer (DOA)",
-        phone: "+94 25 226 7100",
-      },
-    }
-
-    this.alerts.unshift(decisionAlert)
-    this.notify()
-  }
-
-  getOfficerDecisions() {
-    return [...this.officerDecisions]
   }
 
   getExtraReportedHectares(cropSearch: string): number {

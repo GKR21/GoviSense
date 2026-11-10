@@ -1,30 +1,16 @@
-import {
-  ArrowDownCircle,
-  ArrowUpCircle,
-  CheckCircle2,
-  ChevronRight,
-  CircleDollarSign,
-  Clock3,
-  Database,
-  Download,
-  Home,
-  SlidersHorizontal,
-  Sprout,
-  Warehouse,
-} from "lucide-react"
-import { CROP_DATA_CATALOG, DISTRICT_PROFILES, MONTHS } from "../../types"
-import { Button, ConfidenceBadge, KpiTile, PageHeading } from "../../components/common"
+import { Home, RefreshCw } from "lucide-react"
+import { Button, PageHeading } from "../../components/common"
+import { displayNumber } from "../../components/common/ApiDataState"
 import type { CropForecastData } from "../../api"
-
 export function OverviewScreen({
   crop = "Big onion",
   district = "Anuradhapura",
-  season = "Maha 2026",
+  season = "",
   scenario = "Middle",
   onOpenSupply,
   onOpenGap,
+  onRefresh,
   apiCropData,
-  isLiveApi = false,
 }: {
   crop?: string
   district?: string
@@ -32,66 +18,32 @@ export function OverviewScreen({
   scenario?: "Low" | "Middle" | "High"
   onOpenSupply: () => void
   onOpenGap: () => void
+  onRefresh?: () => void
   apiCropData?: CropForecastData
   isLiveApi?: boolean
 }) {
-  const profile = CROP_DATA_CATALOG[crop] || CROP_DATA_CATALOG["Big onion"]
-  const dist = DISTRICT_PROFILES[district] || DISTRICT_PROFILES["Anuradhapura"]
-  const scenarioMultiplier = scenario === "High" ? 1.2 : scenario === "Low" ? 0.85 : 1.0
-  const projectedTons = Math.round(profile.baselineArea * profile.baselineYield * scenarioMultiplier)
-
-  const pointHarvest = apiCropData?.ai1_harvest_forecast
-    ? Math.round(apiCropData.ai1_harvest_forecast.point_forecast_mt * scenarioMultiplier)
-    : projectedTons
-  const harvestRangeLabel = apiCropData?.ai1_harvest_forecast
-    ? `80% Band: ${Math.round(apiCropData.ai1_harvest_forecast.lower_bound_10_mt * scenarioMultiplier).toLocaleString()} - ${Math.round(apiCropData.ai1_harvest_forecast.upper_bound_90_mt * scenarioMultiplier).toLocaleString()} MT`
-    : `From ${profile.baselineArea.toLocaleString()} ha @ ${(profile.baselineYield * scenarioMultiplier).toFixed(2)} t/ha`
-
-  const wholesalePrice = apiCropData?.ai2_price_forecast
-    ? apiCropData.ai2_price_forecast.wholesale_price_rs_kg
-    : profile.spotPrice
-  const priceDirection = apiCropData?.ai2_price_forecast
-    ? apiCropData.ai2_price_forecast.direction
-    : profile.direction
-  const priceConfidence = apiCropData?.ai2_price_forecast
-    ? Math.round(apiCropData.ai2_price_forecast.confidence * 100)
-    : profile.confidence
-  const priceRange = apiCropData?.ai2_price_forecast
-    ? `Rs. ${apiCropData.ai2_price_forecast.lower_bound_rs_kg.toFixed(0)} - ${apiCropData.ai2_price_forecast.upper_bound_rs_kg.toFixed(0)}`
-    : `Rs. ${profile.p10Price.toFixed(0)} - ${profile.p90Price.toFixed(0)}`
-
-  const spiLabel = apiCropData?.ai3_supply_pressure_index
-    ? apiCropData.ai3_supply_pressure_index.spi_label
-    : profile.spiMonthly[6] < 0 ? "Shortage" : "Glut"
-  const spiScore = apiCropData?.ai3_supply_pressure_index
-    ? apiCropData.ai3_supply_pressure_index.spi_score
-    : (profile.spiAnnualScore ?? (profile.spiMonthly[6] || 0.05))
-  const spiAction = apiCropData?.ai3_supply_pressure_index
-    ? apiCropData.ai3_supply_pressure_index.action_summary
-    : (profile.ai4Action || "Maintain cultivation extent")
-
-  const allCrops = ["Big onion", "Chilli", "Green gram", "Maize", "Red onion", "Potato"]
-  const orderedCrops = [crop, ...allCrops.filter((c) => c !== crop)]
-
-  const heatMapValues: Record<string, string[]> = {
-    "Big onion": ["balanced", "balanced", "shortage", "balanced", "balanced", "balanced", "oversupply", "oversupply", "balanced", "balanced", "shortage", "shortage"],
-    "Chilli": ["balanced", "shortage", "shortage", "balanced", "balanced", "balanced", "balanced", "oversupply", "oversupply", "balanced", "balanced", "balanced"],
-    "Green gram": ["shortage", "shortage", "balanced", "balanced", "balanced", "balanced", "balanced", "balanced", "shortage", "shortage", "balanced", "balanced"],
-    "Maize": ["balanced", "oversupply", "oversupply", "balanced", "balanced", "balanced", "balanced", "balanced", "balanced", "balanced", "balanced", "balanced"],
-    "Red onion": ["balanced", "balanced", "balanced", "balanced", "shortage", "shortage", "balanced", "balanced", "oversupply", "balanced", "balanced", "balanced"],
-    "Potato": ["shortage", "shortage", "balanced", "balanced", "balanced", "oversupply", "oversupply", "balanced", "balanced", "balanced", "balanced", "shortage"],
-  }
-
+  const harvest = apiCropData?.ai1_harvest_forecast
+  const pressure = apiCropData?.ai3_supply_pressure_index
+  const price = apiCropData?.ai2_price_forecast
+  const cards = [
+    ["Expected harvest", displayNumber(harvest?.point_forecast_mt, " MT")],
+    ["Projected demand", displayNumber(pressure?.projected_demand_mt, " MT")],
+    ["Supply gap", displayNumber(pressure?.gap_mt, " MT")],
+    [
+      "Wholesale forecast",
+      displayNumber(price?.wholesale_price_rs_kg, " Rs/kg"),
+    ],
+  ]
   return (
     <>
       <PageHeading
-        eyebrow={`Active Filter: ${crop} · ${dist.name} (${dist.zone}) · ${season}`}
+        eyebrow={`${crop} | ${district} | ${season}`}
         icon={Home}
-        title={`Planning overview · ${crop}`}
-        description={`Empirical supply-demand balance and policy decisions for ${crop} in ${dist.name}. Scenario: ${scenario} (${scenario === "High" ? "+20% bumper yield" : scenario === "Low" ? "-15% adverse yield" : "Baseline"}).`}
+        title="Planning overview"
+        description={`Latest backend point estimates for ${crop}. Use Supply pressure to inspect scenarios.`}
         actions={
-          <Button variant="secondary" icon={Download}>
-            Export briefing
+          <Button variant="secondary" icon={RefreshCw} onClick={onRefresh}>
+            Refresh
           </Button>
         }
       />
@@ -203,114 +155,35 @@ export function OverviewScreen({
           tone="success"
         />
       </div>
-
-      <div className="overview-grid">
-        <section className="panel heat-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>12-month risk outlook (All crops)</h2>
-              <p>Active crop <strong>{crop}</strong> highlighted. Click any month to inspect supply pressure.</p>
-            </div>
-            <ConfidenceBadge level="High" />
+      <section className="panel large-data-panel">
+        <div className="panel-heading">
+          <div>
+            <h2>{apiCropData?.crop_name || crop}</h2>
+            <p>Data period: {apiCropData?.target_period || "Not available"}</p>
           </div>
-          <div className="heat-table">
-            <div className="heat-row heat-row--head">
-              <span>Crop</span>
-              {MONTHS.map((month) => (
-                <span key={month}>{month}</span>
-              ))}
-            </div>
-            {orderedCrops.map((c) => {
-              const rowValues = heatMapValues[c] || heatMapValues["Big onion"]
-              const isCurrent = c === crop
-              return (
-                <div
-                  className={`heat-row ${isCurrent ? "heat-row--active" : ""}`}
-                  key={c}
-                  style={isCurrent ? { background: "rgba(16, 185, 129, 0.12)", borderLeft: "3px solid var(--primary)" } : {}}
-                >
-                  <strong style={{ color: isCurrent ? "var(--primary)" : "var(--ink)", display: "flex", alignItems: "center", gap: "6px" }}>
-                    {c} {isCurrent && <span style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "4px", background: "var(--primary)", color: "#000", fontWeight: "800" }}>ACTIVE</span>}
-                  </strong>
-                  {rowValues.map((risk, index) => {
-                    const Icon =
-                      risk === "oversupply"
-                        ? ArrowUpCircle
-                        : risk === "shortage"
-                          ? ArrowDownCircle
-                          : CheckCircle2
-                    return (
-                      <button
-                        onClick={onOpenSupply}
-                        className={`heat-cell heat-cell--${risk}`}
-                        aria-label={`${c}, ${MONTHS[index]}, ${risk}`}
-                        type="button"
-                        key={`${c}-${MONTHS[index]}`}
-                      >
-                        <Icon size={13} />
-                      </button>
-                    )
-                  })}
-                </div>
-              )
-            })}
-          </div>
-          <p className="sr-summary">
-            Chart summary: Displays 12-month risk matrix across national crops.
-          </p>
-        </section>
-
-        <section className="panel attention-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Needs your attention</h2>
-              <p>Prioritized for {crop} & {dist.name}</p>
-            </div>
-            <span className="count-badge">3</span>
-          </div>
-
-          <button className="attention-item" type="button" onClick={onOpenGap}>
-            <span className="attention-item__icon attention-item__icon--warning">
-              <Clock3 size={18} />
-            </span>
-            <span>
-              <strong>{crop} Strategic Directive</strong>
-              <small>Seasonal decision timeline simulation ready for review.</small>
-            </span>
-            <ChevronRight size={17} />
-          </button>
-
-          <button className="attention-item" type="button" onClick={onOpenSupply}>
-            <span className="attention-item__icon attention-item__icon--info">
-              <Sprout size={18} />
-            </span>
-            <span>
-              <strong>{dist.name} Cultivation Target: {profile.baselineArea.toLocaleString()} ha</strong>
-              <small>Agro-ecological suitability: {dist.zone} · {dist.rainfallMm}mm rain</small>
-            </span>
-            <ChevronRight size={17} />
-          </button>
-
-          <button className="attention-item" type="button">
-            <span className="attention-item__icon">
-              <Database size={18} />
-            </span>
-            <span>
-              <strong>HARTI & CBSL daily price feed active</strong>
-              <small>Synced today · Wholesale median Rs. {profile.spotPrice.toFixed(0)} / kg</small>
-            </span>
-            <ChevronRight size={17} />
-          </button>
-        </section>
-      </div>
-
-      <div className="data-footnote">
-        <Database size={15} />
-        <span>
-          Data version 2026.04 · District: {dist.name} · Crop: {crop} · Scenario: {scenario}
-        </span>
-        <ConfidenceBadge level="High" />
-      </div>
+        </div>
+        <p>
+          Supply pressure: {pressure?.spi_label || "Not available"} | Score:{" "}
+          {displayNumber(pressure?.spi_score)}
+        </p>
+        <p>{pressure?.action_summary || "No policy summary was returned."}</p>
+        <p>
+          Harvest interval: {displayNumber(harvest?.lower_bound_10_mt, " MT")} -{" "}
+          {displayNumber(harvest?.upper_bound_90_mt, " MT")}
+        </p>
+        <p>
+          Price interval: {displayNumber(price?.lower_bound_rs_kg, " Rs/kg")} -{" "}
+          {displayNumber(price?.upper_bound_rs_kg, " Rs/kg")}
+        </p>
+        <div className="heading-actions">
+          <Button icon={RefreshCw} onClick={onOpenSupply}>
+            View supply pressure
+          </Button>
+          <Button variant="secondary" onClick={onOpenGap}>
+            View gap timeline
+          </Button>
+        </div>
+      </section>
     </>
   )
 }

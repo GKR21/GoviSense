@@ -1,3 +1,6 @@
+import 'ui_translations_extra.dart';
+import 'ui_translations.dart';
+
 enum AppLanguage {
   en('English', 'English'),
   si('සිංහල', 'Sinhala'),
@@ -14,6 +17,73 @@ class AppTranslations {
   static String t(AppLanguage lang, String key) {
     return _data[lang]?[key] ?? _data[AppLanguage.en]?[key] ?? key;
   }
+
+  static final Map<String, List<String>> _display = {
+    for (final entry in _data[AppLanguage.en]!.entries)
+      entry.value: [
+        _data[AppLanguage.si]![entry.key]!,
+        _data[AppLanguage.ta]![entry.key]!,
+      ],
+    for (final entry in {...uiTranslations, ...uiTranslationsExtra}.entries)
+      _displayKey(entry.key): entry.value
+          .map((value) => value.replaceAll(r'\n', '\n'))
+          .toList(),
+  };
+
+  static String _displayKey(String source) {
+    final key = source
+        .replaceAll(r'\n', '\n')
+        .replaceAll(' (_initialCrops)', '')
+        .replaceAll(' ? ', ' · ');
+    if (key == 'SPI: ?') return 'SPI: —';
+    if (key == 'Supply gap: ?') return 'Supply gap: —';
+    if (key == 'SPI: {0}?') return 'SPI: {0}×';
+    return key;
+  }
+
+  static Set<String> keys(AppLanguage language) =>
+      _data[language]!.keys.toSet();
+  static Map<String, List<String>> get displayTranslations =>
+      Map.unmodifiable(_display);
+
+  static String text(AppLanguage language, String source, [int depth = 0]) {
+    if (language == AppLanguage.en) return source;
+    final index = language == AppLanguage.si ? 0 : 1;
+    final exact = _display[source];
+    if (exact != null) return exact[index];
+    if (depth > 2) return source;
+    for (final entry in _templates) {
+      final match = entry.pattern.firstMatch(source);
+      if (match == null) continue;
+      var translated = entry.values[index];
+      for (var group = 1; group <= match.groupCount; group++) {
+        translated = translated.replaceAll(
+          '{${group - 1}}',
+          text(language, match.group(group)!, depth + 1),
+        );
+      }
+      return translated;
+    }
+    return source;
+  }
+
+  static final _templates = [
+    for (final entry in _display.entries)
+      if (entry.key.contains('{0}'))
+        (
+          pattern: RegExp(
+            [
+              '^',
+              RegExp.escape(entry.key)
+                  .replaceAllMapped(RegExp(r'\\\{\d+\\\}'), (_) => '(.*?)'),
+              r'$',
+            ].join(),
+            dotAll: true,
+          ),
+          values: entry.value,
+          specificity: entry.key.length,
+        ),
+  ]..sort((a, b) => b.specificity.compareTo(a.specificity));
 
   static const Map<AppLanguage, Map<String, String>> _data = {
     AppLanguage.en: {
@@ -35,7 +105,8 @@ class AppTranslations {
       'decisionDesc': 'Finalize your Maha crop before October 18 for best seed procurement and early market advantage.',
       'compareTop3Cta': 'Compare Top 3 Crops',
       'weatherAlertTitle': 'Inter-monsoonal showers expected this week',
-      'weatherAlertDesc': 'Prepare field drainage and clear excess runoff before seed sowing.',
+      'weatherAlertDesc':
+          'Prepare field drainage and clear excess runoff before seed sowing.',
       'topPicksTitle': 'Recommended for Your Land',
       'topPicksSub': 'Calculated for 1.5 acres in Anuradhapura',
       'spiTitle': 'Harvest Market Pressure Outlook',
@@ -96,7 +167,8 @@ class AppTranslations {
       'acknowledgedBadge': '✓ Acknowledged',
       'askOfficerBtn': 'Ask Officer',
       'askOfficerDialogTitle': 'Ask Extension Officer',
-      'askOfficerHint': 'Type your question or request clarification on this advisory...',
+      'askOfficerHint':
+          'Type your question or request clarification on this advisory...',
       'sendQuestionBtn': 'Send Question',
       'cancelBtn': 'Cancel',
       'questionSent': 'Question submitted to Extension Officer',
@@ -126,14 +198,16 @@ class AppTranslations {
       'decisionDesc': 'සාර්ථක බීජ ලබාගැනීම සහ ඉහළ වෙළඳපොළ වාසිය සඳහා ඔක්තෝබර් 18ට පෙර ඔබේ බෝගය තෝරන්න.',
       'compareTop3Cta': 'හොඳම බෝග 3 සසඳන්න',
       'weatherAlertTitle': 'මෙම සතියේ අන්තර් මෝසම් වැසි අපේක්ෂිතයි',
-      'weatherAlertDesc': 'බීජ වැපිරීමට පෙර ලියැදි නියරවල් සකසා ජල කානු පිරිසිදු කරන්න.',
+      'weatherAlertDesc':
+          'බීජ වැපිරීමට පෙර ලියැදි නියරවල් සකසා ජල කානු පිරිසිදු කරන්න.',
       'topPicksTitle': 'ඔබේ ඉඩමට වඩාත් ගැළපෙන බෝග',
       'topPicksSub': 'අනුරාධපුර දිස්ත්‍රික්කයේ අක්කර 1.5 සඳහා ගණනය කර ඇත',
       'spiTitle': 'අස්වනු වෙළඳපොළ සැපයුම් පීඩනය',
       'spiSub': 'ඔබ අස්වනු නෙළන කාලයේ අපේක්ෂිත ජාතික සැපයුම් තත්ත්වය',
       // Compare
       'compareTitle': 'හොඳම බෝග 3 සසඳන්න',
-      'compareSub': 'අපේක්ෂිත ලාභය, පසේ ස්වභාවය සහ වෙළඳපොළ මිල ස්ථාවරත්වය අනුව තෝරා ඇත.',
+      'compareSub':
+          'අපේක්ෂිත ලාභය, පසේ ස්වභාවය සහ වෙළඳපොළ මිල ස්ථාවරත්වය අනුව තෝරා ඇත.',
       'whyButton': 'මෙම බෝග ඇයි?',
       'profitRange': 'අපේක්ෂිත ශුද්ධ ලාභය',
       'perAcre': 'අක්කරයකට',
@@ -144,7 +218,8 @@ class AppTranslations {
       'detailsCta': 'වගා උපදෙස්',
       // Market Prices
       'marketPrices': 'වෙළඳපොළ මිල ගණන්',
-      'marketPricesSub': 'දඹුල්ල සහ කැප්පෙටිපොල ආර්ථික මධ්‍යස්ථානවල දෛනික තොග හා සිල්ලර මිල',
+      'marketPricesSub':
+          'දඹුල්ල සහ කැප්පෙටිපොල ආර්ථික මධ්‍යස්ථානවල දෛනික තොග හා සිල්ලර මිල',
       // Report Wizard
       'reportTitle': 'ඔබේ වගා සැලැස්ම වාර්තා කරන්න',
       'reportSub': 'දිස්ත්‍රික් සැලසුම්කරණයට දායක වී සහනාධාර පහසුකම් ලබාගන්න.',
@@ -156,7 +231,8 @@ class AppTranslations {
       'dateLabel': 'සිටුවන දිනය',
       'seedSourceLabel': 'බීජ ප්‍රභේදය',
       'submitReport': 'තහවුරු කර යොමු කරන්න',
-      'privacyNotice': 'ඔබේ දත්ත රහස්‍ය සාමූහික සංඛ්‍යාලේඛනයක් ලෙස පමණක් භාවිත වේ.',
+      'privacyNotice':
+          'ඔබේ දත්ත රහස්‍ය සාමූහික සංඛ්‍යාලේඛනයක් ලෙස පමණක් භාවිත වේ.',
       'harvestOutcomeLabel': 'අස්වනු ප්‍රමාණය (මෙට්‍රික් ටොන් - විකල්ප)',
       'salePriceLabel': 'විකිණූ සාමාන්‍ය මිල (රු./කි.ග්‍රෑ. - විකල්ප)',
       'saleChannelLabel': 'අලෙවි කළ මාර්ගය',
@@ -182,7 +258,8 @@ class AppTranslations {
       'recordDecisionBtn': 'තීරණය සටහන් කරන්න',
       // Alerts Inbox
       'alertsInboxTitle': 'කෘෂිකාර්මික උපදෙස් සහ චක්‍රලේඛ',
-      'alertsInboxSub': 'කෘෂිකර්ම දෙපාර්තමේන්තුවෙන් සහ ගොවිජන සේවා නිලධාරීන්ගෙන් නිල නිවේදන',
+      'alertsInboxSub':
+          'කෘෂිකර්ම දෙපාර්තමේන්තුවෙන් සහ ගොවිජන සේවා නිලධාරීන්ගෙන් නිල නිවේදන',
       'acknowledgeBtn': 'පිළිගන්න',
       'acknowledgedBadge': '✓ පිළිගන්නා ලදී',
       'askOfficerBtn': 'නිලධාරීගෙන් අසන්න',
@@ -235,10 +312,12 @@ class AppTranslations {
       'detailsCta': 'பயிர் வழிகாட்டி',
       // Market Prices
       'marketPrices': 'சந்தை விலைகள்',
-      'marketPricesSub': 'தம்புள்ளை மற்றும் கெப்பெட்டிபொல மையங்களின் தினசரி விலை விபரம்',
+      'marketPricesSub':
+          'தம்புள்ளை மற்றும் கெப்பெட்டிபொல மையங்களின் தினசரி விலை விபரம்',
       // Report Wizard
       'reportTitle': 'உங்கள் நடவுத் திட்டத்தை பதிவு செய்க',
-      'reportSub': 'மாவட்ட பயிர் திட்டமிடலுக்கு பங்களித்து மானிய உதவிகளைப் பெறுங்கள்.',
+      'reportSub':
+          'மாவட்ட பயிர் திட்டமிடலுக்கு பங்களித்து மானிய உதவிகளைப் பெறுங்கள்.',
       'step1': 'பயிரைத் தேர்ந்தெடுக்கவும்',
       'step2': 'நிலம் & நீர்',
       'step3': 'தேதி & தரவு பதிவு',
@@ -247,7 +326,8 @@ class AppTranslations {
       'dateLabel': 'நடவு தேதி',
       'seedSourceLabel': 'விதை ரகம்',
       'submitReport': 'உறுதி செய்து சமர்ப்பிக்கவும்',
-      'privacyNotice': 'உங்கள் தரவு ரகசிய கூட்டு புள்ளிவிவரமாக மட்டுமே பயன்படுத்தப்படும்.',
+      'privacyNotice':
+          'உங்கள் தரவு ரகசிய கூட்டு புள்ளிவிவரமாக மட்டுமே பயன்படுத்தப்படும்.',
       'harvestOutcomeLabel': 'அறுவடை அளவு (மெட்ரிக் டன் - விருப்பம்)',
       'salePriceLabel': 'விற்பனை விலை (ரூ./கிலோ - விருப்பம்)',
       'saleChannelLabel': 'சந்தைப்படுத்தல் வழி',

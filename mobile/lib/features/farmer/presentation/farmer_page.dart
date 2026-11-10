@@ -1,7 +1,9 @@
+import '../../../core/localization/app_locale.dart';
+import '../../../core/localization/localized_text.dart';
+import 'widgets/planting_receipt_widget.dart';
 import '../../auth/data/auth_repository.dart';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
@@ -19,7 +21,8 @@ import 'market_prices_page.dart';
 import '../../../shared/widgets/premium_confirm_dialog.dart';
 
 class FarmerPage extends StatefulWidget {
-  const FarmerPage({super.key});
+  const FarmerPage({super.key, this.repository});
+  final FarmerRepository? repository;
 
   @override
   State<FarmerPage> createState() => _FarmerPageState();
@@ -37,6 +40,7 @@ class _FarmerPageState extends State<FarmerPage> {
   String _selectedIrrigation = 'Minor Tank';
   String _selectedSeedSource = 'Certified DOA Seed';
   bool _isSuccessView = false;
+  DateTime _plantingDate = DateTime.now();
 
   // Post-Harvest & Marketing Telemetry (from farmer_app)
   final TextEditingController _harvestOutcomeController =
@@ -58,7 +62,7 @@ class _FarmerPageState extends State<FarmerPage> {
   // Alerts filter
   String _alertsFilter = 'all';
 
-  final _repo = FarmerRepository.instance;
+  late final _repo = widget.repository ?? FarmerRepository.instance;
 
   @override
   void initState() {
@@ -80,10 +84,20 @@ class _FarmerPageState extends State<FarmerPage> {
   }
 
   void _onRepoUpdated() {
-    if (mounted) setState(() {});
+    if (mounted) {
+      final current = _latestSubmittedReport;
+      if (current != null) {
+        _latestSubmittedReport = _repo.reports.firstWhere(
+          (report) => report.clientId == current.clientId,
+          orElse: () => current,
+        );
+      }
+      setState(() {});
+    }
   }
 
   void _onLanguageChange(AppLanguage lang) {
+    AppLocale.instance.select(lang);
     setState(() => _language = lang);
   }
 
@@ -119,6 +133,7 @@ class _FarmerPageState extends State<FarmerPage> {
 
   @override
   Widget build(BuildContext context) {
+    _language = AppLocaleScope.of(context, fallback: _language);
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -178,89 +193,17 @@ class _FarmerPageState extends State<FarmerPage> {
           ],
         ),
         actions: [
-          // DEC Market Prices Quick View
           IconButton(
-            tooltip: 'DEC Market Prices',
-            icon: const Icon(
-              Icons.trending_up_rounded,
-              size: 21,
-              color: AppTheme.primary,
-            ),
+            tooltip: context.tr('DEC Market Prices'),
             onPressed: _openMarketPrices,
+            icon: const Icon(Icons.trending_up_rounded),
           ),
-          // Role switch for competition demo (Closed loop showcase)
+          const LanguagePicker(),
           IconButton(
-            tooltip: 'Switch to Officer View',
-            icon: const Icon(
-              Icons.dashboard_customize_outlined,
-              size: 20,
-              color: AppTheme.primary,
-            ),
-            onPressed: () {
-              context.go('/officer');
-            },
-          ),
-          // Trilingual language toggle
-          Container(
-            margin: const EdgeInsets.only(right: 4),
-            decoration: BoxDecoration(
-              color: AppTheme.neutral100,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: AppLanguage.values.map((lang) {
-                final isSelected = _language == lang;
-                return GestureDetector(
-                  onTap: () => _onLanguageChange(lang),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected ? Colors.white : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.08),
-                                blurRadius: 4,
-                                offset: const Offset(0, 1),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Text(
-                      lang == AppLanguage.en
-                          ? 'EN'
-                          : lang == AppLanguage.si
-                          ? 'සිං'
-                          : 'த',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: isSelected
-                            ? AppTheme.primary
-                            : AppTheme.neutral600,
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          // Visible Log Out Button in Mobile AppBar
-          IconButton(
-            tooltip: 'Log Out',
-            icon: const Icon(
-              Icons.logout_rounded,
-              size: 19,
-              color: AppTheme.neutral600,
-            ),
+            tooltip: context.tr('Log Out'),
             onPressed: () => _confirmLogout(context),
+            icon: const Icon(Icons.logout_rounded),
           ),
-          const SizedBox(width: 4),
         ],
       ),
       body: IndexedStack(
@@ -325,12 +268,12 @@ class _FarmerPageState extends State<FarmerPage> {
           NavigationDestination(
             icon: Badge(
               isLabelVisible: _repo.unreadAlertsCount > 0,
-              label: Text('${_repo.unreadAlertsCount}'),
+              label: LocalizedText('${_repo.unreadAlertsCount}'),
               child: const Icon(Icons.notifications_none_rounded),
             ),
             selectedIcon: Badge(
               isLabelVisible: _repo.unreadAlertsCount > 0,
-              label: Text('${_repo.unreadAlertsCount}'),
+              label: LocalizedText('${_repo.unreadAlertsCount}'),
               child: const Icon(Icons.notifications_rounded),
             ),
             label: AppTranslations.t(_language, 'navAlerts'),
@@ -375,8 +318,10 @@ class _FarmerPageState extends State<FarmerPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                runSpacing: 8,
+                spacing: 8,
+                alignment: WrapAlignment.spaceBetween,
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -387,7 +332,7 @@ class _FarmerPageState extends State<FarmerPage> {
                       color: Colors.white.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
+                    child: LocalizedText(
                       AppTranslations.t(_language, 'seasonPeriod'),
                       style: const TextStyle(
                         color: AppTheme.accent,
@@ -430,7 +375,7 @@ class _FarmerPageState extends State<FarmerPage> {
                 ),
               ),
               const SizedBox(height: 2),
-              Text(
+              LocalizedText(
                 AppTranslations.t(_language, 'greetingSub'),
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.8),
@@ -446,7 +391,9 @@ class _FarmerPageState extends State<FarmerPage> {
                 ),
                 onPressed: () => setState(() => _selectedIndex = 1),
                 icon: const Icon(Icons.compare_arrows_rounded, size: 18),
-                label: Text(AppTranslations.t(_language, 'compareTop3Cta')),
+                label: LocalizedText(
+                  AppTranslations.t(_language, 'compareTop3Cta'),
+                ),
               ),
             ],
           ),
@@ -483,7 +430,7 @@ class _FarmerPageState extends State<FarmerPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      const LocalizedText(
                         'WEATHER & DRAINAGE ALERT',
                         style: TextStyle(
                           color: Color(0xFF1D4ED8),
@@ -493,7 +440,7 @@ class _FarmerPageState extends State<FarmerPage> {
                         ),
                       ),
                       const SizedBox(height: 2),
-                      Text(
+                      LocalizedText(
                         AppTranslations.t(_language, 'weatherAlertTitle'),
                         style: const TextStyle(
                           fontSize: 12,
@@ -502,7 +449,7 @@ class _FarmerPageState extends State<FarmerPage> {
                         ),
                       ),
                       const SizedBox(height: 2),
-                      Text(
+                      LocalizedText(
                         AppTranslations.t(_language, 'weatherAlertDesc'),
                         style: const TextStyle(
                           fontSize: 11,
@@ -554,10 +501,12 @@ class _FarmerPageState extends State<FarmerPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      Wrap(
+                        runSpacing: 8,
+                        spacing: 8,
+                        alignment: WrapAlignment.spaceBetween,
                         children: [
-                          Text(
+                          LocalizedText(
                             AppTranslations.t(_language, 'marketPrices'),
                             style: const TextStyle(
                               fontSize: 13,
@@ -565,7 +514,7 @@ class _FarmerPageState extends State<FarmerPage> {
                               color: AppTheme.ink,
                             ),
                           ),
-                          const Text(
+                          const LocalizedText(
                             'View Feed ›',
                             style: TextStyle(
                               fontSize: 11,
@@ -576,7 +525,7 @@ class _FarmerPageState extends State<FarmerPage> {
                         ],
                       ),
                       const SizedBox(height: 2),
-                      const Text(
+                      const LocalizedText(
                         'Dambulla DEC: Big Onion Rs. 320–365 · Chilli Rs. 240–280',
                         style: TextStyle(
                           fontSize: 11,
@@ -615,7 +564,7 @@ class _FarmerPageState extends State<FarmerPage> {
                 ),
                 SizedBox(width: 10),
                 Expanded(
-                  child: Text(
+                  child: LocalizedText(
                     'Querying FastAPI AI recommendation engine...',
                     style: TextStyle(
                       fontSize: 11,
@@ -629,13 +578,15 @@ class _FarmerPageState extends State<FarmerPage> {
           ),
 
         // Top Picks Header
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          runSpacing: 8,
+          spacing: 8,
+          alignment: WrapAlignment.spaceBetween,
           children: [
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                LocalizedText(
                   AppTranslations.t(_language, 'topPicksTitle'),
                   style: const TextStyle(
                     fontSize: 15,
@@ -688,10 +639,12 @@ class _FarmerPageState extends State<FarmerPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                runSpacing: 8,
+                spacing: 8,
+                alignment: WrapAlignment.spaceBetween,
                 children: [
-                  Text(
+                  LocalizedText(
                     AppTranslations.t(_language, 'spiTitle'),
                     style: const TextStyle(
                       fontSize: 12,
@@ -703,7 +656,7 @@ class _FarmerPageState extends State<FarmerPage> {
                     onTap: () => WhyAdviceBottomSheet.show(context, _language),
                     child: const Row(
                       children: [
-                        Text(
+                        LocalizedText(
                           'Why?',
                           style: TextStyle(
                             fontSize: 11,
@@ -722,8 +675,10 @@ class _FarmerPageState extends State<FarmerPage> {
                 ],
               ),
               const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                runSpacing: 8,
+                spacing: 8,
+                alignment: WrapAlignment.spaceBetween,
                 children: [
                   _buildMonthPill(
                     'Jan',
@@ -800,7 +755,7 @@ class _FarmerPageState extends State<FarmerPage> {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
+                        child: LocalizedText(
                           crop.localizedName(_language),
                           style: const TextStyle(
                             fontSize: 13,
@@ -822,7 +777,7 @@ class _FarmerPageState extends State<FarmerPage> {
                               : AppTheme.oversupplyTint,
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: Text(
+                        child: LocalizedText(
                           crop.risk == MarketRisk.balanced
                               ? 'Balanced'
                               : crop.risk == MarketRisk.shortage
@@ -842,7 +797,7 @@ class _FarmerPageState extends State<FarmerPage> {
                     ],
                   ),
                   const SizedBox(height: 3),
-                  Text(
+                  LocalizedText(
                     crop.localizedProfit(_language),
                     style: const TextStyle(
                       fontSize: 13,
@@ -856,7 +811,7 @@ class _FarmerPageState extends State<FarmerPage> {
                     children: [
                       WaterDropsWidget(count: crop.waterNeed),
                       const SizedBox(width: 8),
-                      Text(
+                      LocalizedText(
                         'Harvest: ${crop.localizedHarvestWindow(_language)}',
                         style: const TextStyle(
                           fontSize: 10,
@@ -889,7 +844,7 @@ class _FarmerPageState extends State<FarmerPage> {
       ),
       child: Column(
         children: [
-          Text(
+          LocalizedText(
             month,
             style: TextStyle(
               fontSize: 10,
@@ -897,7 +852,7 @@ class _FarmerPageState extends State<FarmerPage> {
               color: textColor,
             ),
           ),
-          Text(value, style: TextStyle(fontSize: 9, color: textColor)),
+          LocalizedText(value, style: TextStyle(fontSize: 9, color: textColor)),
         ],
       ),
     );
@@ -912,13 +867,15 @@ class _FarmerPageState extends State<FarmerPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          runSpacing: 8,
+          spacing: 8,
+          alignment: WrapAlignment.spaceBetween,
           children: [
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                LocalizedText(
                   AppTranslations.t(_language, 'compareTitle'),
                   style: const TextStyle(
                     fontSize: 18,
@@ -926,7 +883,7 @@ class _FarmerPageState extends State<FarmerPage> {
                     color: AppTheme.ink,
                   ),
                 ),
-                Text(
+                LocalizedText(
                   AppTranslations.t(_language, 'compareSub'),
                   style: const TextStyle(
                     fontSize: 11,
@@ -993,7 +950,7 @@ class _FarmerPageState extends State<FarmerPage> {
                     color: Colors.white.withValues(alpha: 0.95),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Text(
+                  child: LocalizedText(
                     crop.localizedFitBadge(_language),
                     style: const TextStyle(
                       fontSize: 10,
@@ -1011,17 +968,19 @@ class _FarmerPageState extends State<FarmerPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  runSpacing: 8,
+                  spacing: 8,
+                  alignment: WrapAlignment.spaceBetween,
                   children: [
-                    Text(
+                    LocalizedText(
                       crop.localizedName(_language),
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Text(
+                    LocalizedText(
                       crop.scientificName,
                       style: const TextStyle(
                         fontSize: 11,
@@ -1040,10 +999,12 @@ class _FarmerPageState extends State<FarmerPage> {
                     color: AppTheme.primaryTint,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Wrap(
+                    runSpacing: 8,
+                    spacing: 8,
+                    alignment: WrapAlignment.spaceBetween,
                     children: [
-                      Text(
+                      LocalizedText(
                         '${AppTranslations.t(_language, 'profitRange')} (${AppTranslations.t(_language, 'perAcre')})',
                         style: const TextStyle(
                           fontSize: 11,
@@ -1051,7 +1012,7 @@ class _FarmerPageState extends State<FarmerPage> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      Text(
+                      LocalizedText(
                         crop.localizedProfit(_language),
                         style: const TextStyle(
                           fontSize: 14,
@@ -1091,7 +1052,7 @@ class _FarmerPageState extends State<FarmerPage> {
                       ),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: Text(
+                        child: LocalizedText(
                           crop.localizedRiskText(_language),
                           style: TextStyle(
                             fontSize: 11,
@@ -1119,7 +1080,9 @@ class _FarmerPageState extends State<FarmerPage> {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: () => _openCropDetail(crop),
-                        child: Text(AppTranslations.t(_language, 'detailsCta')),
+                        child: LocalizedText(
+                          AppTranslations.t(_language, 'detailsCta'),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -1133,7 +1096,9 @@ class _FarmerPageState extends State<FarmerPage> {
                             _isSuccessView = false;
                           });
                         },
-                        child: Text(AppTranslations.t(_language, 'chooseCta')),
+                        child: LocalizedText(
+                          AppTranslations.t(_language, 'chooseCta'),
+                        ),
                       ),
                     ),
                   ],
@@ -1189,10 +1154,12 @@ class _FarmerPageState extends State<FarmerPage> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         // Stepper Progress Header
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          runSpacing: 8,
+          spacing: 8,
+          alignment: WrapAlignment.spaceBetween,
           children: [
-            Text(
+            LocalizedText(
               'Step $_reportStep of 3',
               style: const TextStyle(
                 fontSize: 12,
@@ -1200,7 +1167,7 @@ class _FarmerPageState extends State<FarmerPage> {
                 color: AppTheme.primary,
               ),
             ),
-            Text(
+            LocalizedText(
               '${(_reportStep / 3 * 100).toInt()}% Done',
               style: const TextStyle(fontSize: 11, color: AppTheme.neutral600),
             ),
@@ -1218,7 +1185,7 @@ class _FarmerPageState extends State<FarmerPage> {
         ),
         const SizedBox(height: 16),
 
-        Text(
+        LocalizedText(
           AppTranslations.t(_language, 'reportTitle'),
           style: const TextStyle(
             fontSize: 18,
@@ -1226,7 +1193,7 @@ class _FarmerPageState extends State<FarmerPage> {
             color: AppTheme.ink,
           ),
         ),
-        Text(
+        LocalizedText(
           AppTranslations.t(_language, 'reportSub'),
           style: const TextStyle(fontSize: 12, color: AppTheme.neutral600),
         ),
@@ -1234,7 +1201,7 @@ class _FarmerPageState extends State<FarmerPage> {
 
         // STEP 1: Select Crop
         if (_reportStep == 1) ...[
-          const Text(
+          const LocalizedText(
             'Select Target Crop',
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
           ),
@@ -1270,11 +1237,11 @@ class _FarmerPageState extends State<FarmerPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          LocalizedText(
                             c.localizedName(_language),
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          Text(
+                          LocalizedText(
                             c.localizedProfit(_language),
                             style: const TextStyle(
                               fontSize: 11,
@@ -1295,7 +1262,7 @@ class _FarmerPageState extends State<FarmerPage> {
 
         // STEP 2: Acreage & Water
         if (_reportStep == 2) ...[
-          Text(
+          LocalizedText(
             'Target Crop: ${selectedCrop.localizedName(_language)}',
             style: const TextStyle(
               fontSize: 13,
@@ -1304,7 +1271,7 @@ class _FarmerPageState extends State<FarmerPage> {
             ),
           ),
           const SizedBox(height: 14),
-          const Text(
+          const LocalizedText(
             'Cultivated Area (Acres)',
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
           ),
@@ -1316,7 +1283,7 @@ class _FarmerPageState extends State<FarmerPage> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 3),
                   child: ChoiceChip(
-                    label: Text('$acres ac'),
+                    label: LocalizedText('$acres ac'),
                     selected: isSelected,
                     onSelected: (val) =>
                         setState(() => _reportedAreaAcres = acres),
@@ -1332,7 +1299,7 @@ class _FarmerPageState extends State<FarmerPage> {
             }).toList(),
           ),
           const SizedBox(height: 18),
-          const Text(
+          const LocalizedText(
             'Water / Irrigation Source',
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
           ),
@@ -1350,7 +1317,7 @@ class _FarmerPageState extends State<FarmerPage> {
                 ].map((irr) {
                   return RadioListTile<String>(
                     value: irr,
-                    title: Text(
+                    title: LocalizedText(
                       irr,
                       style: const TextStyle(
                         fontSize: 13,
@@ -1368,7 +1335,26 @@ class _FarmerPageState extends State<FarmerPage> {
 
         // STEP 3: Date & Seed
         if (_reportStep == 3) ...[
-          const Text(
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const LocalizedText('Planting date'),
+            subtitle: LocalizedText(
+              _plantingDate.toIso8601String().substring(0, 10),
+            ),
+            trailing: const Icon(Icons.calendar_month),
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _plantingDate,
+                firstDate: DateTime(2020),
+                lastDate: DateTime(DateTime.now().year + 2),
+              );
+              if (picked != null && mounted) {
+                setState(() => _plantingDate = picked);
+              }
+            },
+          ),
+          const LocalizedText(
             'Seed Variety & Origin',
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
           ),
@@ -1385,7 +1371,7 @@ class _FarmerPageState extends State<FarmerPage> {
                 ].map((src) {
                   return RadioListTile<String>(
                     value: src,
-                    title: Text(
+                    title: LocalizedText(
                       src,
                       style: const TextStyle(
                         fontSize: 13,
@@ -1410,19 +1396,21 @@ class _FarmerPageState extends State<FarmerPage> {
                 color: AppTheme.primary,
               ),
               const SizedBox(width: 6),
-              const Text(
-                'Post-Harvest & Marketing Telemetry (Optional)',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.ink,
+              const Expanded(
+                child: LocalizedText(
+                  'Post-Harvest Details (Not submitted here)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.ink,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Record realized yield outcome and sale price to help verify and improve AI market forecasts.',
+          const LocalizedText(
+            'This declaration records planting only. Harvest outcomes require a separate harvest report.',
             style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
           ),
           const SizedBox(height: 10),
@@ -1434,9 +1422,9 @@ class _FarmerPageState extends State<FarmerPage> {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: const InputDecoration(
-                    labelText: 'Yield (MT)',
-                    hintText: 'e.g. 3.5',
+                  decoration: InputDecoration(
+                    labelText: context.tr('Yield (MT)'),
+                    hintText: context.tr('e.g. 3.5'),
                     isDense: true,
                     border: OutlineInputBorder(),
                   ),
@@ -1449,9 +1437,9 @@ class _FarmerPageState extends State<FarmerPage> {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: const InputDecoration(
-                    labelText: 'Price (Rs/kg)',
-                    hintText: 'e.g. 320',
+                  decoration: InputDecoration(
+                    labelText: context.tr('Price (Rs/kg)'),
+                    hintText: context.tr('e.g. 320'),
                     isDense: true,
                     border: OutlineInputBorder(),
                   ),
@@ -1460,7 +1448,7 @@ class _FarmerPageState extends State<FarmerPage> {
             ],
           ),
           const SizedBox(height: 12),
-          const Text(
+          const LocalizedText(
             'Marketing Channel',
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
           ),
@@ -1479,7 +1467,7 @@ class _FarmerPageState extends State<FarmerPage> {
                     return Padding(
                       padding: const EdgeInsets.only(right: 6),
                       child: ChoiceChip(
-                        label: Text(channel),
+                        label: LocalizedText(channel),
                         selected: isSelected,
                         onSelected: (_) =>
                             setState(() => _selectedSaleChannel = channel),
@@ -1501,7 +1489,7 @@ class _FarmerPageState extends State<FarmerPage> {
             dense: true,
             contentPadding: EdgeInsets.zero,
             activeColor: AppTheme.primary,
-            title: const Text(
+            title: const LocalizedText(
               'I consent to share pseudonymous cultivation statistics with the Anuradhapura Agrarian Office.',
               style: TextStyle(fontSize: 11, color: AppTheme.neutral700),
             ),
@@ -1526,7 +1514,7 @@ class _FarmerPageState extends State<FarmerPage> {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
+                  child: LocalizedText(
                     AppTranslations.t(_language, 'privacyNotice'),
                     style: const TextStyle(
                       fontSize: 11,
@@ -1547,7 +1535,7 @@ class _FarmerPageState extends State<FarmerPage> {
             if (_reportStep > 1) ...[
               OutlinedButton(
                 onPressed: () => setState(() => _reportStep--),
-                child: const Text('Back'),
+                child: const LocalizedText('Back'),
               ),
               const SizedBox(width: 12),
             ],
@@ -1561,7 +1549,10 @@ class _FarmerPageState extends State<FarmerPage> {
                     final rep = await _repo.submitPlantingReport(
                       cropId: _selectedCropId,
                       areaAcres: _reportedAreaAcres,
-                      plantingDate: '2026-10-25',
+                      plantingDate: _plantingDate.toIso8601String().substring(
+                        0,
+                        10,
+                      ),
                       irrigationType: _selectedIrrigation,
                       seedSource: _selectedSeedSource,
                       harvestOutcomeMt: double.tryParse(
@@ -1577,7 +1568,7 @@ class _FarmerPageState extends State<FarmerPage> {
                     });
                   }
                 },
-                child: Text(
+                child: LocalizedText(
                   _reportStep == 3
                       ? AppTranslations.t(_language, 'submitReport')
                       : 'Next',
@@ -1592,7 +1583,7 @@ class _FarmerPageState extends State<FarmerPage> {
 
   Widget _buildSuccessReceiptView() {
     final rep = _latestSubmittedReport!;
-    final bool isPending = rep.status == 'pending';
+    final bool isPending = !rep.hasVerifiedReceipt;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
@@ -1616,13 +1607,9 @@ class _FarmerPageState extends State<FarmerPage> {
         ),
         const SizedBox(height: 14),
         Center(
-          child: Text(
+          child: LocalizedText(
             isPending
-                ? (_language == AppLanguage.si
-                      ? 'වාර්තාව දේශීයව සුරැකිණි (පොරොත්තු)'
-                      : _language == AppLanguage.ta
-                      ? 'உள்ளூரில் சேமிக்கப்பட்டது (நிலுவையில்)'
-                      : 'Saved Locally (Pending Sync)')
+                ? 'Pending Server Confirmation'
                 : AppTranslations.t(_language, 'reportSuccessTitle'),
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
@@ -1637,12 +1624,8 @@ class _FarmerPageState extends State<FarmerPage> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFFFDE68A)),
               ),
-              child: Text(
-                _language == AppLanguage.si
-                    ? 'සබඳතාව නැත · ස්වයංක්‍රීයව නැවත උත්සාහ කෙරේ'
-                    : _language == AppLanguage.ta
-                    ? 'இணைப்பு இல்லை · தானாக மீண்டும் முயற்சிக்கும்'
-                    : 'Offline Mode · Auto-retry when connection restored',
+              child: LocalizedText(
+                'Pending Server Confirmation',
                 style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
@@ -1673,10 +1656,12 @@ class _FarmerPageState extends State<FarmerPage> {
           ),
           child: Column(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                runSpacing: 8,
+                spacing: 8,
+                alignment: WrapAlignment.spaceBetween,
                 children: [
-                  Text(
+                  LocalizedText(
                     AppTranslations.t(_language, 'receiptTitle'),
                     style: const TextStyle(
                       fontSize: 12,
@@ -1684,7 +1669,7 @@ class _FarmerPageState extends State<FarmerPage> {
                       color: AppTheme.neutral600,
                     ),
                   ),
-                  Text(
+                  LocalizedText(
                     rep.id,
                     style: const TextStyle(
                       fontFamily: 'monospace',
@@ -1697,13 +1682,13 @@ class _FarmerPageState extends State<FarmerPage> {
               const Divider(height: 24),
               _buildReceiptRow(
                 'Submission Status',
-                isPending ? 'PENDING (Saved Locally)' : 'VERIFIED & SYNCED',
+                isPending ? 'PENDING (This app session)' : 'VERIFIED & SYNCED',
               ),
               _buildReceiptRow('Recorded Crop', rep.cropNameEn),
               _buildReceiptRow('Declared Area', '${rep.areaAcres} Acres'),
               _buildReceiptRow('Irrigation', rep.irrigationType),
               _buildReceiptRow('District', rep.district),
-              _buildReceiptRow('Record Hash', rep.receiptHash),
+              PlantingReceiptWidget(report: rep),
             ],
           ),
         ),
@@ -1711,7 +1696,7 @@ class _FarmerPageState extends State<FarmerPage> {
         if (isPending) ...[
           OutlinedButton.icon(
             icon: const Icon(Icons.sync_rounded),
-            label: Text(
+            label: LocalizedText(
               _language == AppLanguage.si
                   ? 'දැන් නැවත උත්සාහ කරන්න'
                   : _language == AppLanguage.ta
@@ -1722,7 +1707,7 @@ class _FarmerPageState extends State<FarmerPage> {
               final synced = await _repo.retryPendingReports();
               if (synced > 0) {
                 final updated = _repo.reports.firstWhere(
-                  (r) => r.id == rep.id,
+                  (r) => r.clientId == rep.clientId,
                   orElse: () => rep,
                 );
                 setState(() => _latestSubmittedReport = updated);
@@ -1736,7 +1721,7 @@ class _FarmerPageState extends State<FarmerPage> {
             _isSuccessView = false;
             _selectedIndex = 0; // Return home
           }),
-          child: Text(AppTranslations.t(_language, 'returnHome')),
+          child: LocalizedText(AppTranslations.t(_language, 'returnHome')),
         ),
       ],
     );
@@ -1745,14 +1730,16 @@ class _FarmerPageState extends State<FarmerPage> {
   Widget _buildReceiptRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Wrap(
+        runSpacing: 8,
+        spacing: 8,
+        alignment: WrapAlignment.spaceBetween,
         children: [
-          Text(
+          LocalizedText(
             label,
             style: const TextStyle(fontSize: 12, color: AppTheme.neutral600),
           ),
-          Text(
+          LocalizedText(
             value,
             style: const TextStyle(
               fontSize: 12,
@@ -1780,7 +1767,7 @@ class _FarmerPageState extends State<FarmerPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        Text(
+        LocalizedText(
           AppTranslations.t(_language, 'alertsInboxTitle'),
           style: const TextStyle(
             fontSize: 18,
@@ -1788,7 +1775,7 @@ class _FarmerPageState extends State<FarmerPage> {
             color: AppTheme.ink,
           ),
         ),
-        Text(
+        LocalizedText(
           AppTranslations.t(_language, 'alertsInboxSub'),
           style: const TextStyle(fontSize: 11, color: AppTheme.neutral600),
         ),
@@ -1828,7 +1815,7 @@ class _FarmerPageState extends State<FarmerPage> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 40),
             child: Center(
-              child: Text(AppTranslations.t(_language, 'noAlerts')),
+              child: LocalizedText(AppTranslations.t(_language, 'noAlerts')),
             ),
           )
         else
@@ -1842,7 +1829,7 @@ class _FarmerPageState extends State<FarmerPage> {
     return Padding(
       padding: const EdgeInsets.only(right: 6),
       child: ChoiceChip(
-        label: Text(count != null ? '$label ($count)' : label),
+        label: LocalizedText(count != null ? '$label ($count)' : label),
         selected: isSelected,
         onSelected: (_) => setState(() => _alertsFilter = filterKey),
         selectedColor: AppTheme.primary,
@@ -1860,12 +1847,14 @@ class _FarmerPageState extends State<FarmerPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(AppTranslations.t(_language, 'askOfficerDialogTitle')),
+        title: LocalizedText(
+          AppTranslations.t(_language, 'askOfficerDialogTitle'),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            LocalizedText(
               alert.localizedTitle(_language),
               style: const TextStyle(
                 fontSize: 12,
@@ -1888,7 +1877,7 @@ class _FarmerPageState extends State<FarmerPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(AppTranslations.t(_language, 'cancelBtn')),
+            child: LocalizedText(AppTranslations.t(_language, 'cancelBtn')),
           ),
           ElevatedButton(
             onPressed: () {
@@ -1898,12 +1887,16 @@ class _FarmerPageState extends State<FarmerPage> {
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(AppTranslations.t(_language, 'questionSent')),
+                    content: LocalizedText(
+                      AppTranslations.t(_language, 'questionSent'),
+                    ),
                   ),
                 );
               }
             },
-            child: Text(AppTranslations.t(_language, 'sendQuestionBtn')),
+            child: LocalizedText(
+              AppTranslations.t(_language, 'sendQuestionBtn'),
+            ),
           ),
         ],
       ),
@@ -1948,7 +1941,7 @@ class _FarmerPageState extends State<FarmerPage> {
               Icon(iconData, color: color, size: 18),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
+                child: LocalizedText(
                   alert.localizedTitle(_language),
                   style: TextStyle(
                     fontSize: 13,
@@ -1971,7 +1964,7 @@ class _FarmerPageState extends State<FarmerPage> {
             ],
           ),
           const SizedBox(height: 6),
-          Text(
+          LocalizedText(
             alert.localizedMessage(_language),
             style: const TextStyle(
               fontSize: 11,
@@ -1999,7 +1992,7 @@ class _FarmerPageState extends State<FarmerPage> {
                         color: AppTheme.primary,
                       ),
                       const SizedBox(width: 4),
-                      Text(
+                      LocalizedText(
                         _language == AppLanguage.si
                             ? 'ඔබගේ විමසීම:'
                             : _language == AppLanguage.ta
@@ -2014,13 +2007,13 @@ class _FarmerPageState extends State<FarmerPage> {
                     ],
                   ),
                   const SizedBox(height: 2),
-                  Text(
+                  LocalizedText(
                     alert.questionAsked!,
                     style: const TextStyle(fontSize: 11, color: AppTheme.ink),
                   ),
                   if (alert.officerResponse != null) ...[
                     const Divider(height: 12),
-                    Text(
+                    LocalizedText(
                       _language == AppLanguage.si
                           ? 'නිලධාරී පිළිතුර:'
                           : _language == AppLanguage.ta
@@ -2033,7 +2026,7 @@ class _FarmerPageState extends State<FarmerPage> {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
+                    LocalizedText(
                       alert.officerResponse!,
                       style: const TextStyle(
                         fontSize: 11,
@@ -2046,10 +2039,12 @@ class _FarmerPageState extends State<FarmerPage> {
             ),
           ],
           const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            runSpacing: 8,
+            spacing: 8,
+            alignment: WrapAlignment.spaceBetween,
             children: [
-              Text(
+              LocalizedText(
                 alert.timestamp,
                 style: const TextStyle(
                   fontSize: 10,
@@ -2072,7 +2067,7 @@ class _FarmerPageState extends State<FarmerPage> {
                           color: AppTheme.balanced.withValues(alpha: 0.3),
                         ),
                       ),
-                      child: Text(
+                      child: LocalizedText(
                         AppTranslations.t(_language, 'acknowledgedBadge'),
                         style: const TextStyle(
                           fontSize: 10,
@@ -2089,7 +2084,7 @@ class _FarmerPageState extends State<FarmerPage> {
                       ),
                       onPressed: () => _repo.acknowledgeAlert(alert.id),
                       icon: const Icon(Icons.check, size: 12),
-                      label: Text(
+                      label: LocalizedText(
                         AppTranslations.t(_language, 'acknowledgeBtn'),
                         style: const TextStyle(fontSize: 11),
                       ),
@@ -2104,7 +2099,7 @@ class _FarmerPageState extends State<FarmerPage> {
                       Icons.chat_bubble_outline_rounded,
                       size: 12,
                     ),
-                    label: Text(
+                    label: LocalizedText(
                       AppTranslations.t(_language, 'askOfficerBtn'),
                       style: const TextStyle(fontSize: 11),
                     ),
@@ -2118,14 +2113,14 @@ class _FarmerPageState extends State<FarmerPage> {
                       onPressed: () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(
+                            content: LocalizedText(
                               'Calling officer at ${alert.officerPhone}',
                             ),
                           ),
                         );
                       },
                       icon: const Icon(Icons.phone, size: 12),
-                      label: Text(
+                      label: LocalizedText(
                         AppTranslations.t(_language, 'callOfficerBtn'),
                         style: const TextStyle(fontSize: 11),
                       ),
@@ -2148,7 +2143,7 @@ class _FarmerPageState extends State<FarmerPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
       children: [
-        const Text(
+        const LocalizedText(
           'Farmer Profile & Govijana Pass',
           style: TextStyle(
             fontSize: 18,
@@ -2159,7 +2154,10 @@ class _FarmerPageState extends State<FarmerPage> {
         const SizedBox(height: 14),
 
         // Digital Card
-        DigitalFarmerCardWidget(profile: profile),
+        DigitalFarmerCardWidget(
+          profile: profile,
+          report: _repo.reports.isEmpty ? null : _repo.reports.first,
+        ),
         const SizedBox(height: 18),
 
         // Language Switcher Tile
@@ -2173,7 +2171,7 @@ class _FarmerPageState extends State<FarmerPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              const LocalizedText(
                 'Display Language',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
               ),
@@ -2196,7 +2194,7 @@ class _FarmerPageState extends State<FarmerPage> {
                           ),
                         ),
                         onPressed: () => _onLanguageChange(lang),
-                        child: Text(
+                        child: LocalizedText(
                           lang.nativeLabel,
                           style: TextStyle(
                             fontSize: 12,
@@ -2247,7 +2245,7 @@ class _FarmerPageState extends State<FarmerPage> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Text(
+                  const LocalizedText(
                     'Farm Parcel Calibration',
                     style: TextStyle(
                       fontSize: 14,
@@ -2258,13 +2256,13 @@ class _FarmerPageState extends State<FarmerPage> {
                 ],
               ),
               const SizedBox(height: 6),
-              const Text(
+              const LocalizedText(
                 'Adjust your soil and irrigation conditions to recalibrate the Top-3 AI recommendations.',
                 style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
               ),
               const SizedBox(height: 14),
               // Land Area Chips
-              const Text(
+              const LocalizedText(
                 'Cultivated Land Area (Acres)',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
               ),
@@ -2276,7 +2274,7 @@ class _FarmerPageState extends State<FarmerPage> {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 2),
                       child: ChoiceChip(
-                        label: Text('$acres'),
+                        label: LocalizedText('$acres'),
                         selected: isSelected,
                         onSelected: (val) =>
                             setState(() => _profileLandAcres = acres),
@@ -2293,7 +2291,7 @@ class _FarmerPageState extends State<FarmerPage> {
               ),
               const SizedBox(height: 14),
               // Irrigation Toggle
-              const Text(
+              const LocalizedText(
                 'Irrigation Regime',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
               ),
@@ -2321,7 +2319,7 @@ class _FarmerPageState extends State<FarmerPage> {
                             ? AppTheme.primary
                             : AppTheme.neutral600,
                       ),
-                      label: Text(
+                      label: LocalizedText(
                         'Canal / Tank',
                         style: TextStyle(
                           fontSize: 11,
@@ -2354,7 +2352,7 @@ class _FarmerPageState extends State<FarmerPage> {
                             ? AppTheme.primary
                             : AppTheme.neutral600,
                       ),
-                      label: Text(
+                      label: LocalizedText(
                         'Rainfed',
                         style: TextStyle(
                           fontSize: 11,
@@ -2370,10 +2368,12 @@ class _FarmerPageState extends State<FarmerPage> {
               ),
               const SizedBox(height: 14),
               // Soil pH Slider
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                runSpacing: 8,
+                spacing: 8,
+                alignment: WrapAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  const LocalizedText(
                     'Soil pH Level',
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                   ),
@@ -2386,7 +2386,7 @@ class _FarmerPageState extends State<FarmerPage> {
                       color: AppTheme.primaryTint,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(
+                    child: LocalizedText(
                       '${_profileSoilPh.toStringAsFixed(1)} pH',
                       style: const TextStyle(
                         fontSize: 12,
@@ -2425,7 +2425,7 @@ class _FarmerPageState extends State<FarmerPage> {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text(
+                              content: LocalizedText(
                                 'Recommendations recalibrated for updated parcel parameters!',
                               ),
                               backgroundColor: AppTheme.primary,
@@ -2443,164 +2443,184 @@ class _FarmerPageState extends State<FarmerPage> {
                         ),
                       )
                     : const Icon(Icons.auto_awesome, size: 16),
-                label: Text(AppTranslations.t(_language, 'recalibrateCta')),
+                label: LocalizedText(
+                  AppTranslations.t(_language, 'recalibrateCta'),
+                ),
               ),
             ],
           ),
         ),
         const SizedBox(height: 16),
 
-        // FastAPI Server Settings Card (from farmer_app)
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppTheme.cardBorder),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: _repo.isLiveConnected
-                              ? AppTheme.balancedTint
-                              : const Color(0xFFFEF3C7),
-                          borderRadius: BorderRadius.circular(10),
+        // Debug server settings are not exposed in production builds.
+        if (AppConfig.canOverrideApiBaseUrl)
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: AppTheme.cardBorder),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  runSpacing: 8,
+                  spacing: 8,
+                  alignment: WrapAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: _repo.isLiveConnected
+                                ? AppTheme.balancedTint
+                                : const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            Icons.cloud_sync_rounded,
+                            color: _repo.isLiveConnected
+                                ? AppTheme.balanced
+                                : const Color(0xFFB45309),
+                            size: 18,
+                          ),
                         ),
-                        child: Icon(
-                          Icons.cloud_sync_rounded,
+                        const SizedBox(width: 8),
+                        const LocalizedText(
+                          'Backend Server & Sync',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.ink,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _repo.isLiveConnected
+                            ? AppTheme.balancedTint
+                            : const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: LocalizedText(
+                        _repo.isLiveConnected ? '● Online' : '○ Standalone',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
                           color: _repo.isLiveConnected
                               ? AppTheme.balanced
                               : const Color(0xFFB45309),
-                          size: 18,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Backend Server & Sync',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.ink,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
                     ),
-                    decoration: BoxDecoration(
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const LocalizedText(
+                  'Configure the FastAPI backend server URL for live AI model inference and telemetry sync.',
+                  style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 8,
+                  children: [
+                    _buildServerChip(
+                      'Emulator (10.0.2.2)',
+                      'http://10.0.2.2:8000',
+                    ),
+                    const SizedBox(width: 6),
+                    _buildServerChip(
+                      'Localhost (127.0.0.1)',
+                      'http://127.0.0.1:8000',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _serverUrlController,
+                  decoration: InputDecoration(
+                    labelText: context.tr('API Base URL'),
+                    hintText: 'http://10.0.2.2:8000',
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.link_rounded, size: 18),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(38),
+                    side: const BorderSide(color: AppTheme.primary),
+                  ),
+                  onPressed: _isTestingServer
+                      ? null
+                      : () async {
+                          setState(() => _isTestingServer = true);
+                          try {
+                            await AppConfig.setBaseUrl(
+                              _serverUrlController.text,
+                            );
+                          } on FormatException {
+                            if (!mounted) return;
+                            setState(() {
+                              _isTestingServer = false;
+                              _serverStatusMessage =
+                                  'Enter a valid server address.';
+                            });
+                            return;
+                          }
+                          final ok = await _repo.checkBackendConnection();
+                          if (!mounted) return;
+                          setState(() {
+                            _isTestingServer = false;
+                            _serverStatusMessage = ok
+                                ? 'Connected to GoviSense FastAPI server!'
+                                : 'Could not reach server. Using offline calibrated data.';
+                          });
+                          if (ok) {
+                            await _repo.refreshRecommendations();
+                          }
+                        },
+                  icon: _isTestingServer
+                      ? const SizedBox(
+                          height: 14,
+                          width: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.wifi_tethering_rounded, size: 16),
+                  label: const LocalizedText('Save & Test Connection'),
+                ),
+                if (_serverStatusMessage != null) ...[
+                  const SizedBox(height: 6),
+                  LocalizedText(
+                    _serverStatusMessage!,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
                       color: _repo.isLiveConnected
-                          ? AppTheme.balancedTint
-                          : const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      _repo.isLiveConnected ? '● Online' : '○ Standalone',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: _repo.isLiveConnected
-                            ? AppTheme.balanced
-                            : const Color(0xFFB45309),
-                      ),
+                          ? AppTheme.balanced
+                          : AppTheme.neutral600,
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Configure the FastAPI backend server URL for live AI model inference and telemetry sync.',
-                style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  _buildServerChip(
-                    'Emulator (10.0.2.2)',
-                    'http://10.0.2.2:8000',
-                  ),
-                  const SizedBox(width: 6),
-                  _buildServerChip(
-                    'Localhost (127.0.0.1)',
-                    'http://127.0.0.1:8000',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _serverUrlController,
-                decoration: const InputDecoration(
-                  labelText: 'API Base URL',
-                  hintText: 'http://10.0.2.2:8000',
-                  isDense: true,
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.link_rounded, size: 18),
-                ),
-              ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(38),
-                  side: const BorderSide(color: AppTheme.primary),
-                ),
-                onPressed: _isTestingServer
-                    ? null
-                    : () async {
-                        setState(() => _isTestingServer = true);
-                        await AppConfig.setBaseUrl(_serverUrlController.text);
-                        final ok = await _repo.checkBackendConnection();
-                        setState(() {
-                          _isTestingServer = false;
-                          _serverStatusMessage = ok
-                              ? 'Connected to GoviSense FastAPI server!'
-                              : 'Could not reach server. Using offline calibrated data.';
-                        });
-                        if (ok) {
-                          await _repo.refreshRecommendations();
-                        }
-                      },
-                icon: _isTestingServer
-                    ? const SizedBox(
-                        height: 14,
-                        width: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.wifi_tethering_rounded, size: 16),
-                label: const Text('Save & Test Connection'),
-              ),
-              if (_serverStatusMessage != null) ...[
-                const SizedBox(height: 6),
-                Text(
-                  _serverStatusMessage!,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: _repo.isLiveConnected
-                        ? AppTheme.balanced
-                        : AppTheme.neutral600,
-                  ),
-                ),
               ],
-            ],
+            ),
           ),
-        ),
         const SizedBox(height: 16),
 
         // 4. ACCOUNT & SESSION (Matches Mobile Design Specification)
@@ -2621,7 +2641,7 @@ class _FarmerPageState extends State<FarmerPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              const LocalizedText(
                 'ACCOUNT & SESSION',
                 style: TextStyle(
                   fontSize: 11,
@@ -2631,7 +2651,7 @@ class _FarmerPageState extends State<FarmerPage> {
                 ),
               ),
               const SizedBox(height: 6),
-              Text(
+              LocalizedText(
                 'Signed in as ${profile.name} (${profile.farmerId})',
                 style: const TextStyle(
                   fontSize: 12,
@@ -2670,11 +2690,11 @@ class _FarmerPageState extends State<FarmerPage> {
                           color: Color(0xFFB91C1C),
                         ),
                         const SizedBox(width: 8),
-                        Text(
+                        LocalizedText(
                           _language == AppLanguage.si
-                              ? 'පද්ධතියෙන් ඉවත් වන්න (Log Out)'
+                              ? 'පද්ධතියෙන් ඉවත් වන්න'
                               : _language == AppLanguage.ta
-                              ? 'வெளியேறு (Log Out)'
+                              ? 'வெளியேறு'
                               : 'Log Out of GoviSense',
                           style: const TextStyle(
                             color: Color(0xFFB91C1C),
@@ -2749,7 +2769,7 @@ class _FarmerPageState extends State<FarmerPage> {
             color: isSelected ? AppTheme.primary : AppTheme.cardBorder,
           ),
         ),
-        child: Text(
+        child: LocalizedText(
           label,
           style: TextStyle(
             fontSize: 10,

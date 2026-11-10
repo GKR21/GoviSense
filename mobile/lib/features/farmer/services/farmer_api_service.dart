@@ -61,17 +61,21 @@ class FarmerApiService {
   }
 
   /// Submits actual farmer planting decision to the Closed-Loop Feedback endpoint
-  Future<bool> submitPlantingReport(PlantingReport report) async {
+  Future<PlantingReceipt?> submitPlantingReport(PlantingReport report) async {
     try {
       final payload = report.toApiPayload();
       final response = await _client.post(
         '/api/feedback/planting-report',
         data: payload,
       );
-      return response.statusCode == 200;
-    } catch (e) {
-      debugPrint('Planting report network submission: $e');
-      return false;
+      if (response.statusCode != 200 && response.statusCode != 201) return null;
+      final data = response.data is String
+          ? jsonDecode(response.data)
+          : response.data;
+      return PlantingReceipt.fromJson(Map<String, dynamic>.from(data as Map));
+    } catch (_) {
+      // An HTTP 200 error body or malformed receipt is not acceptance.
+      return null;
     }
   }
 

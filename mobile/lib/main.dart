@@ -1,3 +1,7 @@
+import 'package:flutter_localizations/flutter_localizations.dart';
+
+import 'core/localization/app_locale.dart';
+import 'core/localization/app_translations.dart';
 import 'features/auth/data/auth_repository.dart';
 
 import 'package:flutter/material.dart';
@@ -10,6 +14,7 @@ import 'core/theme/app_theme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppConfig.init();
+  await AppLocale.instance.restore();
   await AuthRepository.instance.restore();
   runApp(const ProviderScope(child: MyApp()));
 }
@@ -31,11 +36,22 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: AppConfig.appName,
-      theme: AppTheme.light(),
-      routerConfig: _router,
-      debugShowCheckedModeBanner: false,
+    return AppLocaleScope(
+      controller: AppLocale.instance,
+      child: AnimatedBuilder(
+        animation: AppLocale.instance,
+        builder: (context, _) => MaterialApp.router(
+          locale: Locale(AppLocale.instance.language.name),
+          supportedLocales: AppLanguage.values
+              .map((value) => Locale(value.name))
+              .toList(),
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          title: AppConfig.appName,
+          theme: AppTheme.light(),
+          routerConfig: _router,
+          debugShowCheckedModeBanner: false,
+        ),
+      ),
     );
   }
 }
