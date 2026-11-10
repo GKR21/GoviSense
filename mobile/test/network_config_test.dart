@@ -12,10 +12,7 @@ void main() {
 
   test('default API URL is HTTPS and supports a build-time override', () async {
     await AppConfig.init();
-    const expected = String.fromEnvironment(
-      'API_BASE_URL',
-      defaultValue: AppConfig.deployedUrl,
-    );
+    final expected = AppConfig.defaultUrl;
     expect(AppConfig.apiBaseUrl, AppConfig.validateBaseUrl(expected));
   });
 
@@ -60,10 +57,7 @@ void main() {
       'govisense_api_base_url': 'javascript:invalid',
     });
     await AppConfig.init();
-    const expected = String.fromEnvironment(
-      'API_BASE_URL',
-      defaultValue: AppConfig.deployedUrl,
-    );
+    final expected = AppConfig.defaultUrl;
     expect(AppConfig.apiBaseUrl, AppConfig.validateBaseUrl(expected));
   });
 

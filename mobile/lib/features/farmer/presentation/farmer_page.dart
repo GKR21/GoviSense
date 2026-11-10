@@ -2540,6 +2540,11 @@ class _FarmerPageState extends State<FarmerPage> {
                   runSpacing: 8,
                   children: [
                     _buildServerChip(
+                      'Deployed (Railway)',
+                      AppConfig.deployedUrl,
+                    ),
+                    const SizedBox(width: 6),
+                    _buildServerChip(
                       'Emulator (10.0.2.2)',
                       'http://10.0.2.2:8000',
                     ),
