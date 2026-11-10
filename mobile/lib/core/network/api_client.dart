@@ -1,3 +1,4 @@
+import 'transport_policy.dart';
 import '../../features/auth/data/auth_repository.dart';
 
 import 'package:dio/dio.dart';
@@ -6,23 +7,29 @@ import '../config/app_config.dart';
 import 'api_exceptions.dart';
 
 class ApiClient {
-  ApiClient({Dio? dio}) : _customDio = dio;
+  ApiClient({Dio? dio})
+    : _customDio = dio,
+      _client = secureApiDio(
+        dio ??
+            Dio(
+              BaseOptions(
+                baseUrl: AppConfig.apiBaseUrl,
+                headers: {
+                  'Accept': 'application/json',
+                  'Content-Type': 'application/json',
+                },
+                connectTimeout: const Duration(seconds: 5),
+                receiveTimeout: const Duration(seconds: 5),
+              ),
+            ),
+      );
 
   final Dio? _customDio;
+  final Dio _client;
 
   Dio get _dio {
-    if (_customDio != null) return _customDio;
-    return Dio(
-      BaseOptions(
-        baseUrl: AppConfig.apiBaseUrl,
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        connectTimeout: const Duration(seconds: 5),
-        receiveTimeout: const Duration(seconds: 5),
-      ),
-    );
+    if (_customDio == null) _client.options.baseUrl = AppConfig.apiBaseUrl;
+    return _client;
   }
 
   Options get _authOptions => Options(

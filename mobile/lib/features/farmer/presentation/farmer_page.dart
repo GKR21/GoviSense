@@ -2440,161 +2440,175 @@ class _FarmerPageState extends State<FarmerPage> {
         ),
         const SizedBox(height: 16),
 
-        // FastAPI Server Settings Card (from farmer_app)
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppTheme.cardBorder),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                runSpacing: 8,
-                spacing: 8,
-                alignment: WrapAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: _repo.isLiveConnected
-                              ? AppTheme.balancedTint
-                              : const Color(0xFFFEF3C7),
-                          borderRadius: BorderRadius.circular(10),
+        // Debug server settings are not exposed in production builds.
+        if (AppConfig.canOverrideApiBaseUrl)
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: AppTheme.cardBorder),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  runSpacing: 8,
+                  spacing: 8,
+                  alignment: WrapAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: _repo.isLiveConnected
+                                ? AppTheme.balancedTint
+                                : const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            Icons.cloud_sync_rounded,
+                            color: _repo.isLiveConnected
+                                ? AppTheme.balanced
+                                : const Color(0xFFB45309),
+                            size: 18,
+                          ),
                         ),
-                        child: Icon(
-                          Icons.cloud_sync_rounded,
+                        const SizedBox(width: 8),
+                        const LocalizedText(
+                          'Backend Server & Sync',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.ink,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _repo.isLiveConnected
+                            ? AppTheme.balancedTint
+                            : const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: LocalizedText(
+                        _repo.isLiveConnected ? '● Online' : '○ Standalone',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
                           color: _repo.isLiveConnected
                               ? AppTheme.balanced
                               : const Color(0xFFB45309),
-                          size: 18,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      const LocalizedText(
-                        'Backend Server & Sync',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.ink,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
                     ),
-                    decoration: BoxDecoration(
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const LocalizedText(
+                  'Configure the FastAPI backend server URL for live AI model inference and telemetry sync.',
+                  style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 8,
+                  children: [
+                    _buildServerChip(
+                      'Emulator (10.0.2.2)',
+                      'http://10.0.2.2:8000',
+                    ),
+                    const SizedBox(width: 6),
+                    _buildServerChip(
+                      'Localhost (127.0.0.1)',
+                      'http://127.0.0.1:8000',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _serverUrlController,
+                  decoration: InputDecoration(
+                    labelText: context.tr('API Base URL'),
+                    hintText: 'http://10.0.2.2:8000',
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.link_rounded, size: 18),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(38),
+                    side: const BorderSide(color: AppTheme.primary),
+                  ),
+                  onPressed: _isTestingServer
+                      ? null
+                      : () async {
+                          setState(() => _isTestingServer = true);
+                          try {
+                            await AppConfig.setBaseUrl(
+                              _serverUrlController.text,
+                            );
+                          } on FormatException {
+                            if (!mounted) return;
+                            setState(() {
+                              _isTestingServer = false;
+                              _serverStatusMessage =
+                                  'Enter a valid server address.';
+                            });
+                            return;
+                          }
+                          final ok = await _repo.checkBackendConnection();
+                          if (!mounted) return;
+                          setState(() {
+                            _isTestingServer = false;
+                            _serverStatusMessage = ok
+                                ? 'Connected to GoviSense FastAPI server!'
+                                : 'Could not reach server. Using offline calibrated data.';
+                          });
+                          if (ok) {
+                            await _repo.refreshRecommendations();
+                          }
+                        },
+                  icon: _isTestingServer
+                      ? const SizedBox(
+                          height: 14,
+                          width: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.wifi_tethering_rounded, size: 16),
+                  label: const LocalizedText('Save & Test Connection'),
+                ),
+                if (_serverStatusMessage != null) ...[
+                  const SizedBox(height: 6),
+                  LocalizedText(
+                    _serverStatusMessage!,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
                       color: _repo.isLiveConnected
-                          ? AppTheme.balancedTint
-                          : const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: LocalizedText(
-                      _repo.isLiveConnected ? '● Online' : '○ Standalone',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: _repo.isLiveConnected
-                            ? AppTheme.balanced
-                            : const Color(0xFFB45309),
-                      ),
+                          ? AppTheme.balanced
+                          : AppTheme.neutral600,
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 8),
-              const LocalizedText(
-                'Configure the FastAPI backend server URL for live AI model inference and telemetry sync.',
-                style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 6,
-                runSpacing: 8,
-                children: [
-                  _buildServerChip(
-                    'Emulator (10.0.2.2)',
-                    'http://10.0.2.2:8000',
-                  ),
-                  const SizedBox(width: 6),
-                  _buildServerChip(
-                    'Localhost (127.0.0.1)',
-                    'http://127.0.0.1:8000',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _serverUrlController,
-                decoration: InputDecoration(
-                  labelText: context.tr('API Base URL'),
-                  hintText: 'http://10.0.2.2:8000',
-                  isDense: true,
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.link_rounded, size: 18),
-                ),
-              ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(38),
-                  side: const BorderSide(color: AppTheme.primary),
-                ),
-                onPressed: _isTestingServer
-                    ? null
-                    : () async {
-                        setState(() => _isTestingServer = true);
-                        await AppConfig.setBaseUrl(_serverUrlController.text);
-                        final ok = await _repo.checkBackendConnection();
-                        setState(() {
-                          _isTestingServer = false;
-                          _serverStatusMessage = ok
-                              ? 'Connected to GoviSense FastAPI server!'
-                              : 'Could not reach server. Using offline calibrated data.';
-                        });
-                        if (ok) {
-                          await _repo.refreshRecommendations();
-                        }
-                      },
-                icon: _isTestingServer
-                    ? const SizedBox(
-                        height: 14,
-                        width: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.wifi_tethering_rounded, size: 16),
-                label: const LocalizedText('Save & Test Connection'),
-              ),
-              if (_serverStatusMessage != null) ...[
-                const SizedBox(height: 6),
-                LocalizedText(
-                  _serverStatusMessage!,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: _repo.isLiveConnected
-                        ? AppTheme.balanced
-                        : AppTheme.neutral600,
-                  ),
-                ),
               ],
-            ],
+            ),
           ),
-        ),
         const SizedBox(height: 16),
 
         // 4. ACCOUNT & SESSION (Matches Mobile Design Specification)
