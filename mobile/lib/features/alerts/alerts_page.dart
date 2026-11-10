@@ -200,7 +200,7 @@ class _AlertsPageState extends State<AlertsPage> {
         color: alert.isRead ? AppTheme.background : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: alert.isRead ? AppTheme.cardBorder : AppTheme.primary.withOpacity(0.4),
+          color: alert.isRead ? AppTheme.cardBorder : AppTheme.primary.withValues(alpha: 0.4),
           width: alert.isRead ? 1 : 1.5,
         ),
       ),
@@ -288,7 +288,7 @@ class _AlertsPageState extends State<AlertsPage> {
                       decoration: BoxDecoration(
                         color: AppTheme.balancedTint,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppTheme.balanced.withOpacity(0.3)),
+                        border: Border.all(color: AppTheme.balanced.withValues(alpha: 0.3)),
                       ),
                       child: Text(
                         AppTranslations.t(_language, 'acknowledgedBadge'),
