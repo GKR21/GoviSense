@@ -1,3 +1,4 @@
+import '../../auth/data/auth_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
@@ -377,7 +378,7 @@ class _OfficerPageState extends State<OfficerPage> {
       confirmText: 'Log Out',
       cancelText: 'Cancel',
       icon: Icons.logout_rounded,
-      onConfirm: () => context.go('/login'),
+      onConfirm: () async { await AuthRepository.instance.logout(); },
     );
   }
 

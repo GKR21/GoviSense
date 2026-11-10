@@ -1,3 +1,5 @@
+import '../../features/auth/data/auth_repository.dart';
+
 import 'package:dio/dio.dart';
 
 import '../config/app_config.dart';
@@ -13,20 +15,36 @@ class ApiClient {
     return Dio(
       BaseOptions(
         baseUrl: AppConfig.apiBaseUrl,
-        headers: {'Accept': 'application/json', 'Content-Type': 'application/json'},
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
         connectTimeout: const Duration(seconds: 5),
         receiveTimeout: const Duration(seconds: 5),
       ),
     );
   }
 
+  Options get _authOptions => Options(
+    headers: {
+      if (AuthRepository.instance.accessToken != null)
+        'Authorization': 'Bearer ${AuthRepository.instance.accessToken}',
+    },
+  );
+
   Future<Response<T>> get<T>(
     String path, {
     Map<String, dynamic>? queryParameters,
   }) async {
     try {
-      return await _dio.get<T>(path, queryParameters: queryParameters);
+      return await _dio.get<T>(
+        path,
+        queryParameters: queryParameters,
+        options: _authOptions,
+      );
     } on DioException catch (error) {
+      if (error.response?.statusCode == 401)
+        await AuthRepository.instance.logout();
       throw ApiRequestException(
         error.message ?? 'The request could not be completed.',
       );
@@ -39,8 +57,15 @@ class ApiClient {
     Map<String, dynamic>? queryParameters,
   }) async {
     try {
-      return await _dio.post<T>(path, data: data, queryParameters: queryParameters);
+      return await _dio.post<T>(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: _authOptions,
+      );
     } on DioException catch (error) {
+      if (error.response?.statusCode == 401)
+        await AuthRepository.instance.logout();
       throw ApiRequestException(
         error.message ?? 'The request could not be completed.',
       );

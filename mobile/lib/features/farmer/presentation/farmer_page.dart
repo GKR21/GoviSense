@@ -1,3 +1,4 @@
+import '../../auth/data/auth_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/config/app_config.dart';
@@ -2246,7 +2247,7 @@ class _FarmerPageState extends State<FarmerPage> {
       confirmText: confirmText,
       cancelText: cancelText,
       icon: Icons.logout_rounded,
-      onConfirm: () => context.go('/login'),
+      onConfirm: () async { await AuthRepository.instance.logout(); },
     );
   }
 
