@@ -47,7 +47,25 @@ from govisense.db import (
     AlertStatusModel,
     EvaluationResultModel,
 )
-from govisense.db.models import MarketPriceRecord
+from govisense.db.lookups import (
+    ensure_crop_exists,
+    ensure_farmer_profile,
+    normalize_irrigation_code,
+    normalize_lang_code,
+    normalize_sale_channel,
+    normalize_soil_code,
+    resolve_designation_id,
+    resolve_district_id,
+    resolve_division_id,
+    resolve_season_id,
+)
+from govisense.db.models import (
+    CropModel,
+    DistrictModel,
+    HarvestReportProblemModel,
+    MarketPriceRecord,
+    SeasonModel,
+)
 from govisense.db.session import get_db_session
 from govisense.api.auth import (
     router as jwt_auth_router,
@@ -249,13 +267,16 @@ def health():
 
 
 @app.get("/api/forecasts/latest")
-def get_latest_forecasts():
+def get_latest_forecasts(crop: Optional[str] = None):
     """Returns real-time outputs from AI 1, AI 2, AI 3, and AI 4."""
     _ensure_models_loaded()
     results = {}
     spi_list = []
 
-    for crop in ["big_onion", "chilli"]:
+    requested_crop = crop if isinstance(crop, str) else None
+    if requested_crop is not None and requested_crop not in ("big_onion", "chilli"):
+        raise HTTPException(status_code=400, detail="Unsupported forecast crop")
+    for crop in ([requested_crop] if requested_crop else ["big_onion", "chilli"]):
         latest_row = cached_df[cached_df["crop"] == crop].sort_values("date").iloc[-1]
         
         # AI 1
@@ -295,7 +316,15 @@ def get_latest_forecasts():
             )
         a2_res = a2_models[crop].forecast_step(latest_row, horizon=1)
 
+        from govisense.api.monthly_forecasts import build_monthly_series
+        history = cached_df[cached_df["crop"] == crop].sort_values("date")
+        history = history.dropna(subset=a1_models[crop].features).tail(12)
+        monthly_series = build_monthly_series(
+            (row for _, row in history.iterrows()), a1_models[crop], spi_engine, crop
+        )
         results[crop] = {
+            "monthly_series": monthly_series,
+            "monthly_series_note": "Model estimates for the latest available data periods; not future forecasts or out-of-sample validation.",
             "crop": crop,
             "crop_name": settings.crops[crop].name_en,
             "crop_name_si": settings.crops[crop].name_si,
@@ -894,31 +923,34 @@ def initialize_database():
 
 @app.get("/api/farmers")
 def list_farmers(district: Optional[str] = Query(None)):
-    """Retrieve pseudonymous farmer profiles from persistent database."""
+    """Retrieve pseudonymous farmer profiles from persistent PostgreSQL database."""
     eff_district = str(district) if district is not None and not hasattr(district, "default") else None
     with get_session() as session:
         q = session.query(FarmerProfileModel)
         if eff_district:
-            q = q.filter(FarmerProfileModel.district == eff_district)
+            q = q.join(DistrictModel, FarmerProfileModel.district_id == DistrictModel.district_id).filter(
+                DistrictModel.name == eff_district
+            )
         farmers = q.order_by(FarmerProfileModel.pseudonymous_id.asc()).all()
         return [f.to_dict() for f in farmers]
 
 
 @app.post("/api/farmers")
 def register_farmer(payload: FarmerPayload):
-    """Register or update pseudonymous farmer profile in persistent database."""
+    """Register or update pseudonymous farmer profile in persistent PostgreSQL database."""
     with get_session() as session:
+        dist_id = resolve_district_id(session, payload.district)
+        div_id = resolve_division_id(session, dist_id, payload.divisional_secretariat)
         farmer = FarmerProfileModel(
             pseudonymous_id=payload.pseudonymous_id,
-            district=payload.district,
-            divisional_secretariat=payload.divisional_secretariat,
+            district_id=dist_id,
+            division_id=div_id,
             total_land_ha=payload.total_land_ha,
-            irrigation_type=payload.irrigation_type,
-            irrigation_subtype=payload.irrigation_subtype,
-            soil_type=payload.soil_type,
+            irrigation_code=normalize_irrigation_code(payload.irrigation_type, payload.irrigation_subtype),
+            soil_code=normalize_soil_code(payload.soil_type),
             soil_ph=payload.soil_ph,
             consent_given=payload.consent_given,
-            language=payload.language,
+            lang_code=normalize_lang_code(payload.language),
         )
         session.merge(farmer)
         session.commit()
@@ -927,26 +959,31 @@ def register_farmer(payload: FarmerPayload):
 
 @app.get("/api/officers")
 def list_officers(district: Optional[str] = Query(None)):
-    """Retrieve registered agricultural officers from persistent database."""
+    """Retrieve registered agricultural officers from persistent PostgreSQL database."""
     eff_district = str(district) if district is not None and not hasattr(district, "default") else None
     with get_session() as session:
         q = session.query(OfficerModel)
         if eff_district:
-            q = q.filter(OfficerModel.district == eff_district)
+            q = q.join(DistrictModel, OfficerModel.district_id == DistrictModel.district_id).filter(
+                DistrictModel.name == eff_district
+            )
         officers = q.order_by(OfficerModel.officer_id.asc()).all()
         return [o.to_dict() for o in officers]
 
 
 @app.post("/api/officers")
 def register_officer(payload: OfficerPayload):
-    """Register or update agricultural extension officer in persistent database."""
+    """Register or update agricultural extension officer in persistent PostgreSQL database."""
     with get_session() as session:
+        dist_id = resolve_district_id(session, payload.district)
+        div_id = resolve_division_id(session, dist_id, payload.division)
+        desig_id = resolve_designation_id(session, payload.role)
         officer = OfficerModel(
             officer_id=payload.officer_id,
             name=payload.name,
-            district=payload.district,
-            division=payload.division,
-            role=payload.role,
+            district_id=dist_id,
+            division_id=div_id,
+            designation_id=desig_id,
         )
         session.merge(officer)
         session.commit()
@@ -968,23 +1005,45 @@ def submit_harvest_report(payload: HarvestReportPayload):
         }
 
     with get_session() as session:
+        cid = ensure_crop_exists(session, payload.crop_id)
+        season_id = resolve_season_id(session, payload.season)
+        parent = session.query(PlantingReportModel).filter_by(report_id=payload.planting_report_id).first()
+        if not parent:
+            ensure_farmer_profile(
+                session,
+                pseudonymous_id=payload.pseudonymous_id,
+                total_land_ha=max(50.0, float(payload.area_harvested_ha)),
+                consent_given=True,
+            )
+            parent = PlantingReportModel(
+                report_id=payload.planting_report_id,
+                pseudonymous_id=payload.pseudonymous_id,
+                crop_id=cid,
+                season_id=season_id,
+                planned_area_ha=payload.area_harvested_ha,
+                actual_area_ha=payload.area_harvested_ha,
+                irrigation_code="irrigated",
+                consent_given=True,
+            )
+            session.add(parent)
+            session.flush()
+
         harvest = HarvestReportModel(
             planting_report_id=payload.planting_report_id,
-            pseudonymous_id=payload.pseudonymous_id,
-            crop_id=payload.crop_id,
-            season=payload.season,
             area_harvested_ha=payload.area_harvested_ha,
             harvest_quantity_kg=payload.harvest_quantity_kg,
             loss_kg=payload.loss_kg,
             quantity_sold_kg=payload.quantity_sold_kg,
             quantity_stored_kg=payload.quantity_stored_kg,
             sale_price_rs_kg=payload.sale_price_rs_kg,
-            sale_channel=payload.sale_channel,
+            channel_code=normalize_sale_channel(payload.sale_channel),
             sale_month=payload.sale_month,
-            problems=payload.problems or [],
             notes=payload.notes,
         )
-        session.merge(harvest)
+        session.add(harvest)
+        session.flush()
+        for prob in (payload.problems or []):
+            session.add(HarvestReportProblemModel(harvest_id=harvest.harvest_id, problem_code=str(prob)[:50]))
         session.commit()
         return {"status": "ACCEPTED", "harvest": harvest.to_dict()}
 
@@ -1253,24 +1312,46 @@ def fill_forecast_actuals(
     actual_production_mt: Optional[float] = None,
 ) -> int:
     """
-    Fills actual price and production in matching forecast_snapshots rows
-    when post-harvest reports or CBSL prices arrive (Proposal 3.2).
+    Records realized actuals in monthly_data (read by v_forecast_latest view)
+    and returns the count of matching forecast_snapshots for that crop & season.
     """
     with get_session() as session:
-        snaps = (
-            session.query(ForecastSnapshotModel)
-            .filter(
-                ForecastSnapshotModel.crop_id == crop_id,
-                ForecastSnapshotModel.season == season,
+        season_row = session.query(SeasonModel).filter(SeasonModel.label == season).first()
+        q = session.query(ForecastSnapshotModel).filter(ForecastSnapshotModel.crop_id == crop_id)
+        if season_row:
+            q = q.filter(
+                ForecastSnapshotModel.forecast_for_month >= season_row.start_date,
+                ForecastSnapshotModel.forecast_for_month <= season_row.end_date,
             )
-            .all()
-        )
-        for s in snaps:
-            if actual_price_rs_kg is not None:
-                s.actual_price_rs_kg = actual_price_rs_kg
-            if actual_production_mt is not None:
-                s.actual_production_mt = actual_production_mt
-        session.commit()
+        snaps = q.all()
+        if snaps and (actual_price_rs_kg is not None or actual_production_mt is not None):
+            target = snaps[-1]
+            md = (
+                session.query(MonthlyDataModel)
+                .filter(
+                    MonthlyDataModel.crop_id == target.crop_id,
+                    MonthlyDataModel.district_id == target.district_id,
+                    MonthlyDataModel.month == target.forecast_for_month,
+                )
+                .first()
+            )
+            if md:
+                if actual_price_rs_kg is not None:
+                    md.wholesale_price_rs_kg = actual_price_rs_kg
+                if actual_production_mt is not None:
+                    md.production_mt = actual_production_mt
+            else:
+                session.add(
+                    MonthlyDataModel(
+                        crop_id=target.crop_id,
+                        district_id=target.district_id,
+                        month=target.forecast_for_month,
+                        wholesale_price_rs_kg=actual_price_rs_kg,
+                        production_mt=actual_production_mt,
+                        source_type="real",
+                    )
+                )
+            session.commit()
         return len(snaps)
 
 
@@ -1279,12 +1360,15 @@ def fill_forecast_actuals(
 def get_market_prices(category: Optional[str] = None):
     """
     Task 15 (P1): Returns latest benchmark wholesale and retail DEC market prices from CBSL & HARTI.
-    Supports filtering by category (e.g. vegetable, pulse, grain, tuber).
+    Supports filtering by category (e.g. vegetable, pulse, cereal, spice).
     """
     with get_db_session() as db:
         query = db.query(MarketPriceRecord)
         if category and category.lower() != "all":
-            query = query.filter(MarketPriceRecord.category == category.lower())
+            cat_norm = {"grain": "cereal", "tuber": "vegetable"}.get(category.lower(), category.lower())
+            query = query.join(CropModel, MarketPriceRecord.crop_id == CropModel.crop_id).filter(
+                CropModel.category_code == cat_norm
+            )
         records = query.all()
         prices_list = [MarketPriceItemResponse(**r.to_dict()) for r in records]
         return MarketPricesResponse(

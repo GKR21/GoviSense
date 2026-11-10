@@ -22,5 +22,8 @@ frontend/dist/
 *.db
 *.sqlite3
 *.sqlite*
-!data/database/govisense.db
+!data/database/db.sql
 govisense_pgdata/
+
+# Local Flutter SDK path alias (Windows native asset tooling)
+.local-flutter/

@@ -29,6 +29,7 @@ from govisense.api.auth import (
     ALGORITHM,
     ACCESS_TOKEN_EXPIRE_MINUTES,
 )
+from govisense.db.lookups import ensure_farmer_profile, ensure_officer
 from govisense.db.session import init_db, get_db_session
 from govisense.db.models import User
 
@@ -43,13 +44,14 @@ def setup_database_and_users():
         # Verify or create farmer user
         farmer = db.query(User).filter(User.username == "test_farmer").first()
         if not farmer:
+            fp = ensure_farmer_profile(db, pseudonymous_id="LK-TEST-FARMER", district="Anuradhapura")
             farmer = User(
                 username="test_farmer",
                 hashed_password=get_password_hash("FarmerSecret123!"),
                 role="farmer",
+                pseudonymous_id=fp.pseudonymous_id,
                 full_name="Test Farmer Kamal",
                 phone_number="+94771112233",
-                district="Anuradhapura",
                 is_active=True,
             )
             db.add(farmer)
@@ -57,13 +59,14 @@ def setup_database_and_users():
         # Verify or create officer user
         officer = db.query(User).filter(User.username == "test_officer").first()
         if not officer:
+            off = ensure_officer(db, officer_id="OFF-TEST-RBAC", name="Test Officer Kavinda", district="Anuradhapura")
             officer = User(
                 username="test_officer",
                 hashed_password=get_password_hash("OfficerSecret123!"),
                 role="officer",
+                officer_id=off.officer_id,
                 full_name="Test Officer Kavinda",
                 phone_number="+94774445566",
-                district="Anuradhapura",
                 is_active=True,
             )
             db.add(officer)
@@ -71,13 +74,14 @@ def setup_database_and_users():
         # Deactivated user to test inactive account rejection
         inactive = db.query(User).filter(User.username == "test_inactive").first()
         if not inactive:
+            fp_inact = ensure_farmer_profile(db, pseudonymous_id="LK-TEST-INACTIVE", district="Anuradhapura")
             inactive = User(
                 username="test_inactive",
                 hashed_password=get_password_hash("Inactive123!"),
                 role="farmer",
+                pseudonymous_id=fp_inact.pseudonymous_id,
                 full_name="Inactive User",
                 phone_number="+94779998877",
-                district="Anuradhapura",
                 is_active=False,
             )
             db.add(inactive)

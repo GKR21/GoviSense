@@ -1,18 +1,18 @@
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from govisense.db.models import Base, EvaluationResultModel
-from govisense.api.routes.data import get_evaluation_scoreboard
 from unittest.mock import patch
+
+from govisense.db.models import EvaluationResultModel
+from govisense.db.session import get_session
+from govisense.api.routes.data import get_evaluation_scoreboard
 
 
 @pytest.fixture
 def temp_db():
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
-    session = Session()
+    session = get_session()
+    session.query(EvaluationResultModel).delete()
+    session.commit()
     yield session
+    session.rollback()
     session.close()
 
 
@@ -23,13 +23,15 @@ def test_scoreboard_stores_real_results_and_links_every_number(temp_db):
     # Call endpoint with empty table -> triggers real walk-forward backtest
     res = get_evaluation_scoreboard(db=temp_db)
 
-    # Verify rows were stored in the database
+    # Verify rows were stored in PostgreSQL
     stored_rows = temp_db.query(EvaluationResultModel).all()
     assert len(stored_rows) > 0
-    summary_rows = [r for r in stored_rows if r.model_name in ["A3 Supply Forecast", "A2 Price Forecast"] and r.metric_name == "WAPE"]
+    summary_rows = [
+        r for r in stored_rows
+        if r.model_name in ["A3 Supply Forecast", "A2 Price Forecast"] and r.metric_name == "WAPE"
+    ]
     assert len(res["scoreboard"]) == len(summary_rows)
 
-    # Test that no number in the response exists without a matching stored row
     for item in res["scoreboard"]:
         matching = [
             r for r in summary_rows
@@ -49,4 +51,3 @@ def test_scoreboard_returns_no_data_when_backtest_fails(temp_db):
         res = get_evaluation_scoreboard(db=temp_db)
         assert res["data_quality"] == "no_data"
         assert res["scoreboard"] == []
-

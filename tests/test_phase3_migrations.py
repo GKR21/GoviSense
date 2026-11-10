@@ -1,87 +1,68 @@
 """
-Phase 3.1 & 3.2 Tests: Database Schema, Alembic Migrations, and Model Write-Paths
+Phase 3.1 & 3.2 Tests: PostgreSQL db.sql Schema, Views/Triggers, and Model Write-Paths
 Team DARKBITE · ModelX 2.0
 """
 
-import os
-import tempfile
+import uuid
 import pytest
-from sqlalchemy import create_engine, inspect, text
-from alembic.config import Config
-from alembic import command
+from sqlalchemy import inspect, text
 
+from govisense.db.lookups import (
+    ensure_crop_exists,
+    ensure_farmer_profile,
+    resolve_season_id,
+)
 from govisense.db.models import (
-    Base,
     hash_password,
     verify_password,
     validate_season_format,
-    PipelineRunModel,
-    ForecastSnapshotModel,
-    EvaluationResultModel,
-    PlantingReportModel,
-    HarvestReportModel,
-    UserModel,
-    OfficerModel,
-    FarmerProfileModel,
 )
-from govisense.db.session import get_session
+from govisense.db.session import get_engine, get_session
 
 
-def test_alembic_upgrade_and_downgrade():
-    """Verify that alembic can upgrade from empty schema and downgrade back cleanly."""
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-        tmp_path = tmp.name.replace("\\", "/")
+def test_db_sql_schema_tables_views_and_triggers():
+    """Verify PostgreSQL database initialized from db.sql has all expected tables, views, and functions."""
+    eng = get_engine()
+    inspector = inspect(eng)
+    tables = set(inspector.get_table_names())
+    views = set(inspector.get_view_names())
 
-    try:
-        cfg = Config("alembic.ini")
-        cfg.set_main_option("sqlalchemy.url", f"sqlite:///{tmp_path}")
+    expected_tables = {
+        "roles",
+        "languages",
+        "districts",
+        "crops",
+        "seasons",
+        "users",
+        "officers",
+        "farmer_profiles",
+        "planting_reports",
+        "harvest_reports",
+        "runs",
+        "forecast_snapshots",
+        "decision_history",
+        "monthly_data",
+        "market_prices",
+        "data_catalogue",
+        "alerts",
+        "alert_translations",
+        "alert_status",
+        "alert_questions",
+        "evaluation_results",
+        "audit_log",
+    }
+    assert expected_tables.issubset(tables), f"Missing tables: {expected_tables - tables}"
 
-        # 1. Run upgrade head
-        command.upgrade(cfg, "head")
-
-        eng = create_engine(f"sqlite:///{tmp_path}")
-        inspector = inspect(eng)
-        tables = set(inspector.get_table_names())
-
-        expected_tables = {
-            "users",
-            "officers",
-            "farmer_profiles",
-            "planting_reports",
-            "harvest_reports",
-            "runs",
-            "forecast_snapshots",
-            "decision_history",
-            "monthly_data",
-            "data_catalogue",
-            "alerts",
-            "alert_status",
-            "evaluation_results",
-        }
-        assert expected_tables.issubset(tables), f"Missing tables: {expected_tables - tables}"
-
-        # 2. Check columns in forecast_snapshots
-        fs_cols = {c["name"] for c in inspector.get_columns("forecast_snapshots")}
-        assert "retail_price_method" in fs_cols
-        assert "spi_raw" in fs_cols
-        assert "data_quality" in fs_cols
-
-        # 3. Run downgrade base
-        command.downgrade(cfg, "base")
-        inspector_down = inspect(create_engine(f"sqlite:///{tmp_path}"))
-        remaining = set(inspector_down.get_table_names()) - {"alembic_version"}
-        assert len(remaining) == 0, f"Tables remained after downgrade: {remaining}"
-
-        # 4. Re-upgrade
-        command.upgrade(cfg, "head")
-        tables_reup = set(inspector.get_table_names())
-        assert expected_tables.issubset(tables_reup)
-
-    finally:
-        try:
-            os.unlink(tmp_path)
-        except Exception:
-            pass
+    expected_views = {
+        "v_monthly_data",
+        "v_forecast_latest",
+        "v_decision_history",
+        "v_alerts_localized",
+        "v_alert_inbox",
+        "v_planting_harvest",
+        "v_market_prices_latest",
+    }
+    assert expected_views.issubset(views), f"Missing views: {expected_views - views}"
 
 
 def test_bcrypt_password_hashing():
@@ -107,39 +88,40 @@ def test_season_format_validation():
 
 
 def test_harvest_disposition_constraint():
-    """Verify sold + lost + stored <= harvest check constraint."""
-    eng = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(bind=eng)
+    """Verify sold + lost + stored <= harvest check constraint in PostgreSQL."""
+    with get_session() as session:
+        pid = f"LK-TEST-{uuid.uuid4().hex[:6].upper()}"
+        rep_id = f"REP-{uuid.uuid4().hex[:6].upper()}"
+        ensure_farmer_profile(session, pseudonymous_id=pid, total_land_ha=5.0, consent_given=True)
+        cid = ensure_crop_exists(session, "big_onion")
+        sid = resolve_season_id(session, "Maha 2024/2025")
+        session.commit()
 
-    with eng.connect() as conn:
-        # Valid disposition
-        conn.execute(
+        session.execute(
             text(
-                "INSERT INTO farmer_profiles (pseudonymous_id, district, total_land_ha, irrigation_type, consent_given, consent_at, language, created_at) "
-                "VALUES ('LK-TEST-01', 'Anuradhapura', 1.0, 'irrigated', 1, CURRENT_TIMESTAMP, 'si', CURRENT_TIMESTAMP)"
-            )
+                "INSERT INTO planting_reports (report_id, pseudonymous_id, crop_id, season_id, planned_area_ha, actual_area_ha, irrigation_code, consent_given, app_version, lang_code, source) "
+                "VALUES (:rid, :pid, :cid, :sid, 1.0, 1.0, 'irrigated', TRUE, '1.0', 'si', 'farmer_report')"
+            ),
+            {"rid": rep_id, "pid": pid, "cid": cid, "sid": sid},
         )
-        conn.execute(
+        # Valid disposition: 1000 = 800 sold + 100 lost + 100 stored
+        session.execute(
             text(
-                "INSERT INTO planting_reports (report_id, pseudonymous_id, crop_id, season, district, irrigation_type, planned_area_ha, actual_area_ha, consent_given, app_version, language, source, flags, timestamp) "
-                "VALUES ('REP-01', 'LK-TEST-01', 'big_onion', 'Maha 2024/2025', 'Anuradhapura', 'irrigated', 1.0, 1.0, 1, '1.0', 'si', 'farmer_report', '[]', CURRENT_TIMESTAMP)"
-            )
+                "INSERT INTO harvest_reports (harvest_id, planting_report_id, area_harvested_ha, harvest_quantity_kg, loss_kg, quantity_sold_kg, quantity_stored_kg) "
+                "VALUES (:hid, :rid, 1.0, 1000.0, 100.0, 800.0, 100.0)"
+            ),
+            {"hid": f"HVST-OK-{uuid.uuid4().hex[:6]}", "rid": rep_id},
         )
-        # 1000 kg harvested: 800 sold + 100 lost + 100 stored = 1000 <= 1000 (Passes)
-        conn.execute(
-            text(
-                "INSERT INTO harvest_reports (harvest_id, planting_report_id, pseudonymous_id, crop_id, season, area_harvested_ha, harvest_quantity_kg, loss_kg, quantity_sold_kg, quantity_stored_kg, problems, flags, timestamp) "
-                "VALUES ('HVST-01', 'REP-01', 'LK-TEST-01', 'big_onion', 'Maha 2024/2025', 1.0, 1000.0, 100.0, 800.0, 100.0, '[]', '[]', CURRENT_TIMESTAMP)"
-            )
-        )
-        conn.commit()
+        session.commit()
 
-        # Invalid disposition: 1000 harvested but sold 900 + stored 200 = 1100 > 1000 (Must fail constraint)
+        # Invalid disposition: 900 sold + 200 stored = 1100 > 1000 (Must fail chk_disposition_le_harvest)
         with pytest.raises(Exception):
-            conn.execute(
+            session.execute(
                 text(
-                    "INSERT INTO harvest_reports (harvest_id, planting_report_id, pseudonymous_id, crop_id, season, area_harvested_ha, harvest_quantity_kg, loss_kg, quantity_sold_kg, quantity_stored_kg, problems, flags, timestamp) "
-                    "VALUES ('HVST-02', 'REP-01', 'LK-TEST-01', 'big_onion', 'Maha 2024/2025', 1.0, 1000.0, 0.0, 900.0, 200.0, '[]', '[]', CURRENT_TIMESTAMP)"
-                )
+                    "INSERT INTO harvest_reports (harvest_id, planting_report_id, area_harvested_ha, harvest_quantity_kg, loss_kg, quantity_sold_kg, quantity_stored_kg) "
+                    "VALUES (:hid, :rid, 1.0, 1000.0, 0.0, 900.0, 200.0)"
+                ),
+                {"hid": f"HVST-BAD-{uuid.uuid4().hex[:6]}", "rid": rep_id},
             )
-            conn.commit()
+            session.commit()
+        session.rollback()
