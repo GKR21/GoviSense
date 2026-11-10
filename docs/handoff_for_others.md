@@ -1,3 +1,42 @@
+# Handoff outside farmer mobile AI scope
+
+## Hosted backend — BLOCKED
+
+The owner confirmed on 2026-11-10 that the backend is not hosted. Supply the
+actual HTTPS origin and deploy it before verifying the release configuration.
+Do not assume the proposed api.govisense.lk domain is operational.
+
+## Auth/security — excluded from this task
+
+The full baseline has an existing seed-user login failure. The mobile profile
+does not obtain a verified pseudonymous farmer ID from /api/auth/me. The auth
+owner should expose or provide a supported way to resolve that identity.
+
+The request for an in-app release backend override conflicts with the existing
+release policy that disables it. The security owner must resolve that policy;
+do not weaken HTTPS validation. INTERNET permission and cleartext restrictions
+must remain enforced. Farmer-only navigation also requires coordinating with
+AuthRepository.home, which currently routes officer/admin roles to /officer.
+
+## Missing source files — BLOCKED
+
+Restore the independently obtained CBSL daily CSV, WFP food-price CSV and
+original PDFs/source tables expected by the data tests. data/raw currently
+contains only .gitkeep. Do not reconstruct claimed observations from processed
+monthly means or generate replacements. Exact latest-row verification requires
+the original observations.
+
+## Existing baseline failures
+
+See mobile-ai-audit.md for the actual full-suite result: 261 passed, 12 failed,
+2 skipped out of 275. Investigate authentication and direct-call database
+session leakage without changing schemas or bypassing tests. Web dashboard,
+CI, authentication and security changes remain outside this task.
+
+---
+
+## Earlier handoff (retained; audit findings above take precedence)
+
 # GoviSense AI/Model Architecture & API Handoff Document
 **Team DARKBITE · ModelX 2.0 Phase 1 Completion**
 **Audience:** Frontend, Mobile (Flutter), Backend/Security, and Data Engineers
