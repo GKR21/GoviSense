@@ -128,3 +128,23 @@ auth/security failures are handed off rather than changed in this scope.
   fixes outside the permitted scope. Do not claim the release checks passed.
 - Pending: Step 1 contract freeze, A5/A6/A1/A3/A9, B1/B2/B3/B4. An audit is not
   implementation completion and no APK was built.
+
+## A3 date validation follow-up
+
+The endpoint now validates ISO dates and months, defaults to today's UTC month,
+echoes as_of/generated_at/planting_month on both populated and empty responses,
+and rejects conflicting date/month aliases with AS_OF_MONTH_CONFLICT. Existing
+explicit month queries remain supported when no as_of is provided.
+
+Runtime on 2026-11-10 returned brinjal/tomato. On 2026-06-15 it returned
+chilli_green/bitter_gourd/snake_gourd; big onion passes the June window but did
+not rank in the first three for the default parcel. November crops had null
+supply_forecast_mt, profit_range_rs_kg, price_forecast,
+expected_net_profit_per_acre, monthly_price_ranges_12m and spi_ratio_at_harvest.
+The June chilli had these model values; the other June crops lacked them.
+Model freshness/cutoff correctness is not established by this seasonal fix.
+
+All 12 added TestClient cases passed. The full suite collected 287: **275
+passed, 10 failed, 2 skipped**, in 172.34 seconds. The ten failing cases are a
+subset of the baseline failures; the two pool-timeout cases did not recur.
+This is not a clean regression gate. No existing tests were edited or excluded.

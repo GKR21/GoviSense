@@ -3,6 +3,26 @@
 
 This document catalogues external datasets, government publications, and manual reviewer tasks that require human action or air-gapped data transfers in compliance with project rules.
 
+## Current workspace verification — 2026-11-10
+
+**BLOCKED:** the raw files described as STAGED below are absent in this checkout;
+`data/raw` contains only `.gitkeep`. Earlier staging notes do not establish local
+availability. Restore the original CBSL daily CSV, WFP CSV and CPP/CBSL PDFs;
+do not substitute generated observations.
+
+The November farmer season filter returns brinjal and tomato. Both currently
+lack A1/A2 model coverage, supply forecasts, price forecasts, expected profit
+and SPI ratios. Obtain traceable commodity price histories, district planting
+and harvest/yield observations, and demand inputs for these crops before
+claiming economic or supply advice on the default screen. June admits big onion
+and green chilli, which have existing models; their synthetic supply inputs
+still require explicit provenance labeling (A5), not a claim of measured supply.
+
+`as_of` now validates an ISO date and selects its planting month; omitted dates
+use today's UTC date. It does not retrain historical models or establish that
+old training data can predict the requested calendar year. Forecast cutoff and
+freshness handling remain part of A5/contract implementation.
+
 ---
 
 ## 1. External Real Datasets & Download URLs
