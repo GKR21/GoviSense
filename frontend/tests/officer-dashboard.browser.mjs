@@ -95,6 +95,9 @@ function installMockApi() {
   window.__slowPrice = false
   window.__holdForecast = true
   window.__pendingForecast = null
+  window.__identity = { id: 42, username: "backend-login", role: "officer" }
+  window.__receiptMode = "valid"
+  window.__writes = []
   localStorage.setItem(
     "govisense_ground_reports",
     JSON.stringify([{ id: "LOCAL-MOCK-MUST-NOT-APPEAR" }]),
@@ -121,11 +124,17 @@ function installMockApi() {
       upper_bound_rs_kg: 300,
     },
   }
-  window.fetch = async (input) => {
+  window.fetch = async (input, options = {}) => {
     const url = new URL(String(input), location.origin)
     window.__requests.push(url.pathname + url.search)
     if (window.__mode === "offline")
       return new Response("offline", { status: 503 })
+    if (url.pathname === "/api/auth/me") return Response.json(window.__identity)
+    if (url.pathname === "/api/history/log-action") {
+      window.__writes.push(JSON.parse(options.body))
+      if (window.__receiptMode === "failure") return new Response("unavailable", { status: 503 })
+      return Response.json({ status: "RECORDED", decision_id: "SERVER-DECISION-ACK", run_id: "SERVER-RUN-ACK", record_hash: window.__receiptMode === "invalid" ? "not-a-checksum" : "c".repeat(64) })
+    }
     const empty = window.__mode === "empty"
     const cropId = url.searchParams.get("crop_id") || "big_onion"
     const price = {
@@ -163,7 +172,7 @@ function installMockApi() {
                 gap_mid_mt: 0,
                 gap_best_mt: 45,
                 gap_worst_mt: -80,
-                options: [],
+                options: [{ id: "STORE", label: "Store supplied surplus", feasible: true }],
               },
             ],
       },
@@ -372,6 +381,28 @@ try {
   console.log(
     "PASS: late requests do not overwrite the selected crop; no browser exceptions",
   )
+
+  await navigate("Gap & import timeline", "Record option")
+  await click("Record option")
+  await until(async () => (await main()).includes("has not provided an officer identifier"), "missing officer identifier")
+  assert.equal(await evaluate("window.__writes.length"), 0)
+  assert.equal(await evaluate("document.body.innerText.includes('Decision recorded')"), false)
+  await evaluate('window.__identity = { role: "officer", officer_id: "BACKEND-OFFICER-42" }; window.__receiptMode = "invalid"')
+  await click("Record option")
+  await until(async () => (await main()).includes("receipt could not be confirmed"), "malformed receipt")
+  assert.equal(await evaluate("document.body.innerText.includes('Decision recorded')"), false)
+  await evaluate('window.__receiptMode = "failure"')
+  await click("Record option")
+  await until(async () => (await main()).includes("HTTP 503"), "failed decision write")
+  assert.equal(await evaluate("document.body.innerText.includes('Decision recorded')"), false)
+  await evaluate('window.__receiptMode = "valid"')
+  await click("Record option")
+  await until(() => evaluate("document.querySelector('.toast')?.innerText.includes('SERVER-DECISION-ACK')"), "actual server receipt")
+  assert.equal(await evaluate("window.__writes.at(-1).officer_id"), "BACKEND-OFFICER-42")
+  assert.ok(await evaluate("document.querySelector('.toast').innerText.includes('SERVER-RUN-ACK')"))
+  assert.ok(await evaluate("document.querySelector('.toast').innerText.includes('c'.repeat(64))"))
+  assert.deepEqual(errors, [], "no uncaught browser exceptions after writes")
+  console.log("PASS: missing IDs and failed/malformed writes never show success; valid server IDs and hash are displayed unchanged")
 } catch (error) {
   if (socket?.readyState === WebSocket.OPEN) {
     console.error(

@@ -35,7 +35,7 @@ export function DigitalFarmerCard({ profile, language, onEdit }: DigitalFarmerCa
 
         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-300 border border-emerald-400/30">
           <ShieldCheck size={12} />
-          Verified
+          {profile.farmerId ? "Backend ID available" : "Identity unavailable"}
         </span>
       </div>
 
@@ -46,7 +46,7 @@ export function DigitalFarmerCard({ profile, language, onEdit }: DigitalFarmerCa
             {t.profile.badgeNumber}
           </span>
           <div className="font-mono text-xl font-bold tracking-tight text-white mt-0.5">
-            {profile.farmerId}
+            {profile.farmerId || "Not available"}
           </div>
           <div className="mt-1 text-sm font-semibold text-emerald-100">
             {profile.name}

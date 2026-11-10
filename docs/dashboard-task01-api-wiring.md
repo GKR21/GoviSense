@@ -70,3 +70,7 @@ evaluation view still need their respective tasks. In particular, the existing
 OfficerScreen decision-write path still needs task 03; connecting read endpoints
 does not certify its write behavior. Source age/type is displayed only when
 supplied by the catalogue; retrieval date is not claimed to be observation age.
+
+Task 02 follow-up: the ten farmerService.ts type errors described above have
+since been fixed while removing fabricated identities and receipts. Full
+frontend TypeScript checking now passes; see dashboard-task02-server-identifiers.md.

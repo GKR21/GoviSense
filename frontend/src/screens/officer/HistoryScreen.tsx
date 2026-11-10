@@ -229,8 +229,8 @@ export function HistoryScreen({
 
         <div className="audit-kpi-tile">
           <small>CRYPTOGRAPHIC PROVENANCE</small>
-          <strong style={{ color: "#38bdf8" }}>100% SHA-256</strong>
-          <p>Sealed with input data digests & sign-off timestamps</p>
+          <strong style={{ color: "#38bdf8" }}>{allRuns.filter((run) => run.sha256Hash).length}/{allRuns.length} checksums</strong>
+          <p>Checksum values supplied by the backend</p>
         </div>
 
         <div className="audit-kpi-tile">
@@ -381,6 +381,7 @@ export function HistoryScreen({
                           <button
                             type="button"
                             onClick={() => handleCopyHash(row.sha256Hash)}
+                            disabled={!row.sha256Hash}
                             style={{
                               background: "none",
                               border: "none",
@@ -644,10 +645,9 @@ export function HistoryScreen({
                 <ShieldCheck size={14} color="var(--primary)" />
                 Cryptographic Integrity Hash
               </h4>
-              <div className="hash-box">{selectedRun.sha256Hash}</div>
+              <div className="hash-box">{selectedRun.sha256Hash || "Not available"}</div>
               <small style={{ color: "var(--ink-muted)", fontSize: "11px" }}>
-                SHA-256 seal guarantees dataset snapshot and assumption integrity cannot be altered
-                retrospectively.
+                Checksum returned by the backend; the browser does not independently verify its integrity.
               </small>
             </div>
 
