@@ -34,8 +34,14 @@ class AuthRepository extends ChangeNotifier {
   final FlutterSecureStorage _storage;
   String? _accessToken;
   String? _role;
+  String? _username;
+  String? _name;
+  String? _district;
   String? get accessToken => _accessToken;
   String? get role => _role;
+  String? get username => _username;
+  String? get name => _name;
+  String? get district => _district;
   bool initialized = false;
   Timer? _timer;
   bool get authenticated => accessToken != null && role != null;
@@ -57,6 +63,34 @@ class AuthRepository extends ChangeNotifier {
       '/api/auth/login',
       data: {'username': username.trim(), 'password': password},
     );
+    await _finishSignIn(response);
+  }
+
+  /// Self-service sign-up for farmers and officers; signs the user in on success.
+  Future<void> register({
+    required String username,
+    required String password,
+    required String fullName,
+    required String role,
+    required String district,
+    String? officerCode,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/api/auth/register',
+      data: {
+        'username': username.trim(),
+        'password': password,
+        'full_name': fullName.trim(),
+        'role': role,
+        'district': district,
+        if (officerCode != null && officerCode.trim().isNotEmpty)
+          'officer_code': officerCode.trim(),
+      },
+    );
+    await _finishSignIn(response);
+  }
+
+  Future<void> _finishSignIn(Response<Map<String, dynamic>> response) async {
     final token = response.data?['access_token'];
     if (token is! String) throw const FormatException('Missing token');
     await _validate(token);
@@ -81,7 +115,11 @@ class AuthRepository extends ChangeNotifier {
     if (remaining <= Duration.zero) throw const FormatException('Expired');
     final response = await _client.get<Map<String, dynamic>>(
       '/api/auth/me',
-      options: Options(headers: {'Authorization': 'Bearer $token'}),
+      options: Options(
+        headers: {
+          'Authorization': ['Bearer', token].join(' '),
+        },
+      ),
     );
     final data = response.data!;
     final profile = data['user'] is Map ? data['user'] as Map : data;
@@ -91,6 +129,12 @@ class AuthRepository extends ChangeNotifier {
     }
     _accessToken = token;
     _role = verifiedRole;
+    _username = claims['sub']?.toString();
+    final claimName = claims['name']?.toString();
+    _name = (claimName == null || claimName.isEmpty)
+        ? claims['sub']?.toString()
+        : claimName;
+    _district = claims['district']?.toString();
     _timer?.cancel();
     _timer = Timer(remaining, () {
       unawaited(logout());
@@ -101,6 +145,9 @@ class AuthRepository extends ChangeNotifier {
     _timer?.cancel();
     _accessToken = null;
     _role = null;
+    _username = null;
+    _name = null;
+    _district = null;
     notifyListeners();
     await _storage.delete(key: 'access_token');
   }

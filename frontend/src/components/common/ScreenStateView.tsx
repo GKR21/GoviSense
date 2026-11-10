@@ -51,8 +51,7 @@ export function ScreenStateView({
       <Button icon={isError ? RefreshCw : SlidersHorizontal} onClick={onRetry}>
         {isError ? "Try again" : "Change filters"}
       </Button>
-      <span>Data version 2026.03 · Demo environment</span>
+      <span>Live backend data only</span>
     </div>
   )
 }
-

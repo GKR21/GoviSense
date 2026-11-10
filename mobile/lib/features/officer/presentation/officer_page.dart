@@ -30,6 +30,15 @@ class _OfficerPageState extends State<OfficerPage> {
     _repo.addListener(_onRepoUpdated);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        final who = AuthRepository.instance.name ??
+            AuthRepository.instance.username ??
+            '';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(who.isEmpty ? 'Ayubowan!' : 'Ayubowan, $who'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
         _repo.loadForecast();
         _repo.simulate();
       }
@@ -594,8 +603,12 @@ class _OfficerPageState extends State<OfficerPage> {
             'Big Onion: Supply vs Demand',
             style: Theme.of(context).textTheme.titleLarge,
           ),
-          LocalizedText(_repo.forecastNote ?? 'Monthly model estimates'),
-          LocalizedText('${points.first.month} to ${points.last.month}'),
+          Text(_repo.forecastNote ?? 'Monthly model estimates'),
+          Text(
+            points.isEmpty
+                ? 'Live forecast data unavailable'
+                : '${points.first.month} to ${points.last.month}',
+          ),
           if (_repo.loadingForecast) const LinearProgressIndicator(),
           if (_repo.forecastError != null)
             LocalizedText(

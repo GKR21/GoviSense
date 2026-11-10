@@ -47,7 +47,6 @@ import {
   SliderField,
   RiskBadge,
   ConfidenceBadge,
-  DemoRibbon,
   WorkspaceSwitcher,
   ScreenStateView,
 } from "../../components/common"
@@ -114,15 +113,21 @@ export function OfficerScreen({
   const [selectedMonth, setSelectedMonth] = useState(6)
   const [assumptionsOpen, setAssumptionsOpen] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [page, setPage] = useState<OfficerPage>(initialRole === "Admin" ? "Data sources" : initialPage)
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => getStoredAuthUser())
+  const [page, setPage] = useState<OfficerPage>(
+    initialRole === "Admin"
+      ? "Data sources"
+      : currentUser
+        ? initialPage
+        : "Login",
+  )
   const [screenState, setScreenState] = useState<ScreenState>("ready")
   const [lastReport, setLastReport] = useState<GroundReport | null>(null)
   const [decision, setDecision] = useState("")
-  const [decisionError, setDecisionError] = useState<string | null>(null)
-  const [decisionReceipt, setDecisionReceipt] = useState<Awaited<ReturnType<typeof logDecisionActionApi>> | null>(null)
-  const { data: forecastData, loading: forecastLoading, error: forecastError, refetch: reloadForecasts } = useLatestForecasts()
-  const isLiveApi = forecastData?.isLive === true
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => getStoredAuthUser())
+  const [decisionHistory, setDecisionHistory] = useState<PolicyDecision[]>([])
+  const [forecastData, setForecastData] = useState<LatestForecastsWithMeta | null>(null)
+  const [isLiveApi, setIsLiveApi] = useState(false)
+  const [forecastLoading, setForecastLoading] = useState(true)
   const [simulatedMetrics, setSimulatedMetrics] = useState<any>(null)
   const [alertsOpen, setAlertsOpen] = useState(false)
   const [officerNoteText, setOfficerNoteText] = useState<Record<string, string>>({})
@@ -130,8 +135,41 @@ export function OfficerScreen({
   const { data: alertResponse, refetch: reloadAlerts } = useAlerts()
   const alertsData = Array.isArray(alertResponse) ? alertResponse : alertResponse?.alerts
 
-  const cropApiKey = cropApiId(selectedCrop)
-  const currentApiCropData: CropForecastData | undefined = forecastData?.crops?.[cropApiKey]
+  useEffect(() => {
+    let active = true
+    setForecastLoading(true)
+    fetchLatestForecasts()
+      .then((res) => {
+        if (!active) return
+        setForecastData(res)
+        setIsLiveApi(res.isLive)
+        setForecastLoading(false)
+      })
+      .catch(() => {
+        if (!active) return
+        setForecastLoading(false)
+      })
+
+    fetchDecisionHistory()
+      .then((res) => {
+        if (!active) return
+        if (res.isLive && res.records.length > 0) {
+          setDecisionHistory(res.records.map(mapApiRecordToPolicyDecision))
+        }
+      })
+      .catch(() => setDecisionHistory([]))
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const cropApiKey = selectedCrop.toLowerCase().includes("onion")
+    ? "big_onion"
+    : selectedCrop.toLowerCase().includes("chilli")
+      ? "chilli"
+      : selectedCrop.toLowerCase().replace(/\s+/g, "_")
+  const currentApiCropData: CropForecastData | undefined = forecastData?.crops[cropApiKey]
   const changed = area !== currentProfile.baselineArea || yieldValue !== currentProfile.baselineYield
 
   useEffect(() => {
@@ -167,12 +205,19 @@ export function OfficerScreen({
       const receipt = await logDecisionActionApi({
         crop_id: cropApiKey,
         season: "Maha 2025/2026",
-        officer_id: identity.officerId,
+        officer_id: details?.officer || currentUser?.username || "",
         action_type: value.toUpperCase().replace(/\s+/g, "_"),
         quantity: 1200,
         unit: "MT",
         rationale: details?.impactEstimate || details?.notes || `Policy directive: ${value}`,
-        assumptions: { district: selectedDistrict, notes: details?.notes },
+        model_version: currentApiCropData?.ai2_price_forecast.selected_model,
+        data_version: currentApiCropData?.ai2_price_forecast.forecast_source,
+        assumptions: {
+          lead_time_weeks: details?.leadTime || 7,
+          loss_pct: 0.15,
+          district: selectedDistrict,
+          notes: details?.notes,
+        },
         notes: details?.notes,
       })
       setDecision(value)
@@ -183,11 +228,41 @@ export function OfficerScreen({
       setDecision("")
       setDecisionError(error instanceof Error ? error.message : "Decision could not be confirmed. Check the server ledger before retrying.")
     }
+
+    if (!apiRes?.record_hash || !apiRes.decision_id) return
+    const recHash = apiRes.record_hash
+    const recId = apiRes.decision_id
+
+    const newEntry: PolicyDecision = {
+      id: recId,
+      date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+      timestamp: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) + " UTC",
+      crop: selectedCrop,
+      district: selectedDistrict,
+      modelVersion: currentApiCropData?.ai2_price_forecast.selected_model || "",
+      dataVersion: currentApiCropData?.ai2_price_forecast.forecast_source || "",
+      assumptions: details?.assumptions || `Loss 15% · Lead ${details?.leadTime || 7}w`,
+      leadTime: details?.leadTime || 7,
+      action: value,
+      category: details?.category || "Import quota",
+      officer: details?.officer || currentUser?.username || "",
+      designation: details?.designation || "Authorized Agricultural Decision Maker",
+      status: "Active",
+      notes: details?.notes || `Executive directive recorded from Gap & Import Timeline for ${selectedCrop} in ${selectedDistrict}.`,
+      confidence: "High (94%)",
+      sha256Hash: recHash,
+      impactEstimate: details?.impactEstimate || "Dynamic buffer adjustment deployed to prevent retail price divergence.",
+    }
+    setDecisionHistory((prev) => [newEntry, ...prev])
+    setSaved(true)
+    window.setTimeout(() => {
+      setSaved(false)
+      setPage("Decision history")
+    }, 1200)
   }
 
   return (
     <div className="officer-app">
-      <DemoRibbon isLive={isLiveApi} label={forecastLoading ? "Connecting to backend" : isLiveApi ? "Backend connected" : "Backend data unavailable"} />
       <aside className="sidebar">
         <div className="brand">
           <div className="brand__mark">

@@ -132,11 +132,6 @@ export function FarmerScreen({
           </div>
         </div>
 
-        {/* Official Sample Data Ribbon */}
-        <div className="bg-amber-400 py-0.5 text-center text-[10px] font-extrabold uppercase tracking-widest text-amber-950 shadow-inner">
-          ★ GoviSense Demo Slice · DOA Sample Data
-        </div>
-
         {/* Sticky App Header (unless in onboarding) */}
         {currentPage !== "onboarding" && (
           <>
@@ -184,6 +179,7 @@ export function FarmerScreen({
           ) : currentPage === "home" ? (
             <FarmerHome
               crops={crops}
+              profile={profile}
               language={language}
               onCompare={() => setCurrentPage("compare")}
               onSelectCrop={handleCropDetails}
@@ -262,4 +258,3 @@ export function FarmerScreen({
     </div>
   )
 }
-

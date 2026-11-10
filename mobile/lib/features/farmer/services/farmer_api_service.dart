@@ -55,7 +55,7 @@ class FarmerApiService {
         }
       }
     } catch (e) {
-      debugPrint('GoviSense API connection fallback to calibrated data: $e');
+      debugPrint('GoviSense API connection failed: $e');
     }
     return null;
   }
@@ -80,7 +80,7 @@ class FarmerApiService {
   }
 
   /// Fetches live wholesale & retail market price bulletin from FastAPI backend (/api/market-prices)
-  /// Falls back to null if unreachable, allowing UI to gracefully use calibrated offline data.
+  /// Returns null when the live backend is unavailable.
   Future<List<MarketPriceItem>?> getMarketPrices({String? category}) async {
     try {
       final Map<String, dynamic> query = {};
@@ -107,7 +107,7 @@ class FarmerApiService {
         }
       }
     } catch (e) {
-      debugPrint('Market prices API connection fallback: $e');
+      debugPrint('Market prices API connection failed: $e');
     }
     return null;
   }
@@ -121,7 +121,7 @@ class FarmerApiService {
       );
       return response.statusCode == 200;
     } catch (e) {
-      debugPrint('Acknowledge alert API fallback: $e');
+      debugPrint('Acknowledge alert API request failed: $e');
       return false;
     }
   }
@@ -139,7 +139,7 @@ class FarmerApiService {
       );
       return response.statusCode == 200;
     } catch (e) {
-      debugPrint('Ask officer API fallback: $e');
+      debugPrint('Ask officer API request failed: $e');
       return false;
     }
   }
