@@ -243,6 +243,12 @@ class GoviSenseSettings:
             f"sqlite:///{DATABASE_DIR / 'govisense.db'}",
         )
     )
+    allow_sqlite_fallback: bool = field(
+        default_factory=lambda: os.getenv(
+            "ALLOW_SQLITE_FALLBACK",
+            "true",
+        ).lower() in ("true", "1", "yes")
+    )
     db_echo: bool = field(
         default_factory=lambda: os.getenv("DB_ECHO", "false").lower() in ("true", "1", "yes")
     )

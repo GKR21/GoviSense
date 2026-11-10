@@ -6,7 +6,9 @@
 import { useState, useEffect, useCallback } from "react"
 import type { GroundReport } from "./types"
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
+// Use the browser's origin in production so Nginx can proxy /api to FastAPI.
+// Set VITE_API_URL only when the API is hosted on a different origin.
+export const API_BASE_URL = import.meta.env.VITE_API_URL || ""
 
 export interface CropForecastData {
   crop: string
@@ -1041,5 +1043,4 @@ export function usePricesLatest() {
 export function useFarmerTop3(params: Parameters<typeof fetchFarmerTop3>[0]) {
   return useApiQuery(() => fetchFarmerTop3(params), [JSON.stringify(params)])
 }
-
 
