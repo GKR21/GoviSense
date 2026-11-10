@@ -8,7 +8,28 @@ import type { GroundReport } from "./types"
 
 // Use the browser's origin in production so Nginx can proxy /api to FastAPI.
 // Set VITE_API_URL only when the API is hosted on a different origin.
-export const API_BASE_URL = import.meta.env.VITE_API_URL || ""
+export const API_BASE_URL = import.meta.env?.VITE_API_URL || ""
+
+export function cropApiId(crop: string): string {
+  return crop.trim().toLowerCase().replace(/\s+/g, "_")
+}
+
+export function apiUrl(path: string): URL {
+  const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost"
+  return new URL(`${API_BASE_URL.replace(/\/$/, "")}${path}`, origin)
+}
+
+async function readApi(path: string, params: Record<string, string | number | undefined> = {}) {
+  const url = apiUrl(path)
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) url.searchParams.set(key, String(value))
+  }
+  const response = await fetch(url.toString(), { headers: getAuthHeaders() })
+  if (!response.ok) throw new Error(`Could not load ${path} (HTTP ${response.status})`)
+  const data = await response.json()
+  if (data === null || typeof data !== "object") throw new Error(`Invalid response from ${path}`)
+  return data
+}
 
 export interface CropForecastData {
   crop: string
@@ -63,108 +84,14 @@ export interface LatestForecastsResponse {
   }
 }
 
-export const REAL_MODEL_BASELINE: LatestForecastsResponse = {
-  pilot_district: "Anuradhapura",
-  crops: {
-    big_onion: {
-      crop: "big_onion",
-      crop_name: "Big Onion",
-      crop_name_si: "ලොකු ලූනු",
-      target_period: "2024-12",
-      ai1_harvest_forecast: {
-        point_forecast_mt: 2963.1,
-        lower_bound_10_mt: 1318.8,
-        upper_bound_90_mt: 9482.9,
-        baseline_mt: 1325.2,
-      },
-      ai3_supply_pressure_index: {
-        spi_score: -0.626,
-        spi_label: "Shortage",
-        projected_demand_mt: 8333.3,
-        gap_mt: -5220.3,
-        action_summary:
-          "Deficit detected: Consumer price spike risk. Nudge planting expansion or plan targeted imports.",
-      },
-      ai2_price_forecast: {
-        wholesale_price_rs_kg: 364.5,
-        lower_bound_rs_kg: 324.4,
-        upper_bound_rs_kg: 404.6,
-        direction: "up",
-        confidence: 0.6,
-        selected_model: "sarimax",
-        forecast_source: "model",
-      },
-    },
-    chilli: {
-      crop: "chilli",
-      crop_name: "Chilli (Green/Dry)",
-      crop_name_si: "අමු මිරිස් / වියළි මිරිස්",
-      target_period: "2024-12",
-      ai1_harvest_forecast: {
-        point_forecast_mt: 4844.0,
-        lower_bound_10_mt: 3895.7,
-        upper_bound_90_mt: 6468.6,
-        baseline_mt: 4422.8,
-      },
-      ai3_supply_pressure_index: {
-        spi_score: 0.75,
-        spi_label: "Glut",
-        projected_demand_mt: 693.8,
-        gap_mt: 3948.6,
-        action_summary:
-          "Oversupply detected: Farm-gate crash risk. Activate storage buffers / defer imports.",
-      },
-      ai2_price_forecast: {
-        wholesale_price_rs_kg: 276.0,
-        lower_bound_rs_kg: 245.6,
-        upper_bound_rs_kg: 306.3,
-        direction: "down",
-        confidence: 0.9,
-        selected_model: "seasonal_naive",
-        forecast_source: "baseline",
-      },
-    },
-  },
-  ai4_optimization: {
-    solver_status: "OPTIMAL",
-    target_season: "Upcoming Season",
-    recommendations: [
-      {
-        crop: "Big Onion",
-        action_type: "PLANT_EXPANSION",
-        quantity: 336.8,
-        unit: "hectares",
-        timeline: "Nudge farmers within DoA planting window (next 30 days)",
-        rationale:
-          "Fills 5220.3 MT deficit via local cultivation. Protects farm-gate price above fair floor (Rs 120.0/kg).",
-        fair_farmgate_floor_rs_kg: 120.0,
-      },
-      {
-        crop: "Chilli (Green/Dry)",
-        action_type: "HOLD_STORAGE_BUFFER",
-        quantity: 3948.6,
-        unit: "MT",
-        timeline: "Activate Dambulla/Anuradhapura dedicated warehouse storage",
-        rationale:
-          "Hold back bumper surplus off spot market to safeguard minimum fair farmgate floor (Rs 350.0/kg).",
-        fair_farmgate_floor_rs_kg: 350.0,
-      },
-    ],
-  },
-}
-
 export type LatestForecastsWithMeta = LatestForecastsResponse & { isLive: boolean }
 
-export async function fetchLatestForecasts(): Promise<LatestForecastsWithMeta> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/forecasts/latest`, { method: "GET" })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = await res.json()
-    return { ...data, isLive: true }
-  } catch (err) {
-    // When backend is not running, return the real trained ML pipeline baseline
-    return { ...REAL_MODEL_BASELINE, isLive: false }
+export async function fetchLatestForecasts(cropId?: string): Promise<LatestForecastsWithMeta> {
+  const data = await readApi('/api/forecasts/latest', { crop: cropId })
+  if (!data.crops || typeof data.crops !== 'object' || Array.isArray(data.crops)) {
+    throw new Error('Invalid forecast response')
   }
+  return { ...data, isLive: true }
 }
 
 export async function fetchFarmerTop3(params: {
@@ -272,30 +199,13 @@ export interface PlantingReportApi {
   timestamp: string
 }
 
-export async function fetchPlantingReports(
-  cropId?: string,
-  season?: string,
-): Promise<{ reports: PlantingReportApi[]; isLive: boolean }> {
-  try {
-    const url = new URL(`${API_BASE_URL}/api/feedback/planting-reports`)
-    if (cropId && cropId !== "all" && cropId !== "All crops") {
-      const normCrop = cropId.toLowerCase().includes("chilli")
-        ? "chilli"
-        : cropId.toLowerCase().includes("onion")
-          ? "big_onion"
-          : cropId.toLowerCase().replace(/\s+/g, "_")
-      url.searchParams.set("crop_id", normCrop)
-    }
-    if (season) {
-      url.searchParams.set("season", season)
-    }
-    const res = await fetch(url.toString())
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data: PlantingReportApi[] = await res.json()
-    return { reports: data, isLive: true }
-  } catch (err) {
-    return { reports: [], isLive: false }
-  }
+export async function fetchPlantingReports(cropId?: string, season?: string): Promise<{ reports: PlantingReportApi[]; isLive: boolean }> {
+  const data = await readApi('/api/feedback/planting-reports', {
+    crop_id: cropId && cropId !== 'all' && cropId !== 'All crops' ? cropApiId(cropId) : undefined,
+    season,
+  })
+  if (!Array.isArray(data)) throw new Error('Invalid planting reports response')
+  return { reports: data, isLive: true }
 }
 
 export function mapPlantingReportToGroundReport(r: PlantingReportApi): GroundReport {
@@ -350,75 +260,39 @@ export async function simulateScenarioApi(payload: {
 }
 
 export async function fetchGapTimeline(cropId?: string, season?: string, leadWeeks?: number) {
-  try {
-    const url = new URL(`${API_BASE_URL}/api/forecasts/gap-timeline`)
-    if (cropId) url.searchParams.set("crop_id", cropId)
-    if (season) url.searchParams.set("season", season)
-    if (leadWeeks) url.searchParams.set("lead_weeks", String(leadWeeks))
-    const res = await fetch(url.toString(), { headers: getAuthHeaders() })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return await res.json()
-  } catch (err) {
-    return null
-  }
+  const data = await readApi('/api/forecasts/gap-timeline', { crop_id: cropId, season, lead_weeks: leadWeeks })
+  if (!Array.isArray(data.timelines)) throw new Error('Invalid gap timeline response')
+  return data
 }
 
 export async function fetchPriceOutlook(cropId?: string) {
-  try {
-    const url = new URL(`${API_BASE_URL}/api/forecasts/price-outlook`)
-    if (cropId) url.searchParams.set("crop_id", cropId)
-    const res = await fetch(url.toString())
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return await res.json()
-  } catch (err) {
-    return null
-  }
+  const data = await readApi('/api/forecasts/price-outlook', { crop_id: cropId })
+  if (!data.crops || typeof data.crops !== 'object' || Array.isArray(data.crops)) throw new Error('Invalid price outlook response')
+  return data
 }
 
 export async function fetchAdoptionSummary(cropId?: string, season?: string) {
-  try {
-    const url = new URL(`${API_BASE_URL}/api/adoption/summary`)
-    if (cropId) url.searchParams.set("crop_id", cropId)
-    if (season) url.searchParams.set("season", season)
-    const res = await fetch(url.toString())
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return await res.json()
-  } catch (err) {
-    return null
-  }
+  const data = await readApi('/api/adoption/summary', { crop_id: cropId, season })
+
+  return data
 }
 
 export async function fetchGroundReports(cropId?: string, district?: string) {
-  try {
-    const url = new URL(`${API_BASE_URL}/api/feedback/ground-reports`)
-    if (cropId) url.searchParams.set("crop_id", cropId)
-    if (district) url.searchParams.set("district", district)
-    const res = await fetch(url.toString())
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return await res.json()
-  } catch (err) {
-    return null
-  }
+  const data = await readApi('/api/feedback/ground-reports', { crop_id: cropId, district })
+  if (!Array.isArray(data.ground_reports)) throw new Error('Invalid ground reports response')
+  return data
 }
 
 export async function fetchDataCatalogue() {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/catalogue`)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return await res.json()
-  } catch (err) {
-    return null
-  }
+  const data = await readApi('/api/catalogue', {})
+  if (!Array.isArray(data)) throw new Error('Invalid catalogue response')
+  return data
 }
 
 export async function fetchSourcesSummary() {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/catalogue/sources-summary`)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return await res.json()
-  } catch (err) {
-    return null
-  }
+  const data = await readApi('/api/catalogue/sources-summary', {})
+
+  return data
 }
 
 export async function fetchPipelineRuns() {
@@ -477,76 +351,13 @@ export interface AdoptionSimulationResponse {
   isLive?: boolean
 }
 
-export const BASELINE_ADOPTION_SIMULATION: AdoptionSimulationResponse = {
-  crop: "big_onion",
-  season_demand_mt: 26667.0,
-  fair_floor_price_rs_kg: 120.0,
-  scenarios: [
-    {
-      adoption_rate_pct: 0,
-      total_supply_mt: 46000.0,
-      projected_demand_mt: 26667.0,
-      spi_score: 0.466,
-      spi_label: "Glut",
-      farmgate_price_rs_kg: 75.0,
-      fair_floor_price_rs_kg: 120.0,
-      price_crash_risk_pct: 85.0,
-      total_farmer_revenue_mil_rs: 3450.0,
-      market_stability: "Fragile (Farmgate crash risk)",
-    },
-    {
-      adoption_rate_pct: 30,
-      total_supply_mt: 34000.0,
-      projected_demand_mt: 26667.0,
-      spi_score: 0.14,
-      spi_label: "Balanced",
-      farmgate_price_rs_kg: 132.0,
-      fair_floor_price_rs_kg: 120.0,
-      price_crash_risk_pct: 14.0,
-      total_farmer_revenue_mil_rs: 4488.0,
-      market_stability: "Moderate Buffer (+14%)",
-    },
-    {
-      adoption_rate_pct: 60,
-      total_supply_mt: 26667.0,
-      projected_demand_mt: 26667.0,
-      spi_score: 0.02,
-      spi_label: "Balanced",
-      farmgate_price_rs_kg: 158.0,
-      fair_floor_price_rs_kg: 120.0,
-      price_crash_risk_pct: 3.0,
-      total_farmer_revenue_mil_rs: 4213.4,
-      market_stability: "Stable & Equilibrium",
-    },
-  ],
-  conclusion:
-    "At 60% farmer adoption, supply aligns with demand, SPI enters the balanced band (+/-0.15), and price crash risk drops below 5%, preserving farmer profitability.",
-  isLive: false,
+export async function fetchAdoptionSimulation(crop: string = 'big_onion', demandMt?: number, uncoordinatedSupplyMt?: number): Promise<AdoptionSimulationResponse> {
+  const data = await readApi('/api/simulation/adoption', {
+    crop_id: cropApiId(crop), season_demand_mt: demandMt, uncoordinated_supply_mt: uncoordinatedSupplyMt,
+  })
+  if (!Array.isArray(data.scenarios)) throw new Error('Invalid adoption simulation response')
+  return { ...data, isLive: true }
 }
-
-export async function fetchAdoptionSimulation(
-  crop: string = "big_onion",
-  demandMt: number = 26667.0,
-  uncoordinatedSupplyMt: number = 46000.0,
-): Promise<AdoptionSimulationResponse> {
-  const normCrop = crop.toLowerCase().includes("chilli") ? "chilli" : "big_onion"
-  try {
-    const url = new URL(`${API_BASE_URL}/api/simulation/adoption`)
-    url.searchParams.set("crop_id", normCrop)
-    url.searchParams.set("season_demand_mt", String(demandMt))
-    url.searchParams.set("uncoordinated_supply_mt", String(uncoordinatedSupplyMt))
-    const res = await fetch(url.toString())
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = await res.json()
-    return { ...data, isLive: true }
-  } catch (err) {
-    return { ...BASELINE_ADOPTION_SIMULATION, isLive: false }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Item 8: Decision History & Audit Ledger API
-// ---------------------------------------------------------------------------
 
 export interface DecisionRecordApi {
   crop_id: string
@@ -561,6 +372,8 @@ export interface DecisionRecordApi {
   assumptions: Record<string, any>
   decision_id: string
   timestamp: string
+  record_hash?: string
+  run_id?: string
 }
 
 export interface DecisionLogPayloadApi {
@@ -577,32 +390,14 @@ export interface DecisionLogPayloadApi {
   notes?: string
 }
 
-export async function fetchDecisionHistory(
-  cropId?: string,
-  season?: string,
-  limit: number = 50,
-): Promise<{ records: DecisionRecordApi[]; isLive: boolean }> {
-  try {
-    const url = new URL(`${API_BASE_URL}/api/history/decisions`)
-    if (cropId && cropId !== "all" && cropId !== "All crops") {
-      const normCrop = cropId.toLowerCase().includes("chilli")
-        ? "chilli"
-        : cropId.toLowerCase().includes("onion")
-          ? "big_onion"
-          : cropId.toLowerCase().replace(/\s+/g, "_")
-      url.searchParams.set("crop_id", normCrop)
-    }
-    if (season) {
-      url.searchParams.set("season", season)
-    }
-    url.searchParams.set("limit", String(limit))
-    const res = await fetch(url.toString())
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data: DecisionRecordApi[] = await res.json()
-    return { records: data, isLive: true }
-  } catch (err) {
-    return { records: [], isLive: false }
-  }
+export async function fetchDecisionHistory(cropId?: string, season?: string, limit: number = 50): Promise<{ records: DecisionRecordApi[]; isLive: boolean }> {
+  const data = await readApi('/api/history/decisions', {
+    crop_id: cropId && cropId !== 'all' && cropId !== 'All crops' ? cropApiId(cropId) : undefined,
+    season, limit,
+  })
+  const records = Array.isArray(data) ? data : data.records
+  if (!Array.isArray(records)) throw new Error('Invalid decision history response')
+  return { records, isLive: true }
 }
 
 export async function logDecisionActionApi(
@@ -946,42 +741,33 @@ export interface UseApiQueryResult<T> {
   refetch: () => void
 }
 
-export function useApiQuery<T>(
-  fetcher: () => Promise<T>,
-  deps: any[] = [],
-): UseApiQueryResult<T> {
+export function useApiQuery<T>(fetcher: () => Promise<T>, deps: unknown[] = []): UseApiQueryResult<T> {
   const [data, setData] = useState<T | null>(null)
-  const [loading, setLoading] = useState<boolean>(true)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  const execute = useCallback(() => {
-    let active = true
-    setLoading(true)
-    setError(null)
-    fetcher()
-      .then((res) => {
-        if (active) {
-          setData(res)
-          setLoading(false)
-        }
-      })
-      .catch((err) => {
-        if (active) {
-          setError(err?.message || "Failed to load data from server")
-          setLoading(false)
-        }
-      })
-    return () => {
-      active = false
-    }
-  }, deps)
+  const [revision, setRevision] = useState(0)
+  const refetch = useCallback(() => setRevision((value) => value + 1), [])
 
   useEffect(() => {
-    const cleanup = execute()
-    return cleanup
-  }, [execute])
+    let active = true
+    setData(null)
+    setLoading(true)
+    setError(null)
+    Promise.resolve().then(fetcher).then((result) => {
+      if (!active) return
+      if (result === null || result === undefined) throw new Error('No response from server')
+      setData(result)
+      setLoading(false)
+    }).catch((failure: unknown) => {
+      if (!active) return
+      setData(null)
+      setError(failure instanceof Error ? failure.message : 'Failed to load data from server')
+      setLoading(false)
+    })
+    return () => { active = false }
+  }, [...deps, revision])
 
-  return { data, loading, error, refetch: execute }
+  return { data, loading, error, refetch }
 }
 
 export function useHealth() {
@@ -989,7 +775,7 @@ export function useHealth() {
 }
 
 export function useLatestForecasts(cropId?: string) {
-  return useApiQuery(fetchLatestForecasts, [cropId])
+  return useApiQuery(() => fetchLatestForecasts(cropId), [cropId])
 }
 
 export function useGapTimeline(cropId?: string, season?: string) {

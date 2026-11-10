@@ -13,7 +13,7 @@ export function DemoRibbon({ isLive = false, label }: DemoRibbonProps) {
           color: "#d1fae5",
           boxShadow: "0 0 16px rgba(16, 185, 129, 0.4)",
         }}
-        title="Connected to live FastAPI backend"
+        title={label || "Connected to live FastAPI backend"}
       >
         {label || "● LIVE DATA"}
       </div>
@@ -28,7 +28,7 @@ export function DemoRibbon({ isLive = false, label }: DemoRibbonProps) {
         color: "#dbeafe",
         boxShadow: "0 0 16px rgba(37, 99, 235, 0.4)",
       }}
-      title="Displaying trained ML baseline figures (FastAPI backend offline)"
+      title={label || "Displaying trained ML baseline figures (FastAPI backend offline)"}
     >
       {label || "🔵 DEMO / ML BASELINE"}
     </div>

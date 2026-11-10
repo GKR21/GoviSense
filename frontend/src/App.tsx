@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react"
-import type { View, GroundReport } from "./types"
-import { fetchPlantingReports, mapPlantingReportToGroundReport } from "./api"
+import type { View } from "./types"
 import { OfficerScreen } from "./screens/officer/OfficerScreen"
 import { FarmerScreen } from "./screens/farmer/FarmerScreen"
 
@@ -23,44 +22,6 @@ export default function App() {
       url.searchParams.set("view", newView)
       window.history.pushState({}, "", url)
     }
-  }
-
-  const [groundReports, setGroundReports] = useState<GroundReport[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("govisense_ground_reports")
-        if (saved) return JSON.parse(saved)
-      } catch (e) {}
-    }
-    return []
-  })
-
-  useEffect(() => {
-    let active = true
-    fetchPlantingReports()
-      .then((res) => {
-        if (!active) return
-        if (res.isLive && res.reports.length > 0) {
-          const liveReports = res.reports.map(mapPlantingReportToGroundReport)
-          setGroundReports(liveReports)
-        }
-      })
-      .catch(() => {})
-    return () => {
-      active = false
-    }
-  }, [])
-
-  const handleAddReport = (report: GroundReport) => {
-    setGroundReports((prev) => {
-      const next = [report, ...prev]
-      if (typeof window !== "undefined") {
-        try {
-          localStorage.setItem("govisense_ground_reports", JSON.stringify(next))
-        } catch (e) {}
-      }
-      return next
-    })
   }
 
   const [isOnline, setIsOnline] = useState<boolean>(() => {
@@ -90,7 +51,7 @@ export default function App() {
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-amber-200 animate-pulse" />
             <span>
-              <strong>Offline Mode Active</strong> — Operating with cached advisory and field data. New reports will sync once connectivity resumes.
+              <strong>Offline Mode Active</strong> — Reconnect to load the latest server data. Requests may fail while you are offline.
             </span>
           </div>
           <span className="text-[11px] opacity-85 uppercase tracking-wider font-semibold">PWA Field Mode</span>
@@ -102,8 +63,6 @@ export default function App() {
           setView={handleSetView}
           initialRole="Officer"
           initialPage="Overview"
-          groundReports={groundReports}
-          onAddReport={handleAddReport}
         />
       )}
       {view === "admin" && (
@@ -112,8 +71,6 @@ export default function App() {
           setView={handleSetView}
           initialRole="Admin"
           initialPage="Data sources"
-          groundReports={groundReports}
-          onAddReport={handleAddReport}
         />
       )}
       {view === "farmer" && (

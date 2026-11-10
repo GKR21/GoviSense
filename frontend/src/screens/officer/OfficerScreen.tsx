@@ -53,20 +53,19 @@ import {
 } from "../../components/common"
 import { SupplyChart } from "../../components/charts"
 import {
-  fetchLatestForecasts,
-  fetchDecisionHistory,
   logDecisionActionApi,
-  mapApiRecordToPolicyDecision,
   getStoredAuthUser,
   clearAuthSession,
   simulateScenarioApi,
   useAlerts,
   addOfficerNoteApi,
   acknowledgeAlertApi,
-  type LatestForecastsWithMeta,
+  useLatestForecasts,
+  cropApiId,
   type CropForecastData,
   type AuthUser,
 } from "../../api"
+import { ApiDataState } from "../../components/common/ApiDataState"
 
 import { OverviewScreen } from "./OverviewScreen"
 import { GapTimelineScreen } from "./GapTimelineScreen"
@@ -119,53 +118,18 @@ export function OfficerScreen({
   const [lastReport, setLastReport] = useState<GroundReport | null>(null)
   const [decision, setDecision] = useState("")
   const [decisionHistory, setDecisionHistory] = useState<PolicyDecision[]>([])
-  const [forecastData, setForecastData] = useState<LatestForecastsWithMeta | null>(null)
-  const [isLiveApi, setIsLiveApi] = useState(false)
-  const [forecastLoading, setForecastLoading] = useState(true)
+  const { data: forecastData, loading: forecastLoading, error: forecastError, refetch: reloadForecasts } = useLatestForecasts()
+  const isLiveApi = forecastData?.isLive === true
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => getStoredAuthUser())
   const [simulatedMetrics, setSimulatedMetrics] = useState<any>(null)
   const [alertsOpen, setAlertsOpen] = useState(false)
   const [officerNoteText, setOfficerNoteText] = useState<Record<string, string>>({})
   const [noteStatus, setNoteStatus] = useState<Record<string, string>>({})
-  const { data: alertsData, reload: reloadAlerts } = useAlerts()
+  const { data: alertResponse, refetch: reloadAlerts } = useAlerts()
+  const alertsData = Array.isArray(alertResponse) ? alertResponse : alertResponse?.alerts
 
-  useEffect(() => {
-    let active = true
-    setForecastLoading(true)
-    fetchLatestForecasts()
-      .then((res) => {
-        if (!active) return
-        setForecastData(res)
-        setIsLiveApi(res.isLive)
-        setForecastLoading(false)
-      })
-      .catch(() => {
-        if (!active) return
-        setForecastLoading(false)
-      })
-
-    fetchDecisionHistory()
-      .then((res) => {
-        if (!active) return
-        if (res.isLive && res.records.length > 0) {
-          setDecisionHistory(res.records.map(mapApiRecordToPolicyDecision))
-        }
-      })
-      .catch(() => {
-        // fallback to INITIAL_DECISION_HISTORY
-      })
-
-    return () => {
-      active = false
-    }
-  }, [])
-
-  const cropApiKey = selectedCrop.toLowerCase().includes("onion")
-    ? "big_onion"
-    : selectedCrop.toLowerCase().includes("chilli")
-      ? "chilli"
-      : selectedCrop.toLowerCase().replace(/\s+/g, "_")
-  const currentApiCropData: CropForecastData | undefined = forecastData?.crops[cropApiKey]
+  const cropApiKey = cropApiId(selectedCrop)
+  const currentApiCropData: CropForecastData | undefined = forecastData?.crops?.[cropApiKey]
   const changed = area !== currentProfile.baselineArea || yieldValue !== currentProfile.baselineYield
 
   useEffect(() => {
@@ -252,7 +216,7 @@ export function OfficerScreen({
 
   return (
     <div className="officer-app">
-      <DemoRibbon isLive={isLiveApi} />
+      <DemoRibbon isLive={isLiveApi} label={forecastLoading ? "Connecting to backend" : isLiveApi ? "Backend connected" : "Backend data unavailable"} />
       <aside className="sidebar">
         <div className="brand">
           <div className="brand__mark">
@@ -473,6 +437,9 @@ export function OfficerScreen({
               }}
             />
           ) : page === "Overview" ? (
+            forecastLoading || forecastError || !currentApiCropData ? (
+              <ApiDataState loading={forecastLoading} error={forecastError} empty={!currentApiCropData} onRetry={reloadForecasts} />
+            ) : (
             <OverviewScreen
               crop={selectedCrop}
               district={selectedDistrict}
@@ -480,9 +447,11 @@ export function OfficerScreen({
               scenario={scenario}
               onOpenSupply={() => setPage("Supply pressure")}
               onOpenGap={() => setPage("Gap & import timeline")}
+              onRefresh={reloadForecasts}
               apiCropData={currentApiCropData}
               isLiveApi={isLiveApi}
             />
+            )
           ) : page === "Gap & import timeline" ? (
             <GapTimelineScreen
               crop={selectedCrop}
@@ -519,6 +488,8 @@ export function OfficerScreen({
             />
           ) : page === "Settings" ? (
             <SettingsScreen />
+          ) : forecastLoading || forecastError || !currentApiCropData ? (
+            <ApiDataState loading={forecastLoading} error={forecastError} empty={!currentApiCropData} onRetry={reloadForecasts} />
           ) : (
             <>
               <div className="page-heading">
