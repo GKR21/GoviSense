@@ -1,6 +1,7 @@
 """
 FastAPI Dependencies, JWT Authentication, Role Guards, and Rate Limiting
 Team DARKBITE · ModelX 2.0
+Provides database sessions, user identity, rate limiting, and RBAC authorization dependencies.
 """
 
 from __future__ import annotations
@@ -12,15 +13,29 @@ from collections import defaultdict
 from fastapi import Depends, HTTPException, Header, Request, status
 from sqlalchemy.orm import Session
 
-from govisense.api.routes.auth import verify_jwt_token
-from govisense.db.session import get_db
+from govisense.db.session import get_db, get_db_session
+from govisense.api.auth import (
+    get_current_user,
+    require_farmer,
+    require_officer,
+    require_admin,
+    require_officer_or_admin,
+    require_authenticated,
+    require_role,
+    get_current_farmer,
+    get_current_officer,
+    get_current_admin,
+    RoleChecker,
+    decode_token,
+    oauth2_scheme,
+)
 
 # ---------------------------------------------------------------------------
 # Rate Limiting
 # ---------------------------------------------------------------------------
 
 _RATE_LIMIT_BUCKET: Dict[str, list] = defaultdict(list)
-_RATE_LIMIT_MAX_REQUESTS = 30  # Max 30 submissions per window
+_RATE_LIMIT_MAX_REQUESTS = 120  # Max 120 submissions per window
 _RATE_LIMIT_WINDOW_SECONDS = 60  # 1 minute window
 
 
@@ -50,75 +65,37 @@ def rate_limiter(request: Request, authorization: Optional[str] = Header(None)):
 
 
 # ---------------------------------------------------------------------------
-# User Authentication & Role Guards
+# User Authentication Helpers
 # ---------------------------------------------------------------------------
-
-def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
-    """
-    FastAPI dependency that extracts and validates the JWT Bearer token.
-    Raises 401 UNAUTHORIZED if missing, expired, or signature is invalid.
-    """
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid authentication token. Expected 'Bearer <token>'.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    token = authorization.split(" ")[1]
-    payload = verify_jwt_token(token)
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session expired or token is invalid. Please log in again.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return payload
-
 
 def get_optional_current_user(authorization: Optional[str] = Header(None)) -> Optional[Dict[str, Any]]:
     """Optional bearer auth for endpoints accessible both publicly and authenticated."""
     if not authorization or not authorization.startswith("Bearer "):
         return None
     token = authorization.split(" ")[1]
-    return verify_jwt_token(token)
+    try:
+        from govisense.api.routes.auth import verify_jwt_token
+        return verify_jwt_token(token)
+    except Exception:
+        return None
 
 
-def require_officer(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
-    """
-    Role Guard: Requires Officer or Admin privileges.
-    Raises 403 FORBIDDEN if the user is a farmer or unprivileged account.
-    """
-    role = str(current_user.get("role", "")).lower()
-    if role not in ("officer", "admin"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Officer authorization required. Your role does not permit this action.",
-        )
-    return current_user
-
-
-def require_farmer(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
-    """
-    Role Guard: Requires Farmer, Officer, or Admin privileges.
-    """
-    role = str(current_user.get("role", "")).lower()
-    if role not in ("farmer", "officer", "admin"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Farmer account required. Your role does not permit this action.",
-        )
-    return current_user
-
-
-def require_admin(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
-    """
-    Role Guard: Requires Admin privileges.
-    """
-    role = str(current_user.get("role", "")).lower()
-    if role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Administrator authorization required.",
-        )
-    return current_user
+__all__ = [
+    "get_db",
+    "get_db_session",
+    "get_current_user",
+    "get_optional_current_user",
+    "require_farmer",
+    "require_officer",
+    "require_admin",
+    "require_officer_or_admin",
+    "require_authenticated",
+    "require_role",
+    "get_current_farmer",
+    "get_current_officer",
+    "get_current_admin",
+    "RoleChecker",
+    "decode_token",
+    "oauth2_scheme",
+    "rate_limiter",
+]

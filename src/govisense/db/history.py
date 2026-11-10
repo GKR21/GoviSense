@@ -1,6 +1,6 @@
 """
 Confidence Badge & Decision History Audit Module (Item 8)
-Team DARKBITE · ModelX 2.0 Phase 1
+Team DARKBITE · ModelX 2.0 Phase 2
 Pilot: Anuradhapura (Big Onion, Chilli)
 
 Provides:
@@ -11,6 +11,7 @@ Provides:
      - SPI validation pass
      - Soil data present
   2. Audit Decision History Store:
+     - Database-backed (SQLite with WAL or PostgreSQL) with concurrent-write safety
      - Saves model version, data version, key assumptions, officer actions per run.
 """
 
@@ -19,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
+import hashlib
 from datetime import datetime, timezone
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
@@ -28,8 +30,24 @@ from govisense.config import PROCESSED_DATA_DIR
 from govisense.db.session import get_session, init_db
 from govisense.db.models import DecisionRecordModel
 
-
 _DEFAULT_HISTORY_PATH = PROCESSED_DATA_DIR / "decision_history.json"
+
+
+def get_running_model_version(crop_id: Optional[str] = None) -> str:
+    """
+    Dynamically binds model_version to the active running model pipeline
+    (LightGBM yield correction + winning PriceForecaster + HiGHS LP solver).
+    """
+    try:
+        from govisense.api import main as api_main
+        if hasattr(api_main, "a2_models") and api_main.a2_models:
+            crop_key = crop_id if crop_id in api_main.a2_models else next(iter(api_main.a2_models.keys()))
+            forecaster = api_main.a2_models[crop_key]
+            winner = getattr(forecaster, "winner", "lightgbm")
+            return f"GoviSense-v2.0+{winner.upper()}+HiGHS-LP"
+    except Exception:
+        pass
+    return "GoviSense-v2.0+LightGBM+HiGHS-LP"
 
 
 # ---------------------------------------------------------------------------
@@ -208,7 +226,7 @@ class DecisionRecord:
     quantity: float
     unit: str
     rationale: str
-    model_version: str = "GoviSense v2.0"
+    model_version: Optional[str] = None
     data_version: str = "Harti-DoA-2024.12"
     assumptions: Dict[str, Any] = field(default_factory=lambda: {
         "loss_pct": 0.15,
@@ -218,12 +236,28 @@ class DecisionRecord:
     })
     decision_id: str = ""
     timestamp: str = ""
+    run_id: str = ""
+    hash: str = ""
+    is_demo: bool = False
+    data_available: bool = True
+    source_type: str = "officer_audit_log"
 
     def __post_init__(self):
         if not self.decision_id:
             self.decision_id = f"DEC-{uuid.uuid4().hex[:8].upper()}"
         if not self.timestamp:
             self.timestamp = datetime.now(timezone.utc).isoformat()
+        if not self.model_version:
+            self.model_version = get_running_model_version(self.crop_id)
+        if not self.run_id:
+            self.run_id = f"RUN-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+        if not self.hash:
+            payload_str = (
+                f"{self.decision_id}|{self.crop_id}|{self.season}|{self.officer_id}|"
+                f"{self.action_type}|{self.quantity}|{self.unit}|{self.model_version}|"
+                f"{self.data_version}|{self.timestamp}|{self.run_id}"
+            )
+            self.hash = hashlib.sha256(payload_str.encode("utf-8")).hexdigest()
 
 
 class DecisionHistoryStore:
@@ -236,6 +270,7 @@ class DecisionHistoryStore:
     def __init__(self, storage_path: Optional[Path] = None, sync_db: Optional[bool] = None):
         self.storage_path = storage_path or _DEFAULT_HISTORY_PATH
         self.sync_db = sync_db if sync_db is not None else (storage_path is None)
+        self._use_db = self.sync_db
         self._records: List[DecisionRecord] = []
         if self.sync_db:
             try:
@@ -357,6 +392,7 @@ class DecisionHistoryStore:
                         ts = datetime.now(timezone.utc)
                     db_model = DecisionRecordModel(
                         decision_id=record.decision_id,
+                        run_id=record.run_id or None,
                         record_hash=record_hash,
                         crop_id=record.crop_id,
                         season=record.season,
@@ -368,6 +404,9 @@ class DecisionHistoryStore:
                         model_version=record.model_version,
                         data_version=record.data_version,
                         assumptions=record.assumptions,
+                        is_demo=record.is_demo,
+                        data_available=record.data_available,
+                        source_type=record.source_type,
                         timestamp=ts,
                     )
                     session.merge(db_model)
@@ -378,8 +417,15 @@ class DecisionHistoryStore:
         return {
             "status": "RECORDED",
             "decision_id": record.decision_id,
+            "run_id": record.run_id,
+            "hash": record.hash,
             "crop_id": record.crop_id,
             "action_type": record.action_type,
+            "model_version": record.model_version,
+            "data_version": record.data_version,
+            "is_demo": record.is_demo,
+            "data_available": record.data_available,
+            "source_type": record.source_type,
             "timestamp": record.timestamp,
             "record_hash": record_hash,
         }
@@ -391,6 +437,7 @@ class DecisionHistoryStore:
         limit: int = 50,
     ) -> List[DecisionRecord]:
         """List historical decisions, newest first."""
+        lim = int(limit) if isinstance(limit, int) else 50
         if self.sync_db:
             try:
                 with get_session() as session:
@@ -399,7 +446,7 @@ class DecisionHistoryStore:
                         q = q.filter(DecisionRecordModel.crop_id == crop_id)
                     if season:
                         q = q.filter(DecisionRecordModel.season == season)
-                    rows = q.order_by(DecisionRecordModel.timestamp.desc()).limit(limit).all()
+                    rows = q.order_by(DecisionRecordModel.timestamp.desc()).limit(lim).all()
                     if rows:
                         return [
                             DecisionRecord(
@@ -415,6 +462,11 @@ class DecisionHistoryStore:
                                 assumptions=r.assumptions or {},
                                 decision_id=r.decision_id,
                                 timestamp=r.timestamp.isoformat() if hasattr(r.timestamp, "isoformat") else str(r.timestamp),
+                                run_id=r.run_id or "",
+                                hash=r.record_hash or "",
+                                is_demo=bool(r.is_demo) if getattr(r, "is_demo", None) is not None else False,
+                                data_available=bool(r.data_available) if getattr(r, "data_available", None) is not None else True,
+                                source_type=getattr(r, "source_type", None) or "officer_audit_log",
                             )
                             for r in rows
                         ]
@@ -427,6 +479,4 @@ class DecisionHistoryStore:
         if season:
             records = [r for r in records if r.season == season]
         records = sorted(records, key=lambda r: r.timestamp, reverse=True)
-        lim = int(limit) if isinstance(limit, int) else 50
         return records[:lim]
-

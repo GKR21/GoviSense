@@ -1,73 +1,63 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/localization/app_translations.dart';
+import '../models/market_price_item.dart';
+import '../services/farmer_api_service.dart';
 
-class MarketPriceItem {
-  const MarketPriceItem({
-    required this.cropEn,
-    required this.cropSi,
-    required this.cropTa,
-    required this.category,
-    required this.wholesalePrice,
-    required this.retailPrice,
-    required this.economicCenterEn,
-    required this.economicCenterSi,
-    required this.economicCenterTa,
-    required this.trendPct,
-    required this.isUp,
-    required this.isStable,
-  });
-
-  final String cropEn;
-  final String cropSi;
-  final String cropTa;
-  final String category; // 'vegetable', 'pulse', 'tuber', 'grain'
-  final String wholesalePrice;
-  final String retailPrice;
-  final String economicCenterEn;
-  final String economicCenterSi;
-  final String economicCenterTa;
-  final String trendPct;
-  final bool isUp;
-  final bool isStable;
-
-  String localizedCrop(AppLanguage lang) {
-    switch (lang) {
-      case AppLanguage.si:
-        return cropSi;
-      case AppLanguage.ta:
-        return cropTa;
-      case AppLanguage.en:
-        return cropEn;
-    }
-  }
-
-  String localizedCenter(AppLanguage lang) {
-    switch (lang) {
-      case AppLanguage.si:
-        return economicCenterSi;
-      case AppLanguage.ta:
-        return economicCenterTa;
-      case AppLanguage.en:
-        return economicCenterEn;
-    }
-  }
-}
+export '../models/market_price_item.dart';
 
 class MarketPricesPage extends StatefulWidget {
   const MarketPricesPage({
     super.key,
     required this.language,
+    this.apiService,
   });
 
   final AppLanguage language;
+  final FarmerApiService? apiService;
 
   @override
   State<MarketPricesPage> createState() => _MarketPricesPageState();
 }
 
 class _MarketPricesPageState extends State<MarketPricesPage> {
+  late final FarmerApiService _apiService;
   String _selectedCategory = 'all';
+  bool _isLoading = false;
+  bool _isLive = false;
+  List<MarketPriceItem> _currentPrices = _allPrices;
+
+  @override
+  void initState() {
+    super.initState();
+    _apiService = widget.apiService ?? FarmerApiService();
+    _fetchPrices();
+  }
+
+  Future<void> _fetchPrices() async {
+    setState(() => _isLoading = true);
+    try {
+      final live = await _apiService.getMarketPrices(category: _selectedCategory);
+      if (live != null && live.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _currentPrices = live;
+            _isLive = true;
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+    } catch (_) {}
+
+    if (mounted) {
+      setState(() {
+        _currentPrices = _allPrices;
+        _isLive = false;
+        _isLoading = false;
+      });
+    }
+  }
 
   static const List<MarketPriceItem> _allPrices = [
     MarketPriceItem(
@@ -159,7 +149,7 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
   @override
   Widget build(BuildContext context) {
     final lang = widget.language;
-    final filtered = _allPrices.where((item) {
+    final filtered = _currentPrices.where((item) {
       if (_selectedCategory == 'all') return true;
       return item.category == _selectedCategory;
     }).toList();
@@ -178,16 +168,48 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
                       : 'DEC Market Price Bulletin',
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
-            const Text(
-              'CBSL & HARTI Daily Benchmark Feed',
-              style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
+            Row(
+              children: [
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    color: _isLive ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  _isLive ? 'CBSL & HARTI Live API Feed' : 'Offline Baseline Benchmark',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: _isLive ? const Color(0xFF16A34A) : AppTheme.neutral600,
+                    fontWeight: _isLive ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: _isLoading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
+                  )
+                : const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh live prices',
+            onPressed: _isLoading ? null : _fetchPrices,
+          ),
+        ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        children: [
+      body: RefreshIndicator(
+        onRefresh: _fetchPrices,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          children: [
           // Live Bulletin Header Banner
           Container(
             padding: const EdgeInsets.all(14),
@@ -269,8 +291,9 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
           ...filtered.map((item) => _buildPriceCard(item, lang)),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildCategoryChip(String label, String key) {
     final isSelected = _selectedCategory == key;

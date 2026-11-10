@@ -8,7 +8,7 @@ Also provides WP2 endpoints: /api/farmer/top3 (farmer crop recommendation).
 from contextlib import asynccontextmanager
 import logging
 
-from fastapi import FastAPI, Query, HTTPException, status
+from fastapi import FastAPI, Query, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
@@ -47,6 +47,14 @@ from govisense.db import (
     AlertStatusModel,
     EvaluationResultModel,
 )
+from govisense.db.models import MarketPriceRecord
+from govisense.db.session import get_db_session
+from govisense.api.auth import (
+    router as jwt_auth_router,
+    require_officer,
+    require_admin,
+)
+from govisense.api.schemas import MarketPricesResponse, MarketPriceItemResponse
 from govisense.simulation.agent_sim import MarketAdoptionSimulator, calculate_interval_coverage
 from govisense.provenance import compute_data_version, compute_model_version, get_git_commit, compute_dataset_provenance
 from govisense.evaluation.backtest import run_walk_forward_evaluation
@@ -96,6 +104,7 @@ from govisense.api.routes.farmer import (
     create_or_update_farmer_profile,
     get_farmer_history,
 )
+from govisense.api.routes.pipeline import router as pipeline_router
 
 # Configure structured logging
 logging.basicConfig(
@@ -153,9 +162,14 @@ def load_and_train():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """FastAPI application lifespan: load models, initialize DB, seed users."""
+    """FastAPI application lifespan: load models, initialize DB, seed users and alerts."""
     load_and_train()
     ensure_seed_users()
+    try:
+        from govisense.api.routes.alerts import seed_alerts_from_templates
+        seed_alerts_from_templates()
+    except Exception as e:
+        logger.warning(f"Failed to seed alert templates during startup: {e}")
     yield
 
 
@@ -176,10 +190,12 @@ app.add_middleware(
 )
 
 # Mount modular routers
+app.include_router(jwt_auth_router)
 app.include_router(auth_router)
 app.include_router(alerts_router)
 app.include_router(feedback_router)
 app.include_router(data_router)
+app.include_router(pipeline_router)
 app.include_router(officer_router)
 app.include_router(farmer_router)
 
@@ -284,6 +300,9 @@ def get_latest_forecasts():
             "crop_name": settings.crops[crop].name_en,
             "crop_name_si": settings.crops[crop].name_si,
             "target_period": str(latest_row["year_month"]),
+            "data_available": True,
+            "is_demo": False,
+            "source_type": "empirical_pipeline",
             "ai1_harvest_forecast": {
                 "point_forecast_mt": a1_res.point_forecast,
                 "lower_bound_10_mt": a1_res.lower_bound_10,
@@ -294,6 +313,7 @@ def get_latest_forecasts():
                 "model_classification": getattr(a1_res, "model_classification", "agreement with CPP plan"),
                 "data_quality": getattr(a1_res, "data_quality", "partial"),
                 "method": getattr(a1_res, "method", "plan-based agronomic accounting"),
+                "data_available": True,
             },
             "ai3_supply_pressure_index": {
                 "spi_score": spi_res.spi_score,
@@ -302,6 +322,7 @@ def get_latest_forecasts():
                 "projected_demand_mt": spi_res.projected_demand_mt,
                 "gap_mt": spi_res.gap_mt,
                 "action_summary": spi_res.action_summary,
+                "data_available": True,
                 "scenarios": {
                     k: {
                         "scenario": v.scenario,
@@ -323,6 +344,7 @@ def get_latest_forecasts():
                 "confidence": a2_res.direction_confidence,
                 "selected_model": getattr(a2_res, "selected_model", "lightgbm"),
                 "forecast_source": getattr(a2_res, "source", "model"),
+                "data_available": True,
             }
         }
 
@@ -440,7 +462,9 @@ def get_latest_forecasts():
         "model_version": m_ver,
         "data_quality": data_quality,
         "data_age_days": data_age_days,
+        "data_available": True,
         "is_demo": prov_meta["is_demo"],
+        "source_type": "empirical_pipeline",
         "db_fallback": db_fallback,
         "notes": notes,
         "served_model": "LightGBM-v2.1",
@@ -606,7 +630,7 @@ class DecisionLogPayload(BaseModel):
     quantity: float
     unit: str
     rationale: str
-    model_version: Optional[str] = "LightGBM-v2.1+HiGHS-LP"
+    model_version: Optional[str] = None
     data_version: Optional[str] = "CBSL-HARTI-DOA-2024.12"
     assumptions: Optional[Dict[str, Any]] = None
     notes: Optional[str] = None
@@ -704,12 +728,12 @@ def retrigger_pipeline(payload: ReTriggerPayload):
     return asdict(result)
 
 
-@app.get("/api/confidence/badge")
+# Handled via officer_router (@router.get("/api/confidence/badge"))
 def get_confidence_badge(
-    crop_id: str = Query("big_onion"),
-    data_age_days: int = Query(15),
-    area_reported_share: float = Query(0.35),
-    soil_ph_available: bool = Query(True),
+    crop_id: str = "big_onion",
+    data_age_days: int = 15,
+    area_reported_share: float = 0.35,
+    soil_ph_available: bool = True,
 ):
     """
     Item 8: Multi-factor confidence badge evaluation using the 5 operational rules.
@@ -730,10 +754,14 @@ def get_confidence_badge(
         soil_ph_available=soil_ph_available,
     )
     from dataclasses import asdict
-    return asdict(eval_res)
+    res = asdict(eval_res)
+    res["data_available"] = True
+    res["is_demo"] = False
+    res["source_type"] = "confidence_rules_engine"
+    return res
 
 
-@app.post("/api/history/log-action")
+@app.post("/api/history/log-action", dependencies=[Depends(require_officer)])
 def log_officer_action(payload: DecisionLogPayload):
     """
     Item 8: Save officer action with model version, data version, and assumptions snapshot.
@@ -753,7 +781,7 @@ def log_officer_action(payload: DecisionLogPayload):
         quantity=payload.quantity,
         unit=payload.unit,
         rationale=payload.rationale,
-        model_version=payload.model_version or "LightGBM-v2.1+HiGHS-LP",
+        model_version=payload.model_version,
         data_version=payload.data_version or "CBSL-HARTI-DOA-2024.12",
         assumptions=assump,
     )
@@ -837,13 +865,16 @@ class HarvestReportPayload(BaseModel):
     notes: Optional[str] = None
 
 
-@app.post("/api/database/init")
+@app.post("/api/database/init", dependencies=[Depends(require_admin)])
 def initialize_database():
     """Explicitly initializes or verifies PostgreSQL database tables."""
     init_db()
     return {
         "status": "INITIALIZED",
         "dialect": get_active_dialect(),
+        "data_available": True,
+        "is_demo": False,
+        "source_type": "database_admin",
         "tables": [
             "runs",
             "decision_history",
@@ -966,12 +997,6 @@ class LoginPayload(BaseModel):
     username: str
     password: str
     role: Optional[str] = "officer"
-
-
-class AlertAckPayload(BaseModel):
-    user_id: str = "USR-OFFICER-01"
-    ask_officer: bool = False
-    officer_note: Optional[str] = None
 
 
 @app.get("/api/forecasts/gap-timeline")
@@ -1177,10 +1202,33 @@ from govisense.api.routes.data import (
 )
 from govisense.api.routes.alerts import (
     get_alerts as list_alerts,
-    acknowledge_alert,
-    ask_officer_inquiry as ask_officer_on_alert,
+    acknowledge_alert as _route_acknowledge_alert,
+    ask_officer_question as _route_ask_officer_question,
     add_officer_note,
 )
+
+
+def acknowledge_alert(
+    alert_id: str,
+    req: Optional[Any] = None,
+    payload: Optional[Any] = None,
+) -> Dict[str, Any]:
+    """Compatibility wrapper accepting either `req=` or `payload=` for direct Python callers."""
+    return _route_acknowledge_alert(alert_id=alert_id, req=payload or req)
+
+
+def ask_officer_inquiry(
+    alert_id: str,
+    req: Any,
+    db: Optional[Any] = None,
+    current_user: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Compatibility wrapper preserving legacy `INQUIRY_SENT` status for direct Python callers."""
+    res = _route_ask_officer_question(alert_id=alert_id, req=req, db=db, current_user=current_user)
+    return {**res, "status": "INQUIRY_SENT"}
+
+
+ask_officer_on_alert = ask_officer_inquiry
 from govisense.api.routes.officer import (
     list_runs as list_pipeline_runs,
     get_run_detail as get_pipeline_run_by_id,
@@ -1196,12 +1244,6 @@ from govisense.api.routes.feedback import (
 from govisense.api.routes.farmer import (
     farmer_top3_recommendations as farmer_top3,
 )
-
-
-class AlertAckPayload(BaseModel):
-    user_id: str = "USR-001"
-    ask_officer: bool = False
-    officer_note: Optional[str] = None
 
 
 def fill_forecast_actuals(
@@ -1230,6 +1272,29 @@ def fill_forecast_actuals(
                 s.actual_production_mt = actual_production_mt
         session.commit()
         return len(snaps)
+
+
+@app.get("/api/market-prices", response_model=MarketPricesResponse, tags=["Prices"])
+@app.get("/api/prices", response_model=MarketPricesResponse, tags=["Prices"])
+def get_market_prices(category: Optional[str] = None):
+    """
+    Task 15 (P1): Returns latest benchmark wholesale and retail DEC market prices from CBSL & HARTI.
+    Supports filtering by category (e.g. vegetable, pulse, grain, tuber).
+    """
+    with get_db_session() as db:
+        query = db.query(MarketPriceRecord)
+        if category and category.lower() != "all":
+            query = query.filter(MarketPriceRecord.category == category.lower())
+        records = query.all()
+        prices_list = [MarketPriceItemResponse(**r.to_dict()) for r in records]
+        return MarketPricesResponse(
+            data_available=True,
+            is_demo=False,
+            source_type="cbsl_harti_market_bulletin",
+            total=len(prices_list),
+            prices=prices_list,
+        )
+
 
 
 

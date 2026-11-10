@@ -13,4 +13,13 @@ requires-python = ">=3.10"
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
 testpaths = ["tests"]
+norecursedirs = [".venv", "node_modules", "frontend", ".git", "build", "dist"]
 addopts = "-v --tb=short"
+
+[tool.pyrefly]
+search-path = [
+    "src",
+    ".venv/Lib/site-packages",
+    "C:/Users/hesha/AppData/Local/Programs/Python/Python313/Lib/site-packages",
+]
+

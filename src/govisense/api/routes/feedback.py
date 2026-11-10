@@ -14,14 +14,14 @@ import uuid
 from datetime import datetime, timezone, date
 from typing import Optional, List, Dict, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from govisense.api.deps import rate_limiter, get_db
+from govisense.api.deps import rate_limiter, get_db, require_officer
 from govisense.config import settings
-from govisense.db.session import get_session
+from govisense.db.session import get_session, sqlite_write_lock
 from govisense.db.models import (
     PlantingReportModel,
     HarvestReportModel,
@@ -116,7 +116,7 @@ def validate_pseudonymous_id(pid: str) -> bool:
 
 
 @router.post("/api/feedback/planting-report", dependencies=[Depends(rate_limiter)])
-def submit_planting_report(payload: Any, db: Any = Depends(get_db)):
+def submit_planting_report(payload: Dict[str, Any] = Body(...), db: Any = Depends(get_db)):
     """
     Stage 1: Submit actual or planned planting report.
     Validates consent, pseudonymous ID format, bounds, duplicates, and season format.
@@ -126,7 +126,10 @@ def submit_planting_report(payload: Any, db: Any = Depends(get_db)):
         db = get_session()
 
     if isinstance(payload, dict):
-        payload = PlantingReportPayload(**payload)
+        try:
+            payload = PlantingReportPayload(**payload)
+        except ValidationError as ve:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=ve.errors())
 
     # 1. Consent required
     if not getattr(payload, "consent_given", False):
@@ -149,21 +152,40 @@ def submit_planting_report(payload: Any, db: Any = Depends(get_db)):
             detail=f"Unsupported crop: '{payload.crop_id}'. Allowed: {list(settings.crops.keys())}.",
         )
 
-    # 4. Check for duplicates (same farmer, crop, season)
-    existing = (
-        db.query(PlantingReportModel)
-        .filter(
-            PlantingReportModel.pseudonymous_id == payload.pseudonymous_id,
-            PlantingReportModel.crop_id == payload.crop_id,
-            PlantingReportModel.season == payload.season,
-        )
-        .first()
-    )
+    planned_ha = getattr(payload, "planned_area_ha", 1.0)
+    actual_ha = getattr(payload, "actual_area_ha", None)
+    if actual_ha is None:
+        actual_ha = planned_ha
+
+    # 4. Enforce farmer rate limiting and duplicate-report checks (Task 12 & Task 18)
+    existing_dup_id: Optional[str] = None
+    try:
+        with sqlite_write_lock:
+            report_store.check_rate_limit(payload.pseudonymous_id)
+            existing_dup = (
+                db.query(PlantingReportModel)
+                .filter(
+                    PlantingReportModel.pseudonymous_id == payload.pseudonymous_id,
+                    PlantingReportModel.crop_id == payload.crop_id,
+                    PlantingReportModel.season == payload.season,
+                    PlantingReportModel.actual_area_ha == actual_ha,
+                )
+                .first()
+            )
+            if existing_dup:
+                existing_dup_id = existing_dup.report_id
+                raise ValueError(
+                    f"Duplicate planting report detected for farmer '{payload.pseudonymous_id}', "
+                    f"crop '{payload.crop_id}', season '{payload.season}', area {actual_ha} ha."
+                )
+    except ValueError as err:
+        resp_err: Dict[str, Any] = {"status": "ERROR", "message": str(err)}
+        if existing_dup_id:
+            resp_err["report_id"] = existing_dup_id
+        return resp_err
 
     flags = []
     # Anomaly flags
-    planned_ha = getattr(payload, "planned_area_ha", 1.0)
-    actual_ha = getattr(payload, "actual_area_ha", None) or planned_ha
     if planned_ha > 20.0 or actual_ha > 20.0:
         flags.append("FLAG_LARGE_HOLDING")
 
@@ -198,49 +220,34 @@ def submit_planting_report(payload: Any, db: Any = Depends(get_db)):
     rec_crop_shown = getattr(payload, "recommended_crop_shown", None)
     notes = getattr(payload, "notes", None)
 
-    if existing:
-        # Update existing report rather than duplicate
-        existing.planned_area_ha = planned_ha
-        existing.actual_area_ha = actual_ha
-        existing.district = district
-        existing.irrigation_type = irr_type
-        existing.soil_ph = soil_ph
-        existing.planting_date = p_date or existing.planting_date
-        existing.expected_harvest_date = eh_date or existing.expected_harvest_date
-        existing.expected_price_rs_kg = exp_price
-        existing.reason = reason
-        existing.followed_recommendation = followed_rec
-        existing.flags = list(set((existing.flags or []) + flags + ["FLAG_UPDATED_REPORT"]))
-        existing.timestamp = now
-        report_id = existing.report_id
-        db.commit()
-        status_code_msg = "ACCEPTED"
-    else:
-        report_id = f"REP-{uuid.uuid4().hex[:8].upper()}"
-        report_model = PlantingReportModel(
-            report_id=report_id,
-            pseudonymous_id=payload.pseudonymous_id,
-            crop_id=payload.crop_id,
-            season=payload.season,
-            planned_area_ha=planned_ha,
-            actual_area_ha=actual_ha,
-            district=district,
-            irrigation_type=irr_type,
-            soil_ph=soil_ph,
-            planting_date=p_date,
-            expected_harvest_date=eh_date,
-            recommended_crop_shown=rec_crop_shown,
-            followed_recommendation=followed_rec,
-            reason=reason,
-            expected_price_rs_kg=exp_price,
-            consent_given=getattr(payload, "consent_given", True),
-            flags=flags,
-            notes=notes,
-            timestamp=now,
-        )
-        db.add(report_model)
-        db.commit()
-        status_code_msg = "ACCEPTED"
+    report_id = f"REP-{uuid.uuid4().hex[:8].upper()}"
+    report_model = PlantingReportModel(
+        report_id=report_id,
+        pseudonymous_id=payload.pseudonymous_id,
+        crop_id=payload.crop_id,
+        season=payload.season,
+        planned_area_ha=planned_ha,
+        actual_area_ha=actual_ha,
+        district=district,
+        irrigation_type=irr_type,
+        soil_ph=soil_ph,
+        planting_date=p_date,
+        expected_harvest_date=eh_date,
+        recommended_crop_shown=rec_crop_shown,
+        followed_recommendation=followed_rec,
+        reason=reason,
+        expected_price_rs_kg=exp_price,
+        harvest_outcome_mt=getattr(payload, "harvest_outcome_mt", None),
+        sale_price_rs_kg=getattr(payload, "sale_price_rs_kg", None),
+        sale_channel=getattr(payload, "sale_channel", None),
+        consent_given=getattr(payload, "consent_given", True),
+        flags=flags,
+        notes=notes,
+        timestamp=now,
+    )
+    db.add(report_model)
+    db.commit()
+    status_code_msg = "ACCEPTED"
 
     # Retrigger pipeline with new run_id
     new_run_id = f"RUN-{uuid.uuid4().hex[:8].upper()}"
@@ -285,7 +292,7 @@ def submit_planting_report(payload: Any, db: Any = Depends(get_db)):
 
 
 @router.post("/api/feedback/harvest-report", dependencies=[Depends(rate_limiter)])
-def submit_harvest_report(payload: Any, db: Any = Depends(get_db)):
+def submit_harvest_report(payload: Dict[str, Any] = Body(...), db: Any = Depends(get_db)):
     """
     Stage 2: Post-Harvest outcome report.
     Validates sold + lost + stored <= harvest check constraint,
@@ -295,7 +302,10 @@ def submit_harvest_report(payload: Any, db: Any = Depends(get_db)):
         db = get_session()
 
     if isinstance(payload, dict):
-        payload = HarvestReportPayload(**payload)
+        try:
+            payload = HarvestReportPayload(**payload)
+        except ValidationError as ve:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=ve.errors())
     disposed = payload.loss_kg + payload.quantity_sold_kg + payload.quantity_stored_kg
     if payload.harvest_quantity_kg > 0 and disposed > (payload.harvest_quantity_kg * 1.01):
         raise HTTPException(
@@ -400,20 +410,25 @@ def get_planting_reports(
     return [r.to_dict() for r in rows]
 
 
-@router.post("/api/feedback/retrigger")
-def retrigger_pipeline(payload: ReTriggerPayload, db: Any = Depends(get_db)):
+@router.post("/api/feedback/retrigger", dependencies=[Depends(require_officer)])
+def retrigger_pipeline(payload: Dict[str, Any] = Body(...), db: Any = Depends(get_db)):
     """
     Re-trigger SPI and Target Area Calculator (A_rec) using actual reported planting extent.
     Refits A1, A2 and A3 inputs, creates a new run_id and snapshot, and returns retrained: true.
     """
     if not isinstance(db, Session):
         db = get_session()
+    if isinstance(payload, dict):
+        try:
+            payload = ReTriggerPayload(**payload)
+        except ValidationError as ve:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=ve.errors())
 
     result = report_store.retrigger_crop(
         crop_id=payload.crop_id,
         season=payload.season,
-        target_month=payload.target_month,
-        suitable_land_ha=payload.suitable_land_ha,
+        target_month=getattr(payload, "target_month", None) or 4,
+        suitable_land_ha=getattr(payload, "suitable_land_ha", None),
     )
 
     d_ver = compute_data_version()
@@ -474,6 +489,9 @@ def retrigger_pipeline(payload: ReTriggerPayload, db: Any = Depends(get_db)):
         "season": payload.season,
         **res_dict,
         "retrigger": res_dict,
+        "data_available": True,
+        "is_demo": False,
+        "source_type": "retrigger_engine",
         "refit_inputs": {
             "reported_area_ha": result.total_reported_ha,
             "effective_supply_mt": eff_supply,
@@ -520,7 +538,7 @@ def list_ground_reports(
             "message": "Reporting cohort has fewer than 5 submissions. Individual records are suppressed to guarantee farmer anonymity.",
         }
 
-    rows = q.order_by(PlantingReportModel.timestamp.desc()).limit(limit).all()
+    rows = q.order_by(PlantingReportModel.timestamp.desc()).limit(eff_limit).all()
 
     formatted = []
     for r in rows:

@@ -188,7 +188,6 @@ def login_user(payload: LoginPayload):
     }
 
 
-@router.post("/api/auth/login", response_model=LoginResponse)
 @router.post("/auth/login", response_model=LoginResponse)
 def login(req: LoginRequest):
     """
@@ -256,7 +255,6 @@ def login(req: LoginRequest):
         )
 
 
-@router.get("/api/auth/me")
 @router.get("/auth/me")
 def get_current_user(authorization: Optional[str] = Header(None)):
     """Return profile for the currently authenticated bearer token."""

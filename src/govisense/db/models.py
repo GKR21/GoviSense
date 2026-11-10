@@ -145,6 +145,9 @@ class DecisionRecordModel(Base):
     model_version = Column(String(100), nullable=False)
     data_version = Column(String(100), nullable=False, default="CBSL-HARTI-DOA-2024.12")
     assumptions = Column(JSON, nullable=False, default=dict)
+    is_demo = Column(Boolean, nullable=False, default=False)
+    data_available = Column(Boolean, nullable=False, default=True)
+    source_type = Column(String(64), nullable=False, default="officer_audit_log")
     timestamp = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
 
     # Relationships
@@ -152,6 +155,9 @@ class DecisionRecordModel(Base):
     officer = relationship("OfficerModel", back_populates="decisions")
 
     def __init__(self, **kwargs):
+        passed_hash = kwargs.pop("hash", None)
+        if passed_hash and not kwargs.get("record_hash"):
+            kwargs["record_hash"] = passed_hash
         super().__init__(**kwargs)
         if not self.record_hash:
             payload = {
@@ -166,11 +172,20 @@ class DecisionRecordModel(Base):
             }
             self.record_hash = compute_sha256_hash(payload)
 
+    @property
+    def hash(self) -> str:
+        return self.record_hash or ""
+
+    @hash.setter
+    def hash(self, value: str) -> None:
+        self.record_hash = value
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "decision_id": self.decision_id,
             "run_id": self.run_id,
             "record_hash": self.record_hash,
+            "hash": self.record_hash,
             "crop_id": self.crop_id,
             "season": self.season,
             "officer_id": self.officer_id,
@@ -183,6 +198,9 @@ class DecisionRecordModel(Base):
             "model_version": self.model_version,
             "data_version": self.data_version,
             "assumptions": self.assumptions or {},
+            "is_demo": bool(self.is_demo) if self.is_demo is not None else False,
+            "data_available": bool(self.data_available) if self.data_available is not None else True,
+            "source_type": self.source_type or "officer_audit_log",
             "timestamp": self.timestamp.isoformat() if hasattr(self.timestamp, "isoformat") else str(self.timestamp),
         }
 
@@ -271,12 +289,19 @@ class UserModel(Base):
     __tablename__ = "users"
 
     user_id = Column(String(36), primary_key=True, default=lambda: f"USR-{uuid.uuid4().hex[:8].upper()}")
-    username = Column(String(50), unique=True, nullable=False, index=True)
+    id = Column(Integer, nullable=True)
+    username = Column(String(100), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
-    role = Column(String(20), nullable=False)  # officer, farmer, admin
+    hashed_password = Column(String(255), nullable=True)
+    role = Column(String(20), nullable=False, default="farmer")  # officer, farmer, admin
+    full_name = Column(String(128), nullable=True)
+    phone_number = Column(String(32), nullable=True)
+    district = Column(String(64), nullable=True, default="Anuradhapura")
+    is_active = Column(Boolean, default=True, nullable=False)
     pseudonymous_id = Column(String(50), ForeignKey("farmer_profiles.pseudonymous_id"), nullable=True)
     officer_id = Column(String(50), ForeignKey("officers.officer_id"), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), nullable=True, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     last_login = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
@@ -284,11 +309,27 @@ class UserModel(Base):
     officer_profile = relationship("OfficerModel", back_populates="user")
     alert_statuses = relationship("AlertStatusModel", back_populates="user", cascade="all, delete-orphan")
 
+    def __init__(self, **kwargs):
+        if "hashed_password" in kwargs and "password_hash" not in kwargs:
+            kwargs["password_hash"] = kwargs["hashed_password"]
+        elif "password_hash" in kwargs and "hashed_password" not in kwargs:
+            kwargs["hashed_password"] = kwargs["password_hash"]
+        if not kwargs.get("user_id"):
+            kwargs["user_id"] = f"USR-{uuid.uuid4().hex[:8].upper()}"
+        if kwargs.get("id") is None:
+            kwargs["id"] = int(uuid.uuid4().int % 2_000_000_000) or 1
+        super().__init__(**kwargs)
+
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "id": self.id,
             "user_id": self.user_id,
             "username": self.username,
             "role": self.role,
+            "full_name": self.full_name,
+            "phone_number": self.phone_number,
+            "district": self.district,
+            "is_active": bool(self.is_active) if self.is_active is not None else True,
             "pseudonymous_id": self.pseudonymous_id,
             "officer_id": self.officer_id,
             "created_at": self.created_at.isoformat() if hasattr(self.created_at, "isoformat") else str(self.created_at),
@@ -330,6 +371,9 @@ class PlantingReportModel(Base):
     expected_price_rs_kg = Column(Float, nullable=True)
     
     # Governance & Metadata
+    harvest_outcome_mt = Column(Float, nullable=True)
+    sale_price_rs_kg = Column(Float, nullable=True)
+    sale_channel = Column(String(64), nullable=True)
     consent_given = Column(Boolean, nullable=False, default=True)
     app_version = Column(String(20), nullable=False, default="1.0.0")
     language = Column(String(10), nullable=False, default="si")
@@ -339,7 +383,6 @@ class PlantingReportModel(Base):
     timestamp = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
 
     __table_args__ = (
-        UniqueConstraint("pseudonymous_id", "crop_id", "season", name="uq_farmer_crop_season"),
         Index("idx_reports_crop_season", "crop_id", "season"),
     )
 
@@ -355,6 +398,9 @@ class PlantingReportModel(Base):
             "season": self.season,
             "planned_area_ha": float(self.planned_area_ha),
             "actual_area_ha": float(self.actual_area_ha) if self.actual_area_ha is not None else None,
+            "harvest_outcome_mt": float(self.harvest_outcome_mt) if self.harvest_outcome_mt is not None else None,
+            "sale_price_rs_kg": float(self.sale_price_rs_kg) if self.sale_price_rs_kg is not None else None,
+            "sale_channel": self.sale_channel,
             "district": self.district,
             "irrigation_type": self.irrigation_type,
             "soil_ph": float(self.soil_ph) if self.soil_ph is not None else None,
@@ -666,10 +712,18 @@ class AlertModel(Base):
     district = Column(String(50), nullable=False, default="Anuradhapura")
     season = Column(String(50), nullable=True)
     month = Column(String(10), nullable=True)
-    type = Column(String(30), nullable=False)  # GLUT_WARNING, SHORTAGE_RISK, IMPORT_WINDOW_CLOSING
+    type = Column(String(30), nullable=True)  # GLUT_WARNING, SHORTAGE_RISK, IMPORT_WINDOW_CLOSING
     severity = Column(String(20), nullable=False, default="warning")  # info, warning, critical
-    message_key = Column(String(100), nullable=False)
+    message_key = Column(String(100), nullable=True)
     params = Column(JSON, nullable=True, default=dict)
+    title_en = Column(String(255), nullable=True)
+    title_si = Column(String(255), nullable=True)
+    title_ta = Column(String(255), nullable=True)
+    message_en = Column(Text, nullable=True)
+    message_si = Column(Text, nullable=True)
+    message_ta = Column(Text, nullable=True)
+    target_role = Column(String(32), nullable=True, default="all")
+    status = Column(String(32), nullable=True, default="active")
     run_id = Column(String(36), ForeignKey("runs.run_id"), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
 
@@ -677,15 +731,27 @@ class AlertModel(Base):
     run = relationship("PipelineRunModel", back_populates="alerts")
     statuses = relationship("AlertStatusModel", back_populates="alert", cascade="all, delete-orphan")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self, lang: str = "en") -> Dict[str, Any]:
+        eff_title = getattr(self, f"title_{lang}", None) or self.title_en or self.type or "Alert"
+        eff_msg = getattr(self, f"message_{lang}", None) or self.message_en or ""
         return {
             "alert_id": self.alert_id,
             "crop_id": self.crop_id,
             "district": self.district,
             "season": self.season,
             "month": self.month,
-            "type": self.type,
+            "type": self.type or "MARKET_ALERT",
             "severity": self.severity,
+            "title": eff_title,
+            "message": eff_msg,
+            "title_en": self.title_en or "",
+            "title_si": self.title_si,
+            "title_ta": self.title_ta,
+            "message_en": self.message_en or "",
+            "message_si": self.message_si,
+            "message_ta": self.message_ta,
+            "target_role": self.target_role or "all",
+            "status": self.status or "active",
             "message_key": self.message_key,
             "params": self.params or {},
             "run_id": self.run_id,
@@ -702,11 +768,17 @@ class AlertStatusModel(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     alert_id = Column(String(36), ForeignKey("alerts.alert_id"), nullable=False, index=True)
-    user_id = Column(String(36), ForeignKey("users.user_id"), nullable=False, index=True)
+    user_id = Column(String(36), ForeignKey("users.user_id"), nullable=True, index=True)
+    farmer_id = Column(String(64), nullable=True, index=True)
+    acknowledged = Column(Boolean, nullable=False, default=False)
     read_at = Column(DateTime(timezone=True), nullable=True)
     acknowledged_at = Column(DateTime(timezone=True), nullable=True)
     ask_officer = Column(Boolean, nullable=False, default=False)
+    question = Column(Text, nullable=True)
+    officer_response = Column(Text, nullable=True)
     officer_note = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=True, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     alert = relationship("AlertModel", back_populates="statuses")
@@ -717,9 +789,12 @@ class AlertStatusModel(Base):
             "id": self.id,
             "alert_id": self.alert_id,
             "user_id": self.user_id,
+            "farmer_id": self.farmer_id,
+            "acknowledged": bool(self.acknowledged or self.acknowledged_at is not None),
             "read_at": self.read_at.isoformat() if self.read_at else None,
             "acknowledged_at": self.acknowledged_at.isoformat() if self.acknowledged_at else None,
             "ask_officer": bool(self.ask_officer),
+            "question": self.question,
             "officer_note": self.officer_note,
         }
 
@@ -766,4 +841,80 @@ class EvaluationResultModel(Base):
             "details": self.details or {},
             "created_at": self.created_at.isoformat() if hasattr(self.created_at, "isoformat") else str(self.created_at),
         }
+
+
+class MarketPriceRecord(Base):
+    """Market wholesale and retail price records."""
+    __tablename__ = "market_prices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    crop_id = Column(String(64), index=True, nullable=False)
+    crop_name = Column(String(128), nullable=False)
+    crop_en = Column(String(128), nullable=True)
+    crop_si = Column(String(128), nullable=True)
+    crop_ta = Column(String(128), nullable=True)
+    category = Column(String(64), default="vegetable", nullable=False)
+    market_center = Column(String(128), index=True, nullable=False)
+    economic_center_en = Column(String(128), nullable=True)
+    economic_center_si = Column(String(128), nullable=True)
+    economic_center_ta = Column(String(128), nullable=True)
+    wholesale_price = Column(Float, nullable=True)
+    retail_price = Column(Float, nullable=True)
+    wholesale_price_display = Column(String(64), nullable=True)
+    retail_price_display = Column(String(64), nullable=True)
+    trend_pct = Column(String(64), default="±0% (Stable)", nullable=False)
+    is_up = Column(Boolean, default=False, nullable=False)
+    is_stable = Column(Boolean, default=True, nullable=False)
+    price_date = Column(String(32), index=True, nullable=False)
+    source = Column(String(64), default="HARTI/CBSL", nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    __table_args__ = (
+        Index("idx_price_crop_date", "crop_id", "price_date"),
+    )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "crop_id": self.crop_id,
+            "crop_name": self.crop_name,
+            "crop_en": self.crop_en or self.crop_name,
+            "crop_si": self.crop_si or self.crop_name,
+            "crop_ta": self.crop_ta or self.crop_name,
+            "category": self.category or "vegetable",
+            "market_center": self.market_center,
+            "economic_center_en": self.economic_center_en or self.market_center,
+            "economic_center_si": self.economic_center_si or self.market_center,
+            "economic_center_ta": self.economic_center_ta or self.market_center,
+            "wholesale_price": self.wholesale_price_display or f"Rs {int(self.wholesale_price or 0)} / kg",
+            "retail_price": self.retail_price_display or f"Rs {int(self.retail_price or 0)} / kg",
+            "wholesale_val": self.wholesale_price,
+            "retail_val": self.retail_price,
+            "trend_pct": self.trend_pct or "±0% (Stable)",
+            "is_up": bool(self.is_up),
+            "is_stable": bool(self.is_stable),
+            "price_date": self.price_date,
+            "source": self.source,
+        }
+
+
+# Backward compatibility aliases
+User = UserModel
+Officer = OfficerModel
+FarmerProfile = FarmerProfileModel
+PlantingReport = PlantingReportModel
+PlantingReportRecord = PlantingReportModel
+HarvestReport = HarvestReportModel
+PipelineRun = PipelineRunModel
+ForecastSnapshot = ForecastSnapshotModel
+DecisionRecord = DecisionRecordModel
+DecisionHistoryRecord = DecisionRecordModel
+MonthlyData = MonthlyDataModel
+DataCatalogue = DataCatalogueModel
+Alert = AlertModel
+AlertInteraction = AlertStatusModel
+AlertStatus = AlertStatusModel
+EvaluationResult = EvaluationResultModel
+
+
 

@@ -1,12 +1,13 @@
 """
 Feedback Loop Module (WP7 / Item 7)
-Team DARKBITE · ModelX 2.0 Phase 1
+Team DARKBITE · ModelX 2.0 Phase 2
 Pilot: Anuradhapura (Big Onion, Chilli)
 
 Enables farmers and ground agricultural officers to submit actual planting reports.
+Database-backed (SQLite with WAL or PostgreSQL) with concurrent-write safety.
 On report ingestion:
   1. Validates farmer consent and pseudonymous ID.
-  2. Replaces planned / estimated area with farmer-reported area.
+  2. Records report with ACID transaction and thread safety.
   3. Re-triggers SPI and Target Area Calculator (A_rec).
 """
 
@@ -23,7 +24,7 @@ from typing import Dict, Any, List, Optional
 logger = logging.getLogger("govisense.feedback")
 
 from govisense.config import PROCESSED_DATA_DIR, settings
-from govisense.db.session import get_session, init_db
+from govisense.db.session import get_session, get_db_session, sqlite_write_lock, init_db
 from govisense.db.models import PlantingReportModel
 from govisense.models.target_area import TargetAreaCalculator, TargetAreaResult
 from govisense.models.a3_supply_pressure import SupplyPressureEngine, SPIResult
@@ -73,6 +74,14 @@ class ReTriggerResult:
     action_summary: str
 
 
+REGISTRY_VERIFICATION_NOTE = (
+    "NOTE: Live national farmer registry verification with the Department of Agrarian Development "
+    "(DAD) / Agrarian Services Department is documented as future work for Phase 3. "
+    "Current pilot verification relies on pseudonymous ID consistency, local sliding-window rate limiting, "
+    "and duplicate report rejection."
+)
+
+
 class PlantingReportStore:
     """
     Persistent storage for planting reports in PostgreSQL (or SQLite fallback),
@@ -82,13 +91,70 @@ class PlantingReportStore:
     def __init__(self, storage_path: Optional[Path] = None, sync_db: Optional[bool] = None):
         self.storage_path = storage_path or _DEFAULT_STORE_PATH
         self.sync_db = sync_db if sync_db is not None else (storage_path is None)
+        self._use_db = self.sync_db
         self._reports: List[PlantingReport] = []
+        self._rate_limits: Dict[str, List[float]] = {}
         if self.sync_db:
             try:
                 init_db()
             except Exception:
                 pass
         self._load()
+
+    def check_rate_limit(
+        self,
+        pseudonymous_id: str,
+        max_requests: int = 5,
+        window_seconds: float = 60.0,
+    ) -> None:
+        """
+        Enforces local sliding-window rate limiting per farmer ID (Task 12).
+        Raises ValueError if farmer exceeds max_requests within window_seconds.
+        """
+        now = datetime.now(timezone.utc).timestamp()
+        timestamps = self._rate_limits.setdefault(pseudonymous_id, [])
+        valid_timestamps = [t for t in timestamps if now - t < window_seconds]
+        if len(valid_timestamps) >= max_requests:
+            self._rate_limits[pseudonymous_id] = valid_timestamps
+            raise ValueError(
+                f"Rate limit exceeded: farmer '{pseudonymous_id}' exceeded {max_requests} submissions per minute."
+            )
+        valid_timestamps.append(now)
+        self._rate_limits[pseudonymous_id] = valid_timestamps
+
+    def check_duplicate(self, report: PlantingReport) -> None:
+        """
+        Rejects duplicate planting reports for the same farmer, crop, season, and area (Task 12).
+        """
+        if self.sync_db:
+            with get_db_session() as db:
+                existing = (
+                    db.query(PlantingReportModel)
+                    .filter(
+                        PlantingReportModel.pseudonymous_id == report.pseudonymous_id,
+                        PlantingReportModel.crop_id == report.crop_id,
+                        PlantingReportModel.season == report.season,
+                        PlantingReportModel.actual_area_ha == report.actual_area_ha,
+                    )
+                    .first()
+                )
+                if existing:
+                    raise ValueError(
+                        f"Duplicate planting report detected for farmer '{report.pseudonymous_id}', "
+                        f"crop '{report.crop_id}', season '{report.season}', area {report.actual_area_ha} ha."
+                    )
+        else:
+            for existing in self._reports:
+                if (
+                    existing.pseudonymous_id == report.pseudonymous_id
+                    and existing.crop_id == report.crop_id
+                    and existing.season == report.season
+                    and existing.actual_area_ha == report.actual_area_ha
+                ):
+                    raise ValueError(
+                        f"Duplicate planting report detected for farmer '{report.pseudonymous_id}', "
+                        f"crop '{report.crop_id}', season '{report.season}', area {report.actual_area_ha} ha."
+                    )
 
     def _load(self) -> None:
         # 1. Try loading from PostgreSQL database if sync_db is enabled
@@ -173,8 +239,10 @@ class PlantingReportStore:
 
     def submit_report(self, report: PlantingReport) -> Dict[str, Any]:
         """
-        Validates and records a planting report.
+        Validates and records a planting report with concurrent-write safety.
         Strict privacy rule: consent must be explicitly given.
+        Enforces farmer ID rate limiting and duplicate-report detection (Task 12).
+        Note: Verification against the DAD national registry is slated as future work.
         """
         if not report.consent_given:
             raise ValueError(
@@ -182,16 +250,18 @@ class PlantingReportStore:
             )
         if report.actual_area_ha < 0 or report.planned_area_ha < 0:
             raise ValueError("Planted areas cannot be negative.")
-        if not report.pseudonymous_id.strip():
+        if not report.pseudonymous_id or not report.pseudonymous_id.strip():
             raise ValueError("A pseudonymous ID is required for auditability and privacy.")
 
-        self._reports.append(report)
-        self._save()
+        with sqlite_write_lock:
+            # 1. Rate limiting check (Task 12)
+            self.check_rate_limit(report.pseudonymous_id)
 
-        # Persist to PostgreSQL database
-        if self.sync_db:
-            try:
-                with get_session() as session:
+            # 2. Duplicate report check (Task 12)
+            self.check_duplicate(report)
+
+            if self.sync_db:
+                with get_db_session() as db:
                     ts = None
                     if report.timestamp:
                         try:
@@ -214,10 +284,11 @@ class PlantingReportStore:
                         notes=report.notes,
                         timestamp=ts,
                     )
-                    session.merge(model)
-                    session.commit()
-            except Exception:
-                pass
+                    db.merge(model)
+                    db.commit()
+            else:
+                self._reports.append(report)
+                self._save()
 
         total_actual = self.get_total_reported_area(report.crop_id, report.season)
         return {
@@ -228,6 +299,10 @@ class PlantingReportStore:
             "actual_area_ha": report.actual_area_ha,
             "cumulative_reported_ha": total_actual,
             "timestamp": report.timestamp,
+            "registry_verification_note": REGISTRY_VERIFICATION_NOTE,
+            "data_available": True,
+            "is_demo": False,
+            "source_type": "farmer_field_report",
         }
 
     def get_reports(
@@ -296,12 +371,15 @@ class PlantingReportStore:
         """
         Replaces planned area with reported area and recalculates SPI + A_rec.
         """
+        from govisense.models.target_area import TargetAreaCalculator
+        from govisense.models.a3_supply_pressure import SupplyPressureEngine
+        from govisense.models.demand_estimator import DemandEstimator
+        from govisense.data.crop_requirements import get_crop_requirements
+
         demand_est = DemandEstimator()
         dem_res = demand_est.estimate(crop_id, target_month)
-        # Seasonal demand (e.g. 4 months duration)
         season_demand = dem_res.demand_mt * 4.0
 
-        # Crop parameters
         reqs = get_crop_requirements()
         req = reqs.get(crop_id)
         yield_mid = req.yield_mid_mt_ha if req else 15.5
@@ -309,7 +387,6 @@ class PlantingReportStore:
 
         target_calc = TargetAreaCalculator()
 
-        # Previous baseline (before reported acreage)
         prev_ta = target_calc.compute(
             crop=crop_id,
             season=season,
@@ -321,10 +398,8 @@ class PlantingReportStore:
             suitable_land_ha=suitable_land_ha,
         )
 
-        # Actual cumulative reported acreage
         total_reported = self.get_total_reported_area(crop_id, season)
 
-        # New target area with actual reported acreage
         new_ta = target_calc.compute(
             crop=crop_id,
             season=season,
@@ -336,19 +411,18 @@ class PlantingReportStore:
             suitable_land_ha=suitable_land_ha,
         )
 
-        # Supply Pressure Index before and after
         spi_engine = SupplyPressureEngine()
         prev_supply = prev_ta.a_target_ha * yield_mid * (1.0 - loss_pct)
         new_supply = total_reported * yield_mid * (1.0 - loss_pct)
 
         prev_spi = spi_engine.compute_spi(
             crop=crop_id,
-            forecast_supply_mt=prev_supply / 4.0,  # monthly rate
+            forecast_supply_mt=prev_supply / 4.0,
             month=target_month,
         )
         new_spi = spi_engine.compute_spi(
             crop=crop_id,
-            forecast_supply_mt=new_supply / 4.0,  # monthly rate
+            forecast_supply_mt=new_supply / 4.0,
             month=target_month,
         )
 
@@ -378,4 +452,3 @@ class PlantingReportStore:
             oversupply_stop_triggered=oversupply_stop,
             action_summary=summary,
         )
-

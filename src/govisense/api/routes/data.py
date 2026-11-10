@@ -34,7 +34,6 @@ logger = logging.getLogger("govisense.api.data")
 router = APIRouter(prefix="", tags=["Dashboard Data"])
 
 
-@router.get("/api/catalogue")
 def list_data_catalogue(db: Any = Depends(get_db)):
     """
     Dashboard Screen: Data Sources Page (Registry)
@@ -127,6 +126,7 @@ def get_sources_summary(db: Any = Depends(get_db)):
 
 
 @router.get("/api/adoption/summary")
+@router.get("/api/simulation/adoption-summary")
 def get_adoption_summary(
     crop_id: str = Query("big_onion"),
     season: str = Query("Maha 2025/2026"),
@@ -135,7 +135,7 @@ def get_adoption_summary(
     """
     Dashboard Screen: Adoption Tracker (Proposal 7.3 & 3.8)
     Strictly reads from database. If no reports submitted yet, returns explicit null / zero
-    with data_quality: 'no_data' (NO mock placeholders).
+    with data_quality: 'no_data' and data_available: False (NO mock placeholders).
     """
     if not isinstance(db, Session):
         db = get_session()
@@ -153,13 +153,23 @@ def get_adoption_summary(
     )
 
     target_area_ha = 2131.0 if eff_crop == "big_onion" else 1840.0
+    counts_null = {
+        "coordinated_adopters": None,
+        "partial_adopters": None,
+        "uncoordinated": None,
+    }
+    telemetry_msg = f"Real coordinated adoption telemetry is not available yet for {eff_crop} during {eff_season}."
 
     if not reports and not harvests:
         return {
             "crop_id": eff_crop,
             "season": eff_season,
             "district": "Anuradhapura",
+            "data_available": False,
+            "is_demo": False,
+            "source_type": "adoption_telemetry",
             "data_quality": "no_data",
+            "counts": counts_null,
             "acreage": {
                 "target_area_ha": target_area_ha,
                 "reported_planted_area_ha": 0.0,
@@ -187,7 +197,7 @@ def get_adoption_summary(
                 "error_wape": None,
             },
             "status": "NO_DATA",
-            "message": f"No ground reports submitted for {crop_id} during {season} yet.",
+            "message": telemetry_msg,
         }
 
     total_reported_ha = sum(r.actual_area_ha or r.planned_area_ha for r in reports)
@@ -212,7 +222,12 @@ def get_adoption_summary(
         "crop_id": eff_crop,
         "season": eff_season,
         "district": "Anuradhapura",
+        "data_available": False,
+        "is_demo": False,
+        "source_type": "adoption_telemetry",
         "data_quality": "verified",
+        "counts": counts_null,
+        "message": telemetry_msg,
         "acreage": {
             "target_area_ha": target_area_ha,
             "reported_planted_area_ha": round(total_reported_ha, 2),

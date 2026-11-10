@@ -108,7 +108,7 @@ class DataCatalogue:
         system_cols = {
             "year_month", "date", "year", "month", "district", "crop",
             "actual_spi", "spi_class", "is_interpolated", "data_source",
-            "is_simulation", "source", "source_type", "price_trading_days",
+            "is_simulation", "source", "source_type", "is_demo", "price_trading_days",
             "provenance_price", "provenance_area", "provenance_weather", "provenance_import",
             "prov_price", "prov_weather", "prov_area", "prov_yield", "prov_harvest",
             "prov_import", "prov_demand", "prov_spi"

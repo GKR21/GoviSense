@@ -57,7 +57,7 @@ class DecisionPayload(BaseModel):
     run_id: Optional[str] = None
 
 
-@router.post("/api/simulate")
+@router.post("/api/simulate", dependencies=[Depends(require_officer)])
 def simulate_scenario(req: SimulationRequest):
     """
     Officer What-If Sandbox: simulate custom acreage, yield, loss, and import scenarios.
@@ -127,7 +127,9 @@ def simulate_scenario(req: SimulationRequest):
         "data_version": d_ver,
         "model_version": m_ver,
         "data_quality": "real",
+        "data_available": True,
         "is_demo": False,
+        "source_type": "scenario_simulation",
         "served_model": "LightGBM + Baseline Selector",
         "assumptions_ref": "docs/assumptions.md",
     }
@@ -311,3 +313,23 @@ list_pipeline_runs = list_runs
 get_pipeline_run_detail = get_run_detail
 get_officer_decision_history = list_decisions
 save_decision_action = record_officer_decision
+
+
+@router.get("/api/confidence/badge")
+def get_confidence_badge(
+    crop_id: str = Query("big_onion"),
+    data_age_days: int = Query(15),
+    area_reported_share: float = Query(0.35),
+    soil_ph_available: bool = Query(True),
+):
+    """
+    Multi-factor confidence badge evaluation using the 5 operational rules.
+    """
+    from govisense.api import main as api_main
+    return api_main.get_confidence_badge(
+        crop_id=crop_id,
+        data_age_days=data_age_days,
+        area_reported_share=area_reported_share,
+        soil_ph_available=soil_ph_available,
+    )
+

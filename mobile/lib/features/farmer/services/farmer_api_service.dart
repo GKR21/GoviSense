@@ -4,6 +4,7 @@ import '../../../core/network/api_client.dart';
 import '../models/crop_item.dart';
 import '../models/farmer_profile.dart';
 import '../models/planting_report.dart';
+import '../models/market_price_item.dart';
 
 class FarmerApiService {
   FarmerApiService({ApiClient? apiClient}) : _client = apiClient ?? ApiClient();
@@ -64,6 +65,65 @@ class FarmerApiService {
       return response.statusCode == 200;
     } catch (e) {
       debugPrint('Planting report network submission: $e');
+      return false;
+    }
+  }
+
+  /// Fetches live wholesale & retail market price bulletin from FastAPI backend (/api/market-prices)
+  /// Falls back to null if unreachable, allowing UI to gracefully use calibrated offline data.
+  Future<List<MarketPriceItem>?> getMarketPrices({String? category}) async {
+    try {
+      final Map<String, dynamic> query = {};
+      if (category != null && category.isNotEmpty && category != 'all') {
+        query['category'] = category;
+      }
+      final response = await _client.get(
+        '/api/market-prices',
+        queryParameters: query.isNotEmpty ? query : null,
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data is String ? jsonDecode(response.data) : response.data;
+        final list = data['prices'] as List<dynamic>?;
+        if (list != null && list.isNotEmpty) {
+          return list
+              .map((item) => MarketPriceItem.fromJson(item as Map<String, dynamic>))
+              .toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('Market prices API connection fallback: $e');
+    }
+    return null;
+  }
+
+  /// Acknowledges an alert on behalf of the farmer (/api/alerts/{id}/acknowledge)
+  Future<bool> acknowledgeAlert(String alertId, String farmerId) async {
+    try {
+      final response = await _client.post(
+        '/api/alerts/$alertId/acknowledge',
+        data: {'farmer_id': farmerId},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Acknowledge alert API fallback: $e');
+      return false;
+    }
+  }
+
+  /// Sends farmer inquiry to the agricultural extension officer (/api/alerts/{id}/ask)
+  Future<bool> askOfficer(String alertId, String farmerId, String question) async {
+    try {
+      final response = await _client.post(
+        '/api/alerts/$alertId/ask',
+        data: {
+          'farmer_id': farmerId,
+          'question': question,
+        },
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Ask officer API fallback: $e');
       return false;
     }
   }

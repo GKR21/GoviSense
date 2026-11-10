@@ -1,15 +1,10 @@
-name: GoviSense CI Pipeline
+name: GoviSense CI
 
 on:
   push:
-    branches:
-      - main
-      - master
-      - "feature/**"
+    branches: [ "main", "master", "develop", "feature/**" ]
   pull_request:
-    branches:
-      - main
-      - master
+    branches: [ "main", "master", "develop" ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -17,14 +12,15 @@ concurrency:
 
 jobs:
   backend-test:
-    name: Backend Pytest (Python ${{ matrix.python-version }})
+    name: Backend CI (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11"]
+        python-version: ["3.11", "3.12", "3.13"]
+
     steps:
-      - name: Checkout repository
+      - name: Check out repository
         uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
@@ -36,38 +32,46 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libpq-dev
+          sudo apt-get install -y libpq-dev libgl1-mesa-glx ghostscript
 
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest httpx
+          pip install pytest pytest-cov ruff httpx
 
-      - name: Run Pytest test suite
+      - name: Lint and code format check with Ruff
         run: |
-          pytest -v --tb=short
+          ruff check src/ tests/
+
+      - name: Run Pytest test suite with coverage
+        run: |
+          python -m pytest --cov=src/govisense --cov-report=term-missing --cov-report=xml -v
+
+      - name: Verify data pipeline and integrity
+        run: |
+          python -m pytest tests/test_extract.py tests/test_task_18_comprehensive_quality.py -k "test_source_label_data_validation or test_hand_checked_sample_ground_truth_honesty"
 
   frontend-build:
-    name: Frontend Build & Typecheck (Node 20)
+    name: Frontend CI (Node.js 20)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
     steps:
-      - name: Checkout repository
+      - name: Check out repository
         uses: actions/checkout@v4
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: "20"
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install Frontend Dependencies
-        working-directory: frontend
-        run: |
-          npm ci || npm install
+      - name: Install frontend dependencies
+        run: npm ci || npm install
 
-      - name: Build Frontend Application
-        working-directory: frontend
-        run: |
-          npm run build
+      - name: TypeScript typecheck and build
+        run: npm run build

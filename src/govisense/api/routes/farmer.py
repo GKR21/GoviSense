@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 import numpy as np
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -57,7 +57,7 @@ class FarmerProfileCreateOrUpdate(BaseModel):
     language: str = "si"
 
 
-@router.get("/api/farmer/top3")
+@router.get("/api/farmer/top3", dependencies=[Depends(require_farmer)])
 def farmer_top3_recommendations(
     farmer_id: Optional[str] = Query(None),
     soil_ph: Optional[float] = Query(None),
@@ -79,7 +79,6 @@ def farmer_top3_recommendations(
     as_of: Optional[str] = Query(None),
     db: Any = Depends(get_db),
     current_user: Optional[Dict[str, Any]] = Depends(get_optional_current_user),
-    **kwargs: Any,
 ):
     """
     Farmer Advisor: Returns top 3 crop recommendations based on agronomic suitability,
@@ -293,6 +292,9 @@ def farmer_top3_recommendations(
             "stop_rule_triggered": is_target_full,
             "status": "PAUSED" if is_target_full else "APPROVED",
             "target_full_warning": target_full_warning,
+            "data_available": True,
+            "is_demo": False,
+            "source_type": "empirical_recommendation",
         })
 
     d_ver = compute_data_version()
@@ -306,6 +308,8 @@ def farmer_top3_recommendations(
         "model_version": m_ver,
         "data_quality": prov_meta["data_quality"],
         "is_demo": prov_meta["is_demo"],
+        "data_available": True,
+        "source_type": "empirical_recommendation",
         "db_fallback": prov_meta["db_fallback"],
         "served_model": "SuitabilityScorer-v1.4",
         "assumptions_ref": "docs/assumptions.md",
@@ -396,3 +400,12 @@ def upsert_farmer_profile(
 
 # Backwards compatibility aliases
 create_or_update_farmer_profile = upsert_farmer_profile
+farmer_top3 = farmer_top3_recommendations
+
+
+@router.post("/api/farmer/report")
+def submit_farmer_planting_report(payload: Dict[str, Any] = Body(...)):
+    """Convenience endpoint for farmers to submit seasonal planting reports."""
+    from govisense.api.main import submit_planting_report
+    return submit_planting_report(payload)
+

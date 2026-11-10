@@ -23,5 +23,67 @@
     "en": "Wholesale price forecast for {crop} in {month} indicates downward pressure below {floor_price} Rs/kg.",
     "si": "{month} මාසයේදී {crop} තොග මිල කිලෝවකට රු. {floor_price} ට වඩා අඩුවීමේ ප්‍රවණතාවක් පුරෝකථනය කර ඇත.",
     "ta": "{month} மாதத்தில் {crop} மொத்த விலை கிலோவுக்கு ரூ. {floor_price} இற்கும் குறையும் என கணிக்கப்பட்டுள்ளது."
-  }
+  },
+  "templates": [
+    {
+      "template_id": "ALT-001",
+      "crop_id": "big_onion",
+      "severity": "warning",
+      "target_role": "all",
+      "title_en": "High Supply Pressure Expected for Big Onion",
+      "title_si": "ලොකු ළූණු සඳහා ඉහළ සැපයුම් පීඩනයක් අපේක්ෂිතයි",
+      "title_ta": "பெரிய வெங்காயத்திற்கான அதிக விநியோக அழுத்தம் எதிர்பார்க்கப்படுகிறது",
+      "message_en": "Late season supply forecast indicates potential market glut. Consider storage retention or phased harvesting to maintain fair prices.",
+      "message_si": "පසු අස්වනු සැපයුම් පුරෝකථනය මඟින් වෙළඳපොළේ අතිරික්තයක් පෙන්වයි. සාධාරණ මිලක් ලබා ගැනීමට අස්වැන්න ගබඩා කිරීම හෝ අදියර වශයෙන් අස්වනු නෙළීම සලකා බලන්න.",
+      "message_ta": "பருவகால விநியோக முன்னறிவிப்பு சந்தையில் உபரியைக் காட்டுகிறது. நியாயமான விலையைப் பெற சேமிப்பு அல்லது கட்டம் கட்டமாக அறுவடை செய்வதைக் கவனியுங்கள்."
+    },
+    {
+      "template_id": "ALT-002",
+      "crop_id": "chilli",
+      "severity": "critical",
+      "target_role": "farmer",
+      "title_en": "Chilli Planting Window Closing Soon",
+      "title_si": "මිරිස් වගා කාල සීමාව ළඟදීම අවසන් වේ",
+      "title_ta": "மிளகாய் நடுகை கால அவகாசம் விரைவில் முடிகிறது",
+      "message_en": "Maha season planting deadline is approaching within 10 days. Ensure nursery beds are prepared and nursery planting is registered.",
+      "message_si": "මහ කන්නයේ වගා කිරීමේ අවසාන දිනට තව දින 10ක් ඇත. තවාන් සකස් කර වගා වාර්තාව ලියාපදිංචි කර ඇති බවට තහවුරු කරගන්න.",
+      "message_ta": "மகா பருவத்தில் பயிரிடுவதற்கான இறுதித் திகதிக்கு இன்னும் 10 நாட்களே உள்ளன. நாற்றுமேடைகளைத் தயார் செய்து நடவு அறிக்கையைப் பதிவு செய்யவும்."
+    },
+    {
+      "template_id": "ALT-003",
+      "crop_id": "big_onion",
+      "severity": "info",
+      "target_role": "officer",
+      "title_en": "Import Deferral Recommended",
+      "title_si": "ආනයන කල් දැමීම නිර්දේශ කෙරේ",
+      "title_ta": "இறக்குமதியை ஒத்திவைக்க பரிந்துரைக்கப்படுகிறது",
+      "message_en": "Domestic harvest arrival peaks next month. Deferring commercial import permits protects local farmgate floor prices above Rs. 110/kg.",
+      "message_si": "දේශීය අස්වැන්න ලබන මස වෙළඳපොළට පැමිණේ. වාණිජ ආනයන බලපත්‍ර කල් දැමීමෙන් දේශීය ගොවිපළ අවම මිල රු. 110/kg ට වඩා ආරක්ෂා වේ.",
+      "message_ta": "உள்நாட்டு அறுவடை அடுத்த மாதம் சந்தைக்கு வரும். இறக்குமதி அனுமதியை ஒத்திவைப்பது உள்ளூர் பண்ணை விலையை கிலோவுக்கு ரூ. 110க்கு மேல் பாதுகாக்கும்."
+    },
+    {
+      "template_id": "ALT-004",
+      "crop_id": "chilli",
+      "severity": "warning",
+      "target_role": "farmer",
+      "title_en": "Inter-monsoon Rainfall Advisory",
+      "title_si": "අන්තර් මෝසම් වැසි පිළිබඳ කාලගුණ අනතුරු ඇඟවීම",
+      "title_ta": "பருவமழை தொடர்பான வானிலை எச்சரிக்கை",
+      "message_en": "Heavy showers expected this week. Strengthen field bunds and clear drainage channels to prevent waterlogging in chilli fields.",
+      "message_si": "මෙම සතියේ අධික වැසි අපේක්ෂා කෙරේ. මිරිස් වගාවේ ජලය රැඳීම වැළැක්වීමට නියරවල් සකසා ජලාපවහන කානු පිරිසිදු කරන්න.",
+      "message_ta": "இந்த வாரம் பலத்த மழை எதிர்பார்க்கப்படுகிறது. மிளகாய் பயிர்களில் நீர் தேங்குவதைத் தடுக்க வடிகால்களைச் சுத்தம் செய்யவும்."
+    },
+    {
+      "template_id": "ALT-005",
+      "crop_id": "big_onion",
+      "severity": "info",
+      "target_role": "all",
+      "title_en": "Storage Retention Buffer Subsidies Open",
+      "title_si": "ගබඩා කිරීමේ රඳවා ගැනීමේ සහනාධාර විවෘතයි",
+      "title_ta": "சேமிப்பு தக்கவைப்பு மானியங்கள் ஆரம்பம்",
+      "message_en": "Ministry has activated cold storage and ventilated barn subsidies for registered farmer groups in Anuradhapura.",
+      "message_si": "අනුරාධපුරයේ ලියාපදිංචි ගොවි කණ්ඩායම් සඳහා වාතාශ්‍රය සහිත අටු සහ ශීතාගාර සහනාධාර අමාත්‍යාංශය මඟින් සක්‍රීය කර ඇත.",
+      "message_ta": "அனுராதபுரத்தில் பதிவுசெய்யப்பட்ட விவசாயக் குழுக்களுக்கான குளிர்சாதன மற்றும் களஞ்சிய மானியங்களை அமைச்சு செயல்படுத்தியுள்ளது."
+    }
+  ]
 }

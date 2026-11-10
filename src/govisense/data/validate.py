@@ -49,16 +49,16 @@ def validate_master_dataset(df: pd.DataFrame) -> Dict[str, Any]:
         "planted_extent_ha", "yield_mt_per_ha", "harvest_volume_mt",
         "projected_demand_mt", "import_volume_mt", "wholesale_price_rs_kg",
         "retail_price_rs_kg", "farmgate_price_rs_kg", "actual_spi",
-        "is_interpolated", "source", "data_source"
+        "is_interpolated", "source", "data_source", "is_demo"
     ]
 
     for col in required_cols:
         if col not in df.columns:
             issues.append(f"Missing required column: {col}")
 
-    # Validate source column values
+    # Validate source column values (Task 1: real, anchor, interpolated, synthetic)
     if "source" in df.columns:
-        invalid_sources = set(df["source"].unique()) - {"real", "interpolated", "synthetic", "anchor"}
+        invalid_sources = set(df["source"].unique()) - {"real", "anchor", "interpolated", "synthetic"}
         if invalid_sources:
             issues.append(f"Invalid values in 'source' column: {invalid_sources}")
 
