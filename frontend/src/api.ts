@@ -290,24 +290,37 @@ export function mapPlantingReportToGroundReport(r: PlantingReportApi): GroundRep
   }
 }
 
+export interface SimulationResult {
+  crop: string
+  area_ha: number
+  yield_mt_ha: number
+  scenarios?: Partial<Record<"low" | "mid" | "high", {
+    supply_mt?: number; demand_mt?: number; gap_mt?: number; spi_ratio?: number; spi_label?: string
+  }>>
+  data_available?: boolean
+  is_demo?: boolean
+  run_id?: string
+  model_version?: string
+  data_version?: string
+  loss_pct?: number
+  import_volume_mt?: number
+}
+
 export async function simulateScenarioApi(payload: {
   crop: string
   custom_planted_extent_ha?: number
   custom_yield_mt_ha?: number
   custom_import_volume_mt?: number
   custom_loss_pct?: number
-}) {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/simulate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return await res.json()
-  } catch (err) {
-    return null
+}): Promise<SimulationResult> {
+  for (const value of [payload.custom_planted_extent_ha, payload.custom_yield_mt_ha]) {
+    if (value !== undefined && (!Number.isFinite(value) || value < 0)) throw new Error("Area and yield must be finite, non-negative numbers.")
   }
+  const data = await postApi("/api/simulate", payload)
+  if (data.crop !== payload.crop || !Number.isFinite(data.area_ha) || data.area_ha < 0 || !Number.isFinite(data.yield_mt_ha) || data.yield_mt_ha < 0) {
+    throw new Error("Invalid simulation response")
+  }
+  return data
 }
 
 export async function fetchGapTimeline(cropId?: string, season?: string, leadWeeks?: number) {

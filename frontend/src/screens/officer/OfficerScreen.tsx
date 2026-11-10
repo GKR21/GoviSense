@@ -39,7 +39,6 @@ import {
   Zap,
 } from "lucide-react"
 import { cx, type View, type ScreenState, type OfficerPage, type PolicyDecision, type GroundReport } from "../../types"
-import { CROP_DATA_CATALOG, DISTRICT_PROFILES } from "../../types"
 import {
   Button,
   IconButton,
@@ -50,13 +49,12 @@ import {
   WorkspaceSwitcher,
   ScreenStateView,
 } from "../../components/common"
-import { SupplyChart } from "../../components/charts"
+import { SimulationScreen } from "./SimulationScreen"
 import {
   logDecisionActionApi,
   fetchServerIdentity,
   getStoredAuthUser,
   clearAuthSession,
-  simulateScenarioApi,
   useAlerts,
   addOfficerNoteApi,
   acknowledgeAlertApi,
@@ -103,15 +101,9 @@ export function OfficerScreen({
 }) {
   const [currentRole, setCurrentRole] = useState<"Officer" | "Admin">(initialRole)
   const [selectedCrop, setSelectedCrop] = useState("Big onion")
-  const currentProfile = CROP_DATA_CATALOG[selectedCrop] || CROP_DATA_CATALOG["Big onion"]
   const [selectedDistrict, setSelectedDistrict] = useState("Anuradhapura")
   const [selectedSeason, setSelectedSeason] = useState("Maha 2026")
   const [scenario, setScenario] = useState<"Low" | "Middle" | "High">("Middle")
-  const [period, setPeriod] = useState("12 months")
-  const [area, setArea] = useState(2131)
-  const [yieldValue, setYieldValue] = useState(16.45)
-  const [selectedMonth, setSelectedMonth] = useState(6)
-  const [assumptionsOpen, setAssumptionsOpen] = useState(false)
   const [saved, setSaved] = useState(false)
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => getStoredAuthUser())
   const [page, setPage] = useState<OfficerPage>(
@@ -126,7 +118,6 @@ export function OfficerScreen({
   const [decision, setDecision] = useState("")
   const [decisionError, setDecisionError] = useState<string | null>(null)
   const [decisionReceipt, setDecisionReceipt] = useState<Awaited<ReturnType<typeof logDecisionActionApi>> | null>(null)
-  const [simulatedMetrics, setSimulatedMetrics] = useState<any>(null)
   const [alertsOpen, setAlertsOpen] = useState(false)
   const [officerNoteText, setOfficerNoteText] = useState<Record<string, string>>({})
   const [noteStatus, setNoteStatus] = useState<Record<string, string>>({})
@@ -136,30 +127,6 @@ export function OfficerScreen({
   const { data: forecastData, loading: forecastLoading, error: forecastError, refetch: reloadForecasts } = useLatestForecasts(cropApiKey)
   const isLiveApi = forecastData?.isLive === true
   const currentApiCropData: CropForecastData | undefined = forecastData?.crops[cropApiKey]
-  const changed = area !== currentProfile.baselineArea || yieldValue !== currentProfile.baselineYield
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      simulateScenarioApi({
-        crop: cropApiKey,
-        custom_planted_extent_ha: area,
-        custom_yield_mt_ha: yieldValue,
-      }).then((res) => {
-        if (res) setSimulatedMetrics(res)
-      })
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [cropApiKey, area, yieldValue])
-
-  const reset = () => {
-    setArea(currentProfile.baselineArea)
-    setYieldValue(currentProfile.baselineYield)
-  }
-
-  const save = () => {
-    setSaved(true)
-    window.setTimeout(() => setSaved(false), 2600)
-  }
 
   const recordDecision = async (value: string, details?: Partial<PolicyDecision>) => {
     setSaved(false)
@@ -279,9 +246,6 @@ export function OfficerScreen({
               options={["Big onion", "Chilli", "Green gram", "Maize", "Red onion", "Potato"]}
               onChange={(crop) => {
                 setSelectedCrop(crop)
-                const base = CROP_DATA_CATALOG[crop] || CROP_DATA_CATALOG["Big onion"]
-                setArea(base.baselineArea)
-                setYieldValue(base.baselineYield)
               }}
             />
             <SelectControl
@@ -313,7 +277,6 @@ export function OfficerScreen({
                   className={scenario === "Low" ? "active" : ""}
                   onClick={() => {
                     setScenario("Low")
-                    setYieldValue((prev) => Math.round(prev * 0.85 * 100) / 100)
                   }}
                 >
                   Low
@@ -323,7 +286,6 @@ export function OfficerScreen({
                   className={scenario === "Middle" ? "active" : ""}
                   onClick={() => {
                     setScenario("Middle")
-                    setYieldValue(selectedCrop === "Chilli" ? 5.2 : 16.45)
                   }}
                 >
                   Middle
@@ -333,7 +295,6 @@ export function OfficerScreen({
                   className={scenario === "High" ? "active" : ""}
                   onClick={() => {
                     setScenario("High")
-                    setYieldValue((prev) => Math.round(prev * 1.20 * 100) / 100)
                   }}
                 >
                   High
@@ -467,282 +428,12 @@ export function OfficerScreen({
             />
           ) : page === "Settings" ? (
             <SettingsScreen />
-          ) : forecastLoading || forecastError || !currentApiCropData ? (
-            <ApiDataState loading={forecastLoading} error={forecastError} empty={!currentApiCropData} onRetry={reloadForecasts} />
           ) : (
-            <>
-              <div className="page-heading">
-                <div>
-                  <div className="eyebrow">
-                    <BarChart3 size={15} /> Market supply model
-                  </div>
-                  <h1>{selectedCrop} Supply Pressure ({selectedDistrict})</h1>
-                  <p>
-                    Expected harvest against demand, with uncertainty visible
-                    month by month.
-                  </p>
-                </div>
-                <div className="heading-actions">
-                  <Button
-                    variant="secondary"
-                    icon={BookOpen}
-                    onClick={() => setAssumptionsOpen(true)}
-                  >
-                    Assumptions
-                  </Button>
-                  <Button variant="secondary" icon={Save} onClick={save}>
-                    Save view
-                  </Button>
-                </div>
-              </div>
-
-              <div className="insight-banner">
-                <div className="insight-banner__icon">
-                  <ArrowUpCircle size={22} />
-                </div>
-                <div>
-                  <span className="insight-banner__label">
-                    Key insight · middle scenario
-                  </span>
-                  <strong>
-                    {selectedCrop} harvest in {selectedSeason} ({selectedDistrict}):{" "}
-                    {currentApiCropData?.ai3_supply_pressure_index.spi_label || currentProfile.spiLabel || "Balanced"}{" "}
-                    (SPI: {currentApiCropData?.ai3_supply_pressure_index.spi_score !== undefined
-                      ? (currentApiCropData.ai3_supply_pressure_index.spi_score > 0 ? "+" : "") + currentApiCropData.ai3_supply_pressure_index.spi_score.toFixed(2)
-                      : (currentProfile.spiAnnualScore !== undefined ? currentProfile.spiAnnualScore : "+0.08")}).{" "}
-                    {currentApiCropData?.ai3_supply_pressure_index.action_summary || currentProfile.ai4Action || "Maintain planting extent."}
-                  </strong>
-                  <p>
-                    High oversupply risk. Consider shifting part of planned area
-                    to alternative crops.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPage("Gap & import timeline")}
-                >
-                  View actions <ChevronRight size={16} />
-                </button>
-              </div>
-
-              <div className="analysis-grid">
-                <section className="panel chart-panel">
-                  <div className="panel-heading">
-                    <div>
-                      <div className="title-row">
-                        <h2>Expected harvest vs demand</h2>
-                        {changed && (
-                          <span className="edited-chip">
-                            <PencilLine size={13} /> Edited scenario
-                          </span>
-                        )}
-                      </div>
-                      <p>Monthly tonnes · 2026 crop plan</p>
-                    </div>
-                    <SelectControl
-                        compact
-                        label="Period"
-                        value={period}
-                        options={["12 months", "6 months (Maha)", "3 months (Harvest)"]}
-                        onChange={setPeriod}
-                      />
-                  </div>
-                  <SupplyChart
-                    crop={selectedCrop}
-                    area={area}
-                    yieldValue={yieldValue}
-                    selectedMonth={selectedMonth}
-                    onSelectMonth={setSelectedMonth}
-                    apiCropData={currentApiCropData}
-                    isLive={isLiveApi}
-                  />
-                  <div className="chart-footer">
-                    <div>
-                      <Database size={15} />
-                      <span>Crop Production Programme 2026 · version 3.2</span>
-                    </div>
-                    <div>
-                      <ShieldCheck size={15} />
-                      <span>Model confidence: High</span>
-                    </div>
-                    <button type="button">
-                      <Info size={15} /> Data details
-                    </button>
-                  </div>
-                </section>
-
-                <aside className="panel what-if-panel">
-                  <div className="panel-heading">
-                    <div>
-                      <div className="eyebrow">
-                        <SlidersHorizontal size={14} /> Live model
-                      </div>
-                      <h2>What if?</h2>
-                      <p>Test changes to the current crop plan.</p>
-                    </div>
-                    <IconButton
-                      icon={RotateCcw}
-                      label="Reset scenario"
-                      onClick={reset}
-                    />
-                  </div>
-                  <div className="pilot-baseline">
-                    <span>Current plan</span>
-                    <strong>{Math.round(currentProfile.baselineArea * currentProfile.baselineYield).toLocaleString()} t</strong>
-                    <small>from {currentProfile.baselineArea.toLocaleString()} ha in {selectedDistrict}</small>
-                  </div>
-                  <SliderField
-                    label="Planted area"
-                    value={area}
-                    min={Math.round(currentProfile.baselineArea * 0.4)}
-                    max={Math.round(currentProfile.baselineArea * 1.8)}
-                    step={10}
-                    unit="ha"
-                    onChange={setArea}
-                    helper={`Baseline ${currentProfile.baselineArea.toLocaleString()} ha`}
-                  />
-                  <SliderField
-                    label="Expected yield"
-                    value={yieldValue}
-                    min={parseFloat((currentProfile.baselineYield * 0.4).toFixed(2))}
-                    max={parseFloat((currentProfile.baselineYield * 1.8).toFixed(2))}
-                    step={currentProfile.baselineYield > 5 ? 0.1 : 0.05}
-                    unit="t/ha"
-                    onChange={setYieldValue}
-                    helper={`Baseline ${currentProfile.baselineYield.toFixed(2)} t/ha`}
-                  />
-                  <div className="impact-card">
-                    <div>
-                      <span>Live Simulated Supply (A1/A3)</span>
-                      <strong>
-                        {simulatedMetrics?.simulated_supply_mt
-                          ? `${Math.round(simulatedMetrics.simulated_supply_mt).toLocaleString()} MT`
-                          : `${Math.round(area * yieldValue * 0.85).toLocaleString()} MT`}
-                      </strong>
-                    </div>
-                    <span className={cx("delta", changed && "delta--changed")}>
-                      {simulatedMetrics?.primary_spi_label || (changed ? "Customized" : "Baseline")}
-                    </span>
-                  </div>
-                  {simulatedMetrics && (
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", margin: "10px 0" }}>
-                      <div style={{ padding: "8px 10px", background: "var(--bg-surface)", borderRadius: "6px", border: "1px solid var(--border)" }}>
-                        <small style={{ display: "block", fontSize: "10px", color: "var(--ink-muted)", textTransform: "uppercase" }}>SPI Ratio</small>
-                        <strong style={{ fontSize: "13px", color: simulatedMetrics.primary_spi_label === "Glut" ? "var(--oversupply)" : simulatedMetrics.primary_spi_label === "Shortage" ? "var(--shortage)" : "var(--primary)" }}>
-                          {simulatedMetrics.primary_spi_ratio ? simulatedMetrics.primary_spi_ratio.toFixed(2) : "1.00"}
-                        </strong>
-                      </div>
-                      <div style={{ padding: "8px 10px", background: "var(--bg-surface)", borderRadius: "6px", border: "1px solid var(--border)" }}>
-                        <small style={{ display: "block", fontSize: "10px", color: "var(--ink-muted)", textTransform: "uppercase" }}>Simulated Gap</small>
-                        <strong style={{ fontSize: "13px", color: simulatedMetrics.simulated_gap_mt < 0 ? "var(--shortage)" : "var(--ink)" }}>
-                          {simulatedMetrics.simulated_gap_mt ? `${simulatedMetrics.simulated_gap_mt > 0 ? "+" : ""}${Math.round(simulatedMetrics.simulated_gap_mt).toLocaleString()} MT` : "0 MT"}
-                        </strong>
-                      </div>
-                    </div>
-                  )}
-                  <div className="what-if-note">
-                    <Info size={16} />
-                    <p>
-                      Changes update the middle scenario. Low and high ranges
-                      keep the same uncertainty ratio.
-                    </p>
-                  </div>
-                  <div className="what-if-actions">
-                    <Button variant="ghost" icon={RotateCcw} onClick={reset}>
-                      Reset
-                    </Button>
-                    <Button icon={Save} onClick={save}>
-                      Save scenario
-                    </Button>
-                  </div>
-                </aside>
-              </div>
-            </>
+            <SimulationScreen key={cropApiKey} cropId={cropApiKey} cropLabel={selectedCrop} />
           )}
         </main>
       </div>
 
-      {assumptionsOpen && (
-        <div
-          className="drawer-layer"
-          role="presentation"
-          onClick={() => setAssumptionsOpen(false)}
-        >
-          <aside
-            className="drawer"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="assumptions-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="drawer__header">
-              <div>
-                <span>Model settings</span>
-                <h2 id="assumptions-title">Assumptions</h2>
-              </div>
-              <IconButton
-                icon={X}
-                label="Close assumptions"
-                onClick={() => setAssumptionsOpen(false)}
-              />
-            </div>
-            <div className="drawer__body">
-              <div className="drawer-notice">
-                <Info size={18} />
-                <p>Changes apply to this working scenario only until saved.</p>
-              </div>
-              <h3>SPI risk bands</h3>
-              <div className="assumption-row">
-                <RiskBadge risk="shortage" compact />
-                <span>Below</span>
-                <div className="mini-input">0.80</div>
-              </div>
-              <div className="assumption-row">
-                <RiskBadge risk="balanced" compact />
-                <span>Between</span>
-                <div className="mini-input">0.80 – 1.20</div>
-              </div>
-              <div className="assumption-row">
-                <RiskBadge risk="oversupply" compact />
-                <span>Above</span>
-                <div className="mini-input">1.20</div>
-              </div>
-              <h3>Supply adjustments</h3>
-              <SliderField
-                label="Post-harvest loss"
-                value={12}
-                min={0}
-                max={30}
-                step={1}
-                unit="%"
-                onChange={() => {}}
-                helper="Default 12%"
-              />
-              <SliderField
-                label="Demand adjustment"
-                value={0}
-                min={-20}
-                max={20}
-                step={1}
-                unit="%"
-                onChange={() => {}}
-                helper="No adjustment"
-              />
-            </div>
-            <div className="drawer__footer">
-              <Button
-                variant="secondary"
-                onClick={() => setAssumptionsOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button onClick={() => setAssumptionsOpen(false)}>
-                Apply assumptions
-              </Button>
-            </div>
-          </aside>
-        </div>
-      )}
       {alertsOpen && (
         <div className="drawer-overlay" onClick={() => setAlertsOpen(false)}>
           <aside
