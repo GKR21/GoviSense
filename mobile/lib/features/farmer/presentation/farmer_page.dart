@@ -25,7 +25,6 @@ class FarmerPage extends StatefulWidget {
 class _FarmerPageState extends State<FarmerPage> {
   int _selectedIndex = 0;
   AppLanguage _language = AppLanguage.si; // Default to Sinhala
-  CropItem? _selectedCropForReport;
   PlantingReport? _latestSubmittedReport;
 
   // Wizard state for tab 2
@@ -102,7 +101,6 @@ class _FarmerPageState extends State<FarmerPage> {
             Navigator.pop(context);
             setState(() {
               _selectedCropId = crop.id;
-              _selectedCropForReport = crop;
               _selectedIndex = 2; // Go to report tab
               _reportStep = 2;
               _isSuccessView = false;
@@ -997,7 +995,6 @@ class _FarmerPageState extends State<FarmerPage> {
                         onPressed: () {
                           setState(() {
                             _selectedCropId = crop.id;
-                            _selectedCropForReport = crop;
                             _selectedIndex = 2; // Jump to report wizard
                             _reportStep = 2;
                             _isSuccessView = false;
@@ -1146,7 +1143,6 @@ class _FarmerPageState extends State<FarmerPage> {
           const Text('Water / Irrigation Source', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           ...['Minor Tank', 'Rainfed', 'Major Irrigation', 'Agro-well'].map((irr) {
-            final isSelected = _selectedIrrigation == irr;
             return RadioListTile<String>(
               value: irr,
               groupValue: _selectedIrrigation,
@@ -1763,9 +1759,6 @@ class _FarmerPageState extends State<FarmerPage> {
             ],
           ),
         ],
-      ),
-    );
-  }
       ),
     );
   }
