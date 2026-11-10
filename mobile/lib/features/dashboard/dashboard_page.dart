@@ -1,3 +1,6 @@
+import '../../core/localization/app_locale.dart';
+import '../../core/localization/localized_text.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -31,7 +34,7 @@ class _DashboardPageState extends State<DashboardPage> {
         title: const BrandMark(compact: true),
         actions: [
           IconButton(
-            tooltip: 'Notifications',
+            tooltip: context.tr('Notifications'),
             onPressed: () => setState(() => _selectedIndex = 2),
             icon: const Icon(Icons.notifications_none_rounded),
           ),
@@ -78,7 +81,7 @@ class _HomeContent extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
       children: [
-        const Text(
+        const LocalizedText(
           'MAHA 2026',
           style: TextStyle(
             color: AppTheme.primary,
@@ -87,12 +90,12 @@ class _HomeContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Text(
+        LocalizedText(
           'Good morning, Nimal',
           style: Theme.of(context).textTheme.headlineSmall,
         ),
         const SizedBox(height: 4),
-        const Text('Your monthly agricultural picture is ready.'),
+        const LocalizedText('Your monthly agricultural picture is ready.'),
         const SizedBox(height: 20),
         AppCard(
           child: Column(
@@ -102,7 +105,7 @@ class _HomeContent extends StatelessWidget {
                 children: [
                   Icon(Icons.calendar_today_outlined, color: AppTheme.primary),
                   SizedBox(width: 10),
-                  Text(
+                  LocalizedText(
                     'PLANNING WINDOW',
                     style: TextStyle(
                       color: AppTheme.primary,
@@ -113,12 +116,12 @@ class _HomeContent extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 14),
-              Text(
+              LocalizedText(
                 'Make your next crop decision',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
-              const Text(
+              const LocalizedText(
                 'Compare expected demand, supply pressure and price confidence before planting.',
               ),
               const SizedBox(height: 16),
@@ -133,7 +136,7 @@ class _HomeContent extends StatelessWidget {
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () {},
-                child: const Text('Compare recommendations'),
+                child: const LocalizedText('Compare recommendations'),
               ),
             ],
           ),
@@ -158,7 +161,7 @@ class _HomeContent extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    LocalizedText(
                       'SUPPLY PRESSURE',
                       style: TextStyle(
                         color: AppTheme.neutral600,
@@ -167,7 +170,7 @@ class _HomeContent extends StatelessWidget {
                       ),
                     ),
                     SizedBox(height: 4),
-                    Text(
+                    LocalizedText(
                       'Balanced for vegetables this month',
                       style: TextStyle(fontWeight: FontWeight.w700),
                     ),
@@ -187,7 +190,7 @@ class _HomeContent extends StatelessWidget {
               color: AppTheme.primary,
             ),
             SizedBox(width: 7),
-            Text(
+            LocalizedText(
               'Model version 2026.03 · High confidence',
               style: TextStyle(fontSize: 12, color: AppTheme.neutral600),
             ),

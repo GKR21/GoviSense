@@ -1,3 +1,5 @@
+import '../../core/localization/localized_text.dart';
+
 import 'package:flutter/material.dart';
 
 class SectionPlaceholder extends StatelessWidget {
@@ -7,6 +9,6 @@ class SectionPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(child: Text(title));
+    return Center(child: LocalizedText(title));
   }
 }
