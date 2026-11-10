@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../data/auth_repository.dart';
 import '../../../shared/widgets/brand_mark.dart';
 import '../../../shared/widgets/app_card.dart';
+import '../../../core/localization/app_locale.dart';
+import '../../../core/localization/localized_text.dart';
 
 const _districts = [
   'Anuradhapura',
@@ -176,7 +178,8 @@ class _AuthPageState extends State<AuthPage> {
                           ],
                           onChanged: _loading
                               ? null
-                              : (v) => setState(() => _district = v ?? _district),
+                              : (v) =>
+                                    setState(() => _district = v ?? _district),
                         ),
                         const SizedBox(height: 14),
                       ],
@@ -256,7 +259,9 @@ class _AuthPageState extends State<AuthPage> {
                         ),
                         label: Text(
                           _loading
-                              ? (_signUp ? 'Creating account...' : 'Signing in...')
+                              ? (_signUp
+                                    ? 'Creating account...'
+                                    : 'Signing in...')
                               : (_signUp ? 'Create account' : 'Sign in'),
                         ),
                       ),

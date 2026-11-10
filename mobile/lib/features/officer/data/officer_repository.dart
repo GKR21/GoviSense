@@ -64,7 +64,9 @@ class OfficerRepository extends ChangeNotifier {
   bool loadingForecast = false;
   bool simulating = false;
   bool savingDecision = false;
+  bool loadingAdoption = false;
   String? forecastError;
+  String? adoptionError;
   String? simulationError;
   String? decisionError;
   String? modelVersion;
@@ -75,6 +77,7 @@ class OfficerRepository extends ChangeNotifier {
   double? simulatedGap;
   double? _baselineSupply;
   List<MonthlySupplyPoint> _points = [];
+  List<AdoptionRow> _adoptionRows = [];
   final List<OfficerDecision> _decisions = [];
   bool get hasSimulation =>
       simulatedSupply != null && !simulating && simulationError == null;
@@ -151,11 +154,19 @@ class OfficerRepository extends ChangeNotifier {
         '/api/simulate',
         data: {
           'crop': 'big_onion',
-          'custom_planted_extent_ha': requestedArea,
-          'custom_yield_mt_ha': requestedYield,
+          if (requestedArea > 0) 'custom_planted_extent_ha': requestedArea,
+          if (requestedYield > 0) 'custom_yield_mt_ha': requestedYield,
         },
       );
       final data = response.data!;
+      final serverArea = (data['area_ha'] as num?)?.toDouble();
+      final serverYield = (data['yield_mt_ha'] as num?)?.toDouble();
+      if (requestedArea <= 0 && serverArea != null && serverArea > 0) {
+        _area = serverArea;
+      }
+      if (requestedYield <= 0 && serverYield != null && serverYield > 0) {
+        _yieldValue = serverYield;
+      }
       final supply = (data['simulated_supply_mt'] as num).toDouble();
       final spi = (data['simulated_spi_ratio'] as num).toDouble();
       final gap = (data['simulated_gap_mt'] as num).toDouble();
@@ -170,7 +181,9 @@ class OfficerRepository extends ChangeNotifier {
       simulatedSupply = supply;
       simulatedSpi = spi;
       simulatedGap = gap;
-      if (requestedArea == 2131 && requestedYield == 16.45) {
+      if (_baselineSupply == null &&
+          requestedArea <= 0 &&
+          requestedYield <= 0) {
         _baselineSupply = supply;
       }
       modelVersion = data['model_version'] as String?;
@@ -192,9 +205,9 @@ class OfficerRepository extends ChangeNotifier {
 
   static final OfficerRepository instance = OfficerRepository();
 
-  double _area = 2131; // Baseline ha for Big Onion in Anuradhapura
-  double _yieldValue = 16.45; // Baseline t/ha
-  int _selectedMonthIndex = 6; // July (Oversupply risk month)
+  double _area = 0;
+  double _yieldValue = 0;
+  int _selectedMonthIndex = 0;
 
   double get area => _area;
   double get yieldValue => _yieldValue;
@@ -218,7 +231,14 @@ class OfficerRepository extends ChangeNotifier {
   }
 
   void resetWhatIf() {
-    updateWhatIf(area: 2131, yieldValue: 16.45);
+    _area = 0;
+    _yieldValue = 0;
+    simulatedSupply = null;
+    simulatedSpi = null;
+    simulatedGap = null;
+    simulationError = null;
+    simulate();
+    _changed();
   }
 
   void setSelectedMonth(int index) {
@@ -266,37 +286,44 @@ class OfficerRepository extends ChangeNotifier {
       List.unmodifiable(_points);
 
   List<AdoptionRow> getAdoptionRows() {
-    // Dynamically calculate farmer reported area incorporating real-time submissions!
-    final reports = FarmerRepository.instance.reports;
-    double extraGreenGramHa = 0;
-    double extraChilliHa = 0;
-    double extraOnionHa = 0;
+    return List.unmodifiable(_adoptionRows);
+  }
 
-    for (final r in reports) {
-      final ha = r.areaAcres * 0.404686;
-      if (r.cropId.contains('greengram')) extraGreenGramHa += ha;
-      if (r.cropId.contains('chilli')) extraChilliHa += ha;
-      if (r.cropId.contains('bigonion')) extraOnionHa += ha;
+  Future<void> loadAdoption() async {
+    if (loadingAdoption) return;
+    loadingAdoption = true;
+    adoptionError = null;
+    _changed();
+    try {
+      final response = await _client.get<Map<String, dynamic>>(
+        '/api/adoption/summary',
+        queryParameters: {'crop_id': 'big_onion', 'season': 'Maha 2025/2026'},
+      );
+      final data = response.data!;
+      final acreage = data['acreage'];
+      if (acreage is! Map) {
+        throw const FormatException('Invalid adoption response');
+      }
+      final target = (acreage['target_area_ha'] as num?)?.toDouble();
+      final reported = (acreage['reported_planted_area_ha'] as num?)
+          ?.toDouble();
+      if (target == null || reported == null || target < 0 || reported < 0) {
+        throw const FormatException('Invalid adoption acreage');
+      }
+      _adoptionRows = [
+        AdoptionRow(
+          crop: data['crop_id']?.toString() ?? 'big_onion',
+          recommendedHa: target,
+          reportedHa: reported,
+        ),
+      ];
+    } catch (_) {
+      _adoptionRows = [];
+      adoptionError = 'Unable to load adoption data. Check your connection.';
+    } finally {
+      loadingAdoption = false;
+      _changed();
     }
-
-    return [
-      AdoptionRow(
-        crop: 'Big onion',
-        recommendedHa: 2131,
-        reportedHa: 1880 + extraOnionHa,
-      ),
-      AdoptionRow(
-        crop: 'Chilli',
-        recommendedHa: 2493,
-        reportedHa: 2210 + extraChilliHa,
-      ),
-      AdoptionRow(
-        crop: 'Green gram',
-        recommendedHa: 1750,
-        reportedHa: 1960 + extraGreenGramHa,
-      ),
-      const AdoptionRow(crop: 'Maize', recommendedHa: 3100, reportedHa: 2870),
-    ];
   }
 
   Future<OfficerDecision?> recordDecision(
