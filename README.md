@@ -135,10 +135,24 @@ npm --prefix frontend install
 npm --prefix frontend run dev
 ```
 
+The backend reads `DATABASE_URL` from the server-only `.env` file. Do not put
+that value in `frontend/` or `mobile/`. For Docker, start from the repository
+root so Compose loads the same server environment:
+
+```powershell
+docker compose up --build
+```
+
+The frontend uses the same-origin `/api` proxy in Docker. For local Vite
+development it proxies `/api` to `http://localhost:8000`.
+
 ### Building the Unified Mobile APK (Flutter)
 ```powershell
 cd mobile
 flutter pub get
+# Android emulator:
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
+# Physical device: replace the host with the backend's reachable LAN/HTTPS URL.
 flutter build apk --release
 # Output APK: mobile/build/app/outputs/flutter-apk/app-release.apk
 ```
