@@ -8,7 +8,7 @@ Provides Crop Suitability Scorer Top 3 recommendations, 110% oversupply stop rul
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional, List, Dict, Any
 import numpy as np
 
@@ -76,14 +76,14 @@ def farmer_top3_recommendations(
     land_area_ha: Optional[float] = Query(None),
     land_ha: Optional[float] = Query(None),
     season: Optional[str] = Query(None),
-    planting_month: Optional[int] = Query(None),
-    current_month: Optional[int] = Query(None),
+    planting_month: Optional[int] = Query(None, ge=1, le=12),
+    current_month: Optional[int] = Query(None, ge=1, le=12),
     is_rainfed: Optional[bool] = Query(None),
     annual_rainfall_mm: Optional[float] = Query(None),
     avg_temp_c: Optional[float] = Query(None),
     zone: Optional[str] = Query(None),
     water_source: Optional[str] = Query(None),
-    as_of: Optional[str] = Query(None),
+    as_of: Optional[date] = Query(None),
     db: Any = Depends(get_db),
     current_user: Optional[Dict[str, Any]] = Depends(get_optional_current_user),
 ):
@@ -92,6 +92,28 @@ def farmer_top3_recommendations(
     market demand, 110% oversupply stop rule, 12-month expected price ranges (P10–P90),
     and expected net profit per acre.
     """
+    generated_at = datetime.now(timezone.utc)
+    # Direct Python callers predate FastAPI's typed date validation.
+    if isinstance(as_of, str):
+        try:
+            as_of = date.fromisoformat(as_of)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail={"reason_code": "INVALID_AS_OF"}) from exc
+    reference_date = as_of if isinstance(as_of, date) else generated_at.date()
+    explicit_months = [m for m in (current_month, planting_month) if isinstance(m, int)]
+    if any(isinstance(m, bool) or not 1 <= m <= 12 for m in explicit_months):
+        raise HTTPException(status_code=422, detail={"reason_code": "INVALID_PLANTING_MONTH"})
+    if len(set(explicit_months)) > 1 or (
+        isinstance(as_of, date) and any(m != reference_date.month for m in explicit_months)
+    ):
+        raise HTTPException(status_code=422, detail={"reason_code": "AS_OF_MONTH_CONFLICT"})
+    eff_month = explicit_months[0] if explicit_months else reference_date.month
+    date_metadata = {
+        "as_of": reference_date.isoformat(),
+        "generated_at": generated_at.isoformat(),
+        "planting_month": eff_month,
+    }
+
     if not isinstance(db, Session):
         db = get_session()
 
@@ -100,7 +122,6 @@ def farmer_top3_recommendations(
     eff_season = season if isinstance(season, str) else "Maha 2025/2026"
     eff_farmer_id = farmer_id if isinstance(farmer_id, str) else (current_user.get("pseudonymous_id") if isinstance(current_user, dict) else "LK-AP-DEFAULT")
     eff_land = land_ha if isinstance(land_ha, (int, float)) else (land_area_ha if isinstance(land_area_ha, (int, float)) else 1.0)
-    eff_month = current_month if isinstance(current_month, int) else (planting_month if isinstance(planting_month, int) else 10)
     eff_rainfed = is_rainfed if isinstance(is_rainfed, bool) else (eff_irrigation.lower() == "rainfed")
 
     area_conditions = {
@@ -130,6 +151,7 @@ def farmer_top3_recommendations(
 
     if not ranking:
         return {
+            **date_metadata,
             "run_id": run_id,
             "data_version": d_ver,
             "model_version": m_ver,
@@ -310,6 +332,7 @@ def farmer_top3_recommendations(
     prov_meta = compute_dataset_provenance()
 
     return {
+        **date_metadata,
         "run_id": f"RUN-{g_commit[:7]}",
         "data_version": d_ver,
         "model_version": m_ver,
