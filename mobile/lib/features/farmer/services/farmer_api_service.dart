@@ -1,5 +1,7 @@
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
+
 import '../../../core/network/api_client.dart';
 import '../models/crop_item.dart';
 import '../models/farmer_profile.dart';
@@ -42,10 +44,14 @@ class FarmerApiService {
       );
 
       if (response.statusCode == 200 && response.data != null) {
-        final data = response.data is String ? jsonDecode(response.data) : response.data;
+        final data = response.data is String
+            ? jsonDecode(response.data)
+            : response.data;
         final list = data['top3'] as List<dynamic>?;
         if (list != null && list.isNotEmpty) {
-          return list.map((item) => _mapJsonToCropItem(item as Map<String, dynamic>)).toList();
+          return list
+              .map((item) => _mapJsonToCropItem(item as Map<String, dynamic>))
+              .toList();
         }
       }
     } catch (e) {
@@ -55,17 +61,21 @@ class FarmerApiService {
   }
 
   /// Submits actual farmer planting decision to the Closed-Loop Feedback endpoint
-  Future<bool> submitPlantingReport(PlantingReport report) async {
+  Future<PlantingReceipt?> submitPlantingReport(PlantingReport report) async {
     try {
       final payload = report.toApiPayload();
       final response = await _client.post(
         '/api/feedback/planting-report',
         data: payload,
       );
-      return response.statusCode == 200;
-    } catch (e) {
-      debugPrint('Planting report network submission: $e');
-      return false;
+      if (response.statusCode != 200 && response.statusCode != 201) return null;
+      final data = response.data is String
+          ? jsonDecode(response.data)
+          : response.data;
+      return PlantingReceipt.fromJson(Map<String, dynamic>.from(data as Map));
+    } catch (_) {
+      // An HTTP 200 error body or malformed receipt is not acceptance.
+      return null;
     }
   }
 
@@ -83,11 +93,16 @@ class FarmerApiService {
       );
 
       if (response.statusCode == 200 && response.data != null) {
-        final data = response.data is String ? jsonDecode(response.data) : response.data;
+        final data = response.data is String
+            ? jsonDecode(response.data)
+            : response.data;
         final list = data['prices'] as List<dynamic>?;
         if (list != null && list.isNotEmpty) {
           return list
-              .map((item) => MarketPriceItem.fromJson(item as Map<String, dynamic>))
+              .map(
+                (item) =>
+                    MarketPriceItem.fromJson(item as Map<String, dynamic>),
+              )
               .toList();
         }
       }
@@ -112,14 +127,15 @@ class FarmerApiService {
   }
 
   /// Sends farmer inquiry to the agricultural extension officer (/api/alerts/{id}/ask)
-  Future<bool> askOfficer(String alertId, String farmerId, String question) async {
+  Future<bool> askOfficer(
+    String alertId,
+    String farmerId,
+    String question,
+  ) async {
     try {
       final response = await _client.post(
         '/api/alerts/$alertId/ask',
-        data: {
-          'farmer_id': farmerId,
-          'question': question,
-        },
+        data: {'farmer_id': farmerId, 'question': question},
       );
       return response.statusCode == 200;
     } catch (e) {
@@ -131,12 +147,17 @@ class FarmerApiService {
   CropItem _mapJsonToCropItem(Map<String, dynamic> json) {
     final cropId = (json['crop_id'] as String? ?? 'unknown').toLowerCase();
     final fitScore = (json['fit_score'] as num?)?.toInt() ?? 80;
-    final spiBand = (json['spi_band_at_harvest'] as String? ?? 'Balanced').toLowerCase();
+    final spiBand = (json['spi_band_at_harvest'] as String? ?? 'Balanced')
+        .toLowerCase();
     final priceRange = json['profit_range_rs_kg'] as Map<String, dynamic>?;
     final p10 = (priceRange?['p10_rs_kg'] as num?)?.toDouble() ?? 200.0;
     final p90 = (priceRange?['p90_rs_kg'] as num?)?.toDouble() ?? 350.0;
     final waterMm = (json['water_need_mm_season'] as num?)?.toInt() ?? 500;
-    final reasons = (json['suitability_reasons'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
+    final reasons =
+        (json['suitability_reasons'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        [];
 
     MarketRisk risk = MarketRisk.balanced;
     if (spiBand.contains('shortage')) {
@@ -149,7 +170,9 @@ class FarmerApiService {
     if (waterMm <= 400) waterDrops = 1;
     if (waterMm >= 600) waterDrops = 3;
 
-    final firstReason = reasons.isNotEmpty ? reasons.first : 'Optimal conditions in Anuradhapura';
+    final firstReason = reasons.isNotEmpty
+        ? reasons.first
+        : 'Optimal conditions in Anuradhapura';
 
     if (cropId.contains('onion')) {
       return CropItem(
@@ -168,8 +191,10 @@ class FarmerApiService {
         risk: risk,
         spiScore: 1.38,
         riskTextEn: 'Watch supply · Risk of peak harvest congestion & imports',
-        riskTextSi: 'සැපයුම ගැන විමසිලිමත් වන්න · අස්වනු සමයේ තොග තදබද අවදානමක්',
-        riskTextTa: 'வழங்கலைக் கவனிக்கவும் · அறுவடைக் காலத்தில் விலை சரிவு அபாயம்',
+        riskTextSi:
+            'සැපයුම ගැන විමසිලිමත් වන්න · අස්වනු සමයේ තොග තදබද අවදානමක්',
+        riskTextTa:
+            'வழங்கலைக் கவனிக்கவும் · அறுவடைக் காலத்தில் விலை சரிவு அபாயம்',
         waterNeed: waterDrops,
         plantWindowEn: 'Nov 01 – Nov 25',
         plantWindowSi: 'නොවැ 01 – නොවැ 25',
@@ -274,4 +299,3 @@ class FarmerApiService {
     }
   }
 }
-

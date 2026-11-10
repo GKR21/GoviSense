@@ -909,9 +909,10 @@ class PlantingReportModel(Base):
         return self.submitted_at
 
     def to_dict(self) -> Dict[str, Any]:
+        from govisense.feedback.receipts import planting_receipt
         first_harvest = self.harvest_reports[0] if self.harvest_reports else None
         return {
-            "report_id": self.report_id,
+            **planting_receipt(self),
             "pseudonymous_id": self.pseudonymous_id,
             "crop_id": self.crop_id,
             "season_id": self.season_id,

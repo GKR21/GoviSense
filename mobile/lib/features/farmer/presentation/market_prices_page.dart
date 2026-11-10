@@ -1,4 +1,8 @@
+import '../../../core/localization/app_locale.dart';
+import '../../../core/localization/localized_text.dart';
+
 import 'package:flutter/material.dart';
+
 import '../../../core/theme/app_theme.dart';
 import '../../../core/localization/app_translations.dart';
 import '../models/market_price_item.dart';
@@ -7,11 +11,7 @@ import '../services/farmer_api_service.dart';
 export '../models/market_price_item.dart';
 
 class MarketPricesPage extends StatefulWidget {
-  const MarketPricesPage({
-    super.key,
-    required this.language,
-    this.apiService,
-  });
+  const MarketPricesPage({super.key, required this.language, this.apiService});
 
   final AppLanguage language;
   final FarmerApiService? apiService;
@@ -37,7 +37,9 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
   Future<void> _fetchPrices() async {
     setState(() => _isLoading = true);
     try {
-      final live = await _apiService.getMarketPrices(category: _selectedCategory);
+      final live = await _apiService.getMarketPrices(
+        category: _selectedCategory,
+      );
       if (live != null && live.isNotEmpty) {
         if (mounted) {
           setState(() {
@@ -148,7 +150,7 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final lang = widget.language;
+    final lang = AppLocaleScope.of(context, fallback: widget.language);
     final filtered = _currentPrices.where((item) {
       if (_selectedCategory == 'all') return true;
       return item.category == _selectedCategory;
@@ -160,12 +162,12 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            LocalizedText(
               lang == AppLanguage.si
                   ? 'වෙළඳපොළ තොග මිල ගණන්'
                   : lang == AppLanguage.ta
-                      ? 'சந்தை மொத்த விலைகள்'
-                      : 'DEC Market Price Bulletin',
+                  ? 'சந்தை மொத்த விலைகள்'
+                  : 'DEC Market Price Bulletin',
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             Row(
@@ -174,16 +176,22 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
                   width: 7,
                   height: 7,
                   decoration: BoxDecoration(
-                    color: _isLive ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+                    color: _isLive
+                        ? const Color(0xFF16A34A)
+                        : const Color(0xFFD97706),
                     shape: BoxShape.circle,
                   ),
                 ),
                 const SizedBox(width: 5),
-                Text(
-                  _isLive ? 'CBSL & HARTI Live API Feed' : 'Offline Baseline Benchmark',
+                LocalizedText(
+                  _isLive
+                      ? 'CBSL & HARTI Live API Feed'
+                      : 'Offline Baseline Benchmark',
                   style: TextStyle(
                     fontSize: 11,
-                    color: _isLive ? const Color(0xFF16A34A) : AppTheme.neutral600,
+                    color: _isLive
+                        ? const Color(0xFF16A34A)
+                        : AppTheme.neutral600,
                     fontWeight: _isLive ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
@@ -197,10 +205,13 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
                 ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppTheme.primary,
+                    ),
                   )
                 : const Icon(Icons.refresh_rounded),
-            tooltip: 'Refresh live prices',
+            tooltip: context.tr('Refresh live prices'),
             onPressed: _isLoading ? null : _fetchPrices,
           ),
         ],
@@ -210,97 +221,104 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
-          // Live Bulletin Header Banner
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0F3E26), Color(0xFF1B7F4B)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+            // Live Bulletin Header Banner
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0F3E26), Color(0xFF1B7F4B)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primary.withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.primary.withValues(alpha: 0.2),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(10),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.storefront_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
                   ),
-                  child: const Icon(Icons.storefront_rounded, color: Colors.white, size: 22),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        lang == AppLanguage.si
-                            ? 'විශේෂ ආර්ථික මධ්‍යස්ථාන (DEC) මිල'
-                            : lang == AppLanguage.ta
-                                ? 'பொருளாதார மைய (DEC) விலைகள்'
-                                : 'Dedicated Economic Centers (DEC)',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        LocalizedText(
+                          lang == AppLanguage.si
+                              ? 'විශේෂ ආර්ථික මධ්‍යස්ථාන (DEC) මිල'
+                              : lang == AppLanguage.ta
+                              ? 'பொருளாதார மைய (DEC) விலைகள்'
+                              : 'Dedicated Economic Centers (DEC)',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        lang == AppLanguage.si
-                            ? 'දඹුල්ල, කැප්පෙටිපොල සහ අනුරාධපුර දෛනික සත්‍යාපිත තොරතුරු'
-                            : lang == AppLanguage.ta
-                                ? 'தம்புள்ளை மற்றும் கெப்பெட்டிபொல தினசரி விலை விபரம்'
-                                : 'Official farmgate & wholesale arrivals from Dambulla & Keppetipola',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 11),
-                      ),
-                    ],
+                        const SizedBox(height: 2),
+                        LocalizedText(
+                          lang == AppLanguage.si
+                              ? 'දඹුල්ල, කැප්පෙටිපොල සහ අනුරාධපුර දෛනික සත්‍යාපිත තොරතුරු'
+                              : lang == AppLanguage.ta
+                              ? 'தம்புள்ளை மற்றும் கெப்பெட்டிபொல தினசரி விலை விபரம்'
+                              : 'Official farmgate & wholesale arrivals from Dambulla & Keppetipola',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 14),
+            const SizedBox(height: 14),
 
-          // Category Chips
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _buildCategoryChip('All Commodities', 'all'),
-                _buildCategoryChip('Vegetables', 'vegetable'),
-                _buildCategoryChip('Pulses', 'pulse'),
-                _buildCategoryChip('Grains', 'grain'),
-                _buildCategoryChip('Tubers', 'tuber'),
-              ],
+            // Category Chips
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildCategoryChip('All Commodities', 'all'),
+                  _buildCategoryChip('Vegetables', 'vegetable'),
+                  _buildCategoryChip('Pulses', 'pulse'),
+                  _buildCategoryChip('Grains', 'grain'),
+                  _buildCategoryChip('Tubers', 'tuber'),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 14),
+            const SizedBox(height: 14),
 
-          // Price Cards List
-          ...filtered.map((item) => _buildPriceCard(item, lang)),
-        ],
+            // Price Cards List
+            ...filtered.map((item) => _buildPriceCard(item, lang)),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildCategoryChip(String label, String key) {
     final isSelected = _selectedCategory == key;
     return Padding(
       padding: const EdgeInsets.only(right: 6),
       child: ChoiceChip(
-        label: Text(label),
+        label: LocalizedText(label),
         selected: isSelected,
         onSelected: (_) => setState(() => _selectedCategory = key),
         selectedColor: AppTheme.primary,
@@ -353,18 +371,31 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    LocalizedText(
                       item.localizedCrop(lang),
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.ink),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.ink,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Row(
                       children: [
-                        const Icon(Icons.location_on_outlined, size: 12, color: AppTheme.primary),
+                        const Icon(
+                          Icons.location_on_outlined,
+                          size: 12,
+                          color: AppTheme.primary,
+                        ),
                         const SizedBox(width: 3),
-                        Text(
-                          item.localizedCenter(lang),
-                          style: const TextStyle(fontSize: 11, color: AppTheme.neutral600),
+                        Expanded(
+                          child: LocalizedText(
+                            item.localizedCenter(lang),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.neutral600,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -381,9 +412,13 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
                   children: [
                     Icon(trendIcon, size: 14, color: trendColor),
                     const SizedBox(width: 4),
-                    Text(
+                    LocalizedText(
                       item.trendPct,
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: trendColor),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: trendColor,
+                      ),
                     ),
                   ],
                 ),
@@ -403,18 +438,26 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      LocalizedText(
                         lang == AppLanguage.si
                             ? 'තොග මිල (DEC)'
                             : lang == AppLanguage.ta
-                                ? 'மொத்த விலை (DEC)'
-                                : 'Wholesale (DEC)',
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                            ? 'மொத்த விலை (DEC)'
+                            : 'Wholesale (DEC)',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primary,
+                        ),
                       ),
                       const SizedBox(height: 2),
-                      Text(
+                      LocalizedText(
                         item.wholesalePrice,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppTheme.ink),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.ink,
+                        ),
                       ),
                     ],
                   ),
@@ -432,18 +475,26 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      LocalizedText(
                         lang == AppLanguage.si
                             ? 'සිල්ලර මිල'
                             : lang == AppLanguage.ta
-                                ? 'சில்லறை விலை'
-                                : 'Consumer Retail',
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.neutral600),
+                            ? 'சில்லறை விலை'
+                            : 'Consumer Retail',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.neutral600,
+                        ),
                       ),
                       const SizedBox(height: 2),
-                      Text(
+                      LocalizedText(
                         item.retailPrice,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.neutral700),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.neutral700,
+                        ),
                       ),
                     ],
                   ),
@@ -456,4 +507,3 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
     );
   }
 }
-

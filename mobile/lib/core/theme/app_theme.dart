@@ -50,6 +50,7 @@ class AppTheme {
       scaffoldBackgroundColor: background,
       useMaterial3: true,
       fontFamily: 'Inter',
+      fontFamilyFallback: const ['NotoSansSinhala', 'NotoSansTamil'],
       textTheme: const TextTheme(
         headlineLarge: TextStyle(
           color: ink,
@@ -115,10 +116,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
-          textStyle: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-          ),
+          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
         ),
       ),
     );

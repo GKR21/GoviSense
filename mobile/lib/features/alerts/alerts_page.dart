@@ -1,3 +1,6 @@
+import '../../core/localization/app_locale.dart';
+import '../../core/localization/localized_text.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -47,12 +50,14 @@ class _AlertsPageState extends State<AlertsPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(AppTranslations.t(_language, 'askOfficerDialogTitle')),
+        title: LocalizedText(
+          AppTranslations.t(_language, 'askOfficerDialogTitle'),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            LocalizedText(
               alert.localizedTitle(_language),
               style: const TextStyle(
                 fontSize: 12,
@@ -75,7 +80,7 @@ class _AlertsPageState extends State<AlertsPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(AppTranslations.t(_language, 'cancelBtn')),
+            child: LocalizedText(AppTranslations.t(_language, 'cancelBtn')),
           ),
           ElevatedButton(
             onPressed: () {
@@ -85,12 +90,16 @@ class _AlertsPageState extends State<AlertsPage> {
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(AppTranslations.t(_language, 'questionSent')),
+                    content: LocalizedText(
+                      AppTranslations.t(_language, 'questionSent'),
+                    ),
                   ),
                 );
               }
             },
-            child: Text(AppTranslations.t(_language, 'sendQuestionBtn')),
+            child: LocalizedText(
+              AppTranslations.t(_language, 'sendQuestionBtn'),
+            ),
           ),
         ],
       ),
@@ -99,6 +108,7 @@ class _AlertsPageState extends State<AlertsPage> {
 
   @override
   Widget build(BuildContext context) {
+    _language = AppLocaleScope.of(context, fallback: _language);
     final allAlerts = _repo.alerts;
     final filtered = allAlerts.where((a) {
       if (_filter == 'unread') return !a.isRead;
@@ -110,18 +120,21 @@ class _AlertsPageState extends State<AlertsPage> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: Text(AppTranslations.t(_language, 'alertsInboxTitle')),
+        title: LocalizedText(AppTranslations.t(_language, 'alertsInboxTitle')),
         actions: [
           DropdownButton<AppLanguage>(
             value: _language,
             underline: const SizedBox.shrink(),
             onChanged: (lang) {
-              if (lang != null) setState(() => _language = lang);
+              if (lang != null) {
+                AppLocale.instance.select(lang);
+                setState(() => _language = lang);
+              }
             },
             items: AppLanguage.values.map((l) {
               return DropdownMenuItem(
                 value: l,
-                child: Text(
+                child: LocalizedText(
                   l.nativeLabel,
                   style: const TextStyle(fontSize: 12),
                 ),
@@ -134,7 +147,7 @@ class _AlertsPageState extends State<AlertsPage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
-          Text(
+          LocalizedText(
             AppTranslations.t(_language, 'alertsInboxSub'),
             style: const TextStyle(fontSize: 11, color: AppTheme.neutral600),
           ),
@@ -174,7 +187,7 @@ class _AlertsPageState extends State<AlertsPage> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 40),
               child: Center(
-                child: Text(AppTranslations.t(_language, 'noAlerts')),
+                child: LocalizedText(AppTranslations.t(_language, 'noAlerts')),
               ),
             )
           else
@@ -189,7 +202,7 @@ class _AlertsPageState extends State<AlertsPage> {
     return Padding(
       padding: const EdgeInsets.only(right: 6),
       child: ChoiceChip(
-        label: Text(count != null ? '$label ($count)' : label),
+        label: LocalizedText(count != null ? '$label ($count)' : label),
         selected: isSelected,
         onSelected: (_) => setState(() => _filter = key),
         selectedColor: AppTheme.primary,
@@ -240,7 +253,7 @@ class _AlertsPageState extends State<AlertsPage> {
               Icon(iconData, color: color, size: 18),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
+                child: LocalizedText(
                   alert.localizedTitle(_language),
                   style: TextStyle(
                     fontSize: 13,
@@ -263,7 +276,7 @@ class _AlertsPageState extends State<AlertsPage> {
             ],
           ),
           const SizedBox(height: 6),
-          Text(
+          LocalizedText(
             alert.localizedMessage(_language),
             style: const TextStyle(
               fontSize: 11,
@@ -291,7 +304,7 @@ class _AlertsPageState extends State<AlertsPage> {
                         color: AppTheme.primary,
                       ),
                       const SizedBox(width: 4),
-                      Text(
+                      LocalizedText(
                         _language == AppLanguage.si
                             ? 'ඔබගේ විමසීම:'
                             : _language == AppLanguage.ta
@@ -306,13 +319,13 @@ class _AlertsPageState extends State<AlertsPage> {
                     ],
                   ),
                   const SizedBox(height: 2),
-                  Text(
+                  LocalizedText(
                     alert.questionAsked!,
                     style: const TextStyle(fontSize: 11, color: AppTheme.ink),
                   ),
                   if (alert.officerResponse != null) ...[
                     const Divider(height: 12),
-                    Text(
+                    LocalizedText(
                       _language == AppLanguage.si
                           ? 'නිලධාරී පිළිතුර:'
                           : _language == AppLanguage.ta
@@ -325,7 +338,7 @@ class _AlertsPageState extends State<AlertsPage> {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
+                    LocalizedText(
                       alert.officerResponse!,
                       style: const TextStyle(
                         fontSize: 11,
@@ -341,7 +354,7 @@ class _AlertsPageState extends State<AlertsPage> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
+              LocalizedText(
                 alert.timestamp,
                 style: const TextStyle(
                   fontSize: 10,
@@ -367,7 +380,7 @@ class _AlertsPageState extends State<AlertsPage> {
                           color: AppTheme.balanced.withValues(alpha: 0.3),
                         ),
                       ),
-                      child: Text(
+                      child: LocalizedText(
                         AppTranslations.t(_language, 'acknowledgedBadge'),
                         style: const TextStyle(
                           fontSize: 10,
@@ -384,7 +397,7 @@ class _AlertsPageState extends State<AlertsPage> {
                       ),
                       onPressed: () => _repo.acknowledgeAlert(alert.id),
                       icon: const Icon(Icons.check, size: 12),
-                      label: Text(
+                      label: LocalizedText(
                         AppTranslations.t(_language, 'acknowledgeBtn'),
                         style: const TextStyle(fontSize: 11),
                       ),
@@ -399,7 +412,7 @@ class _AlertsPageState extends State<AlertsPage> {
                       Icons.chat_bubble_outline_rounded,
                       size: 12,
                     ),
-                    label: Text(
+                    label: LocalizedText(
                       AppTranslations.t(_language, 'askOfficerBtn'),
                       style: const TextStyle(fontSize: 11),
                     ),
@@ -413,14 +426,14 @@ class _AlertsPageState extends State<AlertsPage> {
                       onPressed: () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(
+                            content: LocalizedText(
                               'Calling officer at ${alert.officerPhone}',
                             ),
                           ),
                         );
                       },
                       icon: const Icon(Icons.phone, size: 12),
-                      label: Text(
+                      label: LocalizedText(
                         AppTranslations.t(_language, 'callOfficerBtn'),
                         style: const TextStyle(fontSize: 11),
                       ),

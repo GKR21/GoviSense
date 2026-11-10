@@ -1,4 +1,7 @@
+import '../../../../core/localization/localized_text.dart';
+
 import 'package:flutter/material.dart';
+
 import '../../../../core/theme/app_theme.dart';
 import '../../models/crop_item.dart';
 
@@ -91,7 +94,7 @@ class MiniGaugeWidget extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              const LocalizedText(
                 '< 0.85 Shortage',
                 style: TextStyle(
                   fontSize: 10,
@@ -105,7 +108,7 @@ class MiniGaugeWidget extends StatelessWidget {
                   color: AppTheme.neutral100,
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: Text(
+                child: LocalizedText(
                   'SPI ${score.toStringAsFixed(2)}×',
                   style: const TextStyle(
                     fontSize: 11,
@@ -114,7 +117,7 @@ class MiniGaugeWidget extends StatelessWidget {
                   ),
                 ),
               ),
-              const Text(
+              const LocalizedText(
                 '> 1.15 Glut',
                 style: TextStyle(
                   fontSize: 10,
@@ -129,4 +132,3 @@ class MiniGaugeWidget extends StatelessWidget {
     );
   }
 }
-

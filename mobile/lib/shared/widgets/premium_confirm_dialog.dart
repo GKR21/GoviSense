@@ -1,3 +1,6 @@
+import '../../core/localization/app_locale.dart';
+import '../../core/localization/localized_text.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -41,7 +44,7 @@ class PremiumConfirmDialog extends StatelessWidget {
     return showGeneralDialog<bool>(
       context: context,
       barrierDismissible: true,
-      barrierLabel: 'Dismiss',
+      barrierLabel: context.tr('Dismiss'),
       barrierColor: Colors.black.withValues(alpha: 0.5),
       transitionDuration: const Duration(milliseconds: 220),
       pageBuilder: (ctx, anim1, anim2) => PremiumConfirmDialog(
@@ -126,7 +129,7 @@ class PremiumConfirmDialog extends StatelessWidget {
             const SizedBox(height: 18),
 
             // Dialog Title
-            Text(
+            LocalizedText(
               title,
               textAlign: TextAlign.center,
               style: theme.textTheme.titleLarge?.copyWith(
@@ -139,7 +142,7 @@ class PremiumConfirmDialog extends StatelessWidget {
             const SizedBox(height: 8),
 
             // Dialog Description
-            Text(
+            LocalizedText(
               message,
               textAlign: TextAlign.center,
               style: const TextStyle(
@@ -177,7 +180,7 @@ class PremiumConfirmDialog extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text(
+                      child: LocalizedText(
                         accountInfo!,
                         style: const TextStyle(
                           fontSize: 12,
@@ -197,7 +200,7 @@ class PremiumConfirmDialog extends StatelessWidget {
                           color: AppTheme.primaryTint,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Text(
+                        child: LocalizedText(
                           roleBadge!,
                           style: const TextStyle(
                             fontSize: 10,
@@ -232,7 +235,7 @@ class PremiumConfirmDialog extends StatelessWidget {
                       ),
                     ),
                     onPressed: () => Navigator.of(context).pop(false),
-                    child: Text(
+                    child: LocalizedText(
                       cancelText,
                       style: const TextStyle(
                         fontSize: 13,
@@ -271,7 +274,7 @@ class PremiumConfirmDialog extends StatelessWidget {
                         onConfirm();
                       },
                       icon: Icon(icon, size: 16),
-                      label: Text(
+                      label: LocalizedText(
                         confirmText,
                         style: const TextStyle(
                           fontSize: 13,

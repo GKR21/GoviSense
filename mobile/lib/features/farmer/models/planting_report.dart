@@ -1,3 +1,5 @@
+import '../../../core/config/app_config.dart';
+
 class PlantingReport {
   const PlantingReport({
     required this.id,
@@ -11,8 +13,9 @@ class PlantingReport {
     required this.irrigationType,
     required this.seedSource,
     required this.timestamp,
-    required this.receiptHash,
-    this.status = 'verified',
+    this.receiptHash = '',
+    this.status = 'pending',
+    String? clientId,
     this.plannedAreaHa,
     this.actualAreaHa,
     this.harvestOutcomeMt,
@@ -22,8 +25,9 @@ class PlantingReport {
     this.pseudonymousId = 'LK-NC-0842',
     this.season = 'Maha 2026',
     this.notes,
-  });
+  }) : clientId = clientId ?? id;
 
+  final String clientId;
   final String id;
   final String cropId;
   final String cropNameEn;
@@ -37,6 +41,26 @@ class PlantingReport {
   final String timestamp;
   final String receiptHash;
   final String status;
+  bool get hasVerifiedReceipt =>
+      status == 'verified' &&
+      RegExp(r'^[a-fA-F0-9]{64}$').hasMatch(receiptHash) &&
+      id.isNotEmpty;
+  String? get verificationUrl => !hasVerifiedReceipt
+      ? null
+      : Uri.parse(AppConfig.apiBaseUrl)
+            .replace(
+              path:
+                  '/api/feedback/planting-reports/${Uri.encodeComponent(id)}/receipt',
+              queryParameters: {'receipt_hash': receiptHash},
+              fragment: '',
+            )
+            .toString();
+
+  PlantingReport withReceipt(PlantingReceipt receipt) => copyWith(
+    id: receipt.reportId,
+    receiptHash: receipt.hash,
+    status: 'verified',
+  );
 
   // Day 6 Closed-Loop Telemetry fields from farmer_app
   final double? plannedAreaHa;
@@ -77,6 +101,7 @@ class PlantingReport {
     String? notes,
   }) {
     return PlantingReport(
+      clientId: clientId,
       id: id ?? this.id,
       cropId: cropId ?? this.cropId,
       cropNameEn: cropNameEn ?? this.cropNameEn,
@@ -108,20 +133,38 @@ class PlantingReport {
       'season': _normalizeSeasonForBackend(season),
       'planned_area_ha': double.parse(effectivePlannedHa.toStringAsFixed(2)),
       'actual_area_ha': double.parse(effectiveActualHa.toStringAsFixed(2)),
+      'district': district,
+      'planting_date': plantingDate,
+      'irrigation_type': _normalizeIrrigation(irrigationType),
       'consent_given': consentGiven,
       'pseudonymous_id': pseudonymousId,
-      'harvest_outcome_mt': harvestOutcomeMt,
-      'sale_price_rs_kg': salePriceRsKg,
-      'sale_channel': saleChannel ?? 'Dambulla DEC',
-      'notes': notes ?? 'Self-reported by farmer from GoviSense mobile client',
+      'notes':
+          notes ??
+          'Self-reported planting declaration. Seed source: $seedSource',
     };
   }
 
-  static String _normalizeSeasonForBackend(String s) {
-    if (s.contains('2026') || s.contains('2025')) {
-      return 'Maha 2025/2026';
+  static String _normalizeSeasonForBackend(String season) {
+    final singleYearMaha = RegExp(
+      r'^Maha (\d{4})$',
+      caseSensitive: false,
+    ).firstMatch(season.trim());
+    if (singleYearMaha != null) {
+      final year = int.parse(singleYearMaha.group(1)!);
+      return 'Maha $year/${year + 1}';
     }
-    return s;
+    return season.trim();
+  }
+
+  static String _normalizeIrrigation(String value) {
+    final normalized = value.trim().toLowerCase().replaceAll(' ', '_');
+    return switch (normalized) {
+      'rainfed' => 'rainfed',
+      'minor_tank' => 'minor_tank',
+      'major_irrigation' || 'major_scheme' => 'major_irrigation',
+      'agro_well' || 'well' => 'agro_well',
+      _ => 'irrigated',
+    };
   }
 
   static String _normalizeCropIdForBackend(String id) {
@@ -130,5 +173,24 @@ class PlantingReport {
     if (id.contains('gram')) return 'green_gram';
     if (id.contains('maize')) return 'maize';
     return id.replaceAll('crop-', '');
+  }
+}
+
+class PlantingReceipt {
+  const PlantingReceipt._(this.reportId, this.hash);
+  final String reportId;
+  final String hash;
+
+  factory PlantingReceipt.fromJson(Map<String, dynamic> data) {
+    final id = data['report_id'];
+    final hash = data['receipt_hash'];
+    if (data['status'] != 'ACCEPTED' ||
+        id is! String ||
+        id.trim().isEmpty ||
+        hash is! String ||
+        !RegExp(r'^[a-fA-F0-9]{64}$').hasMatch(hash)) {
+      throw const FormatException('No accepted server receipt');
+    }
+    return PlantingReceipt._(id, hash.toLowerCase());
   }
 }
