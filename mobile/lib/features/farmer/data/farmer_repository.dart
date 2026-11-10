@@ -199,7 +199,7 @@ class FarmerRepository extends ChangeNotifier {
           titleSi: 'වගා වාර්තාව තහවුරු විය (${crop.nameSi})',
           titleTa: 'நடவு அறிக்கை உறுதிப்படுத்தப்பட்டது (${crop.nameTa})',
           messageEn:
-              'Successfully submitted $areaAcres acres for ${report.season}. Receipt ID: ${report.id}. Telemetry synced with Anuradhapura Agrarian Ledger.',
+              'Successfully submitted $areaAcres acres for ${report.season}. Receipt ID: ${report.id}. Telemetry synced with ${_profile.district} Agrarian Ledger.',
           messageSi:
               'අක්කර $areaAcres ක් සාර්ථකව වාර්තා කරන ලදී. රිසිට්පත් අංකය: ${report.id}. දත්ත අනුරාධපුර ගොවිජන ලේඛනය සමඟ සමමුහුර්ත විය.',
           messageTa:
@@ -222,7 +222,7 @@ class FarmerRepository extends ChangeNotifier {
           titleSi: 'වාර්තාව සමමුහුර්ත වීම පොරොත්තුයි (${crop.nameSi})',
           titleTa: 'அறிக்கை ஒத்திசைவு நிலுவையில் உள்ளது (${crop.nameTa})',
           messageEn:
-              'Unable to reach Anuradhapura Agrarian Ledger. Report ${report.id} kept pending in this app session. Retry when connected; durable offline saving is not available yet.',
+              'Unable to reach ${_profile.district} Agrarian Ledger. Report ${report.id} kept pending in this app session. Retry when connected; durable offline saving is not available yet.',
           messageSi:
               'අනුරාධපුර ගොවිජන ලේඛනය වෙත සම්බන්ධ විය නොහැක. වාර්තාව ${report.id} "පොරොත්තු" ලෙස දේශීයව සුරකින ලද අතර සබඳතාව යථා තත්ත්වයට පත් වූ විට ස්වයංක්‍රීයව නැවත උත්සාහ කරනු ඇත.',
           messageTa:

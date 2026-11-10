@@ -23,6 +23,14 @@ class OfficerPage extends StatefulWidget {
 class _OfficerPageState extends State<OfficerPage> {
   int _selectedIndex = 0;
   late final _repo = widget.repository ?? OfficerRepository.instance;
+  String get _officerName =>
+      AuthRepository.instance.name ??
+      AuthRepository.instance.username ??
+      'Officer';
+  String get _officerId =>
+      AuthRepository.instance.username ?? 'Authenticated officer';
+  String get _officerDistrict =>
+      AuthRepository.instance.district ?? 'Assigned district';
 
   @override
   void initState() {
@@ -30,7 +38,8 @@ class _OfficerPageState extends State<OfficerPage> {
     _repo.addListener(_onRepoUpdated);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        final who = AuthRepository.instance.name ??
+        final who =
+            AuthRepository.instance.name ??
             AuthRepository.instance.username ??
             '';
         ScaffoldMessenger.of(context).showSnackBar(
@@ -40,6 +49,7 @@ class _OfficerPageState extends State<OfficerPage> {
           ),
         );
         _repo.loadForecast();
+        _repo.loadAdoption();
         _repo.simulate();
       }
     });
@@ -219,9 +229,14 @@ class _OfficerPageState extends State<OfficerPage> {
                       ),
                     ],
                   ),
-                  child: const Center(
+                  child: Center(
                     child: LocalizedText(
-                      'OW',
+                      _officerName
+                          .split(RegExp(r'\s+'))
+                          .where((part) => part.isNotEmpty)
+                          .take(2)
+                          .map((part) => part[0].toUpperCase())
+                          .join(),
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
@@ -232,14 +247,14 @@ class _OfficerPageState extends State<OfficerPage> {
                   ),
                 ),
                 const SizedBox(width: 14),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
                           LocalizedText(
-                            'Dr. K. M. Wickramasinghe',
+                            _officerName,
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
@@ -264,7 +279,7 @@ class _OfficerPageState extends State<OfficerPage> {
                         ),
                       ),
                       LocalizedText(
-                        'Department of Agriculture · Anuradhapura',
+                        'Department of Agriculture · $_officerDistrict',
                         style: TextStyle(
                           fontSize: 11,
                           color: AppTheme.neutral600,
@@ -283,7 +298,7 @@ class _OfficerPageState extends State<OfficerPage> {
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: AppTheme.cardBorder),
               ),
-              child: const Column(
+              child: Column(
                 children: [
                   Wrap(
                     runSpacing: 8,
@@ -298,7 +313,7 @@ class _OfficerPageState extends State<OfficerPage> {
                         ),
                       ),
                       LocalizedText(
-                        'DOA-OFF-0084',
+                        _officerId,
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -321,7 +336,7 @@ class _OfficerPageState extends State<OfficerPage> {
                         ),
                       ),
                       LocalizedText(
-                        'Anuradhapura North (Zone 2)',
+                        _officerDistrict,
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -407,8 +422,8 @@ class _OfficerPageState extends State<OfficerPage> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  const LocalizedText(
-                    'Signed in as Dr. K. M. Wickramasinghe (DOA-OFF-0084)',
+                  LocalizedText(
+                    'Signed in as $_officerName ($_officerId)',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -477,7 +492,7 @@ class _OfficerPageState extends State<OfficerPage> {
       context,
       title: 'Sign Out of Workstation',
       message: 'Are you sure you want to log out of the Agrarian Planning Workstation? All recorded policy directives are safely preserved in the ledger.',
-      accountInfo: 'Dr. K. M. Wickramasinghe · DOA-OFF-0084',
+      accountInfo: '$_officerName · $_officerId',
       roleBadge: 'Officer',
       confirmText: 'Log Out',
       cancelText: 'Cancel',
@@ -728,26 +743,35 @@ class _OfficerPageState extends State<OfficerPage> {
         const LocalizedText(
           'Big Onion · server simulation · includes backend loss assumptions',
         ),
-        LocalizedText('Planted area: ${_repo.area.toStringAsFixed(0)} ha'),
-        Slider(
-          value: _repo.area,
-          min: 1000,
-          max: 4000,
-          divisions: 300,
-          onChanged: (value) =>
-              _repo.updateWhatIf(area: value, yieldValue: _repo.yieldValue),
-        ),
-        LocalizedText(
-          'Expected yield: ${_repo.yieldValue.toStringAsFixed(2)} t/ha',
-        ),
-        Slider(
-          value: _repo.yieldValue,
-          min: 5,
-          max: 25,
-          divisions: 200,
-          onChanged: (value) =>
-              _repo.updateWhatIf(area: _repo.area, yieldValue: value),
-        ),
+        if (_repo.area <= 0 || _repo.yieldValue <= 0)
+          const Center(
+            child: LocalizedText(
+              'Waiting for server simulation inputs.',
+              textAlign: TextAlign.center,
+            ),
+          )
+        else ...[
+          LocalizedText('Planted area: ${_repo.area.toStringAsFixed(0)} ha'),
+          Slider(
+            value: _repo.area.clamp(1000, 4000).toDouble(),
+            min: 1000,
+            max: 4000,
+            divisions: 300,
+            onChanged: (value) =>
+                _repo.updateWhatIf(area: value, yieldValue: _repo.yieldValue),
+          ),
+          LocalizedText(
+            'Expected yield: ${_repo.yieldValue.toStringAsFixed(2)} t/ha',
+          ),
+          Slider(
+            value: _repo.yieldValue.clamp(5, 25).toDouble(),
+            min: 5,
+            max: 25,
+            divisions: 200,
+            onChanged: (value) =>
+                _repo.updateWhatIf(area: _repo.area, yieldValue: value),
+          ),
+        ],
         if (_repo.simulating) const LinearProgressIndicator(),
         if (_repo.simulationError != null) ...[
           LocalizedText(_repo.simulationError!),
@@ -799,363 +823,47 @@ class _OfficerPageState extends State<OfficerPage> {
   }
 
   Widget _buildGapTimelineTab() {
+    final latestPeriod = _repo.getMonthlyPoints().isEmpty
+        ? null
+        : _repo.getMonthlyPoints().last.month;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
       children: [
         const LocalizedText(
-          'Sea Freight & Policy Timeline',
+          'Policy timeline',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w900,
             color: AppTheme.ink,
           ),
         ),
-        const LocalizedText(
-          'Planning examples · illustrative dates and values, not live forecast output',
-          style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
-        ),
         const SizedBox(height: 16),
-
-        // Critical Urgency Banner
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppTheme.oversupplyBorder),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.amber.withValues(alpha: 0.06),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Wrap(
-                spacing: 12,
-                runSpacing: 8,
-                children: [
-                  LocalizedText(
-                    'CRITICAL IMPORT DECISION DEADLINE',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.oversupply,
-                    ),
-                  ),
-                  LocalizedText(
-                    '7 WEEKS LEAD TIME',
-                    style: TextStyle(fontSize: 10),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              const LocalizedText(
-                'Freeze Deadline: 14 May 2026',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: AppTheme.ink,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const LocalizedText(
-                'Due to maritime transit delays from ports in India/Pakistan to Colombo, private import permits destined for July must be decided before May 14. Any uncoordinated import shipments landing in July will trigger destructive farmgate price collapse.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppTheme.neutral600,
-                  height: 1.45,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 18),
-
-        // Visual Supply Chain Stepper
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppTheme.cardBorder),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const LocalizedText(
-                'Maritime Supply Chain Timeline',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.ink,
-                ),
-              ),
-              const SizedBox(height: 14),
-
-              _buildTimelineStep(
-                date: '14 May 2026',
-                tag: 'T - 7 Weeks',
-                title: 'Import License Window Freeze',
-                desc: 'DOA locks foreign vessel allocations. Last date to enforce deferral.',
-                isFirst: true,
-                isActive: true,
-              ),
-              _buildTimelineStep(
-                date: '05 June 2026',
-                tag: 'T - 3 Weeks',
-                title: 'Early Domestic Harvest Influx',
-                desc: 'Galnewa & Thalawa early sowings arrive at regional Dambulla DEC.',
-                isActive: false,
-              ),
-              _buildTimelineStep(
-                date: '01 July 2026',
-                tag: 'T - 0 Weeks',
-                title: 'Peak Maha Harvest Glut Window',
-                desc: 'Production exceeds 4,400 tonnes. Domestic supply fully covers market.',
-                isLast: true,
-                isActive: false,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 18),
-
-        // Action Directives Trigger Cards
-        const LocalizedText(
-          'Actionable Policy Interventions',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-            color: AppTheme.ink,
-          ),
-        ),
-        const SizedBox(height: 10),
-
-        _buildPolicyLeverCard(
-          icon: Icons.timer_off_outlined,
-          title: 'Delay Sea Freight Import Permits',
-          desc: 'Recommend Ministry of Trade freeze private Big Onion import licenses until Sept 2026.',
-          actionLabel: 'Apply Delay Directive',
-          onTap: () => _showRecordDecisionModal(
-            'Delay private import quotas until late harvest',
-            actionType: 'delay_import',
-            quantity: 0,
-            unit: 'MT',
-          ),
-        ),
-        const SizedBox(height: 10),
-
-        _buildPolicyLeverCard(
-          icon: Icons.ac_unit_rounded,
-          title: 'Incentivize Cold Storage Buffer',
-          desc: 'Authorize 30% storage subsidy for Anuradhapura agrarian farmer co-operatives.',
-          actionLabel: 'Incentivize Storage',
-          onTap: () => _showRecordDecisionModal(
-            'Incentivize on-farm cold storage with 30% subsidy',
-            actionType: 'storage_subsidy',
-            quantity: 30,
-            unit: 'percent',
-          ),
-        ),
-        const SizedBox(height: 10),
-
-        _buildPolicyLeverCard(
-          icon: Icons.published_with_changes_rounded,
-          title: 'Direct Green Gram Crop Shifting',
-          desc: 'Issue advisory to divert 350 hectares in zone 2 toward high-value pulses.',
-          actionLabel: 'Broadcast Crop Shift',
-          onTap: () => _showRecordDecisionModal(
-            'Shift Big Onion land toward Green Gram in Zone 2',
-            actionType: 'crop_shift',
-            quantity: 350,
-            unit: 'ha',
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTimelineStep({
-    required String date,
-    required String tag,
-    required String title,
-    required String desc,
-    bool isFirst = false,
-    bool isLast = false,
-    bool isActive = false,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          children: [
-            Container(
-              width: 16,
-              height: 16,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isActive ? AppTheme.primary : Colors.white,
-                border: Border.all(
-                  color: isActive ? AppTheme.primary : AppTheme.neutral400,
-                  width: 2,
-                ),
-              ),
-              child: isActive
-                  ? const Center(
-                      child: Icon(Icons.circle, size: 6, color: Colors.white),
-                    )
-                  : null,
-            ),
-            if (!isLast)
-              Container(width: 2, height: 48, color: AppTheme.neutral200),
-          ],
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  LocalizedText(
-                    date,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.ink,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 1.5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isActive
-                          ? AppTheme.primaryTint
-                          : AppTheme.neutral100,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: LocalizedText(
-                      tag,
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                        color: isActive
-                            ? AppTheme.primary
-                            : AppTheme.neutral600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              LocalizedText(
-                title,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              LocalizedText(
-                desc,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppTheme.neutral600,
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPolicyLeverCard({
-    required IconData icon,
-    required String title,
-    required String desc,
-    required String actionLabel,
-    required VoidCallback onTap,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppTheme.cardBorder),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryTint,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: AppTheme.primary, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                LocalizedText(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.ink,
-                  ),
+                const LocalizedText(
+                  'No live timeline data is available yet.',
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 8),
                 LocalizedText(
-                  desc,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppTheme.neutral600,
-                    height: 1.35,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(130, 34),
-                      visualDensity: VisualDensity.compact,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    onPressed: onTap,
-                    child: LocalizedText(
-                      actionLabel,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+                  latestPeriod == null
+                      ? 'Load a forecast to see timeline information.'
+                      : 'Latest forecast period: $latestPeriod',
+                  style: const TextStyle(color: AppTheme.neutral600),
                 ),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  // -------------------------------------------------------------
-  // TAB 3: ADOPTION TRACKER & DECENTRALIZED STREAM
+  // -------------------------------------------------------------`r`n  // TAB 3: ADOPTION TRACKER & DECENTRALIZED STREAM
   // -------------------------------------------------------------
   Widget _buildAdoptionTab() {
     final rows = _repo.getAdoptionRows();
@@ -1208,113 +916,135 @@ class _OfficerPageState extends State<OfficerPage> {
         ),
         const SizedBox(height: 16),
 
-        // Live Adoption Cards
-        ...rows.map((row) {
-          final progress = (row.reportedHa / row.recommendedHa).clamp(
-            0.0,
-            1.25,
-          );
-          final isOver = progress > 1.05;
-          final isUnder = progress < 0.85;
-
-          final color = isOver
-              ? AppTheme.oversupply
-              : isUnder
-              ? AppTheme.shortage
-              : AppTheme.balanced;
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppTheme.cardBorder),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.02),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
+        if (_repo.loadingAdoption)
+          const Center(child: CircularProgressIndicator())
+        else if (_repo.adoptionError != null)
+          Center(
+            child: Column(
+              children: [
+                LocalizedText(_repo.adoptionError!),
+                TextButton(
+                  onPressed: _repo.loadAdoption,
+                  child: const LocalizedText('Retry'),
                 ),
               ],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  runSpacing: 8,
-                  spacing: 8,
-                  alignment: WrapAlignment.spaceBetween,
-                  children: [
-                    LocalizedText(
-                      row.crop,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.ink,
-                      ),
-                    ),
-                    LocalizedText(
-                      '${row.reportedHa.toInt()} / ${row.recommendedHa.toInt()} ha',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: progress.clamp(0.0, 1.0),
-                    minHeight: 10,
-                    backgroundColor: AppTheme.neutral200,
-                    valueColor: AlwaysStoppedAnimation(color),
+          )
+        else if (rows.isEmpty)
+          const Center(
+            child: LocalizedText(
+              'No adoption telemetry is available yet.',
+              textAlign: TextAlign.center,
+            ),
+          )
+        // Live Adoption Cards
+        else
+          ...rows.map((row) {
+            final progress = (row.reportedHa / row.recommendedHa).clamp(
+              0.0,
+              1.25,
+            );
+            final isOver = progress > 1.05;
+            final isUnder = progress < 0.85;
+
+            final color = isOver
+                ? AppTheme.oversupply
+                : isUnder
+                ? AppTheme.shortage
+                : AppTheme.balanced;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppTheme.cardBorder),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  runSpacing: 8,
-                  spacing: 8,
-                  alignment: WrapAlignment.spaceBetween,
-                  children: [
-                    LocalizedText(
-                      'Recommended: ${row.recommendedHa.toInt()} ha',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppTheme.neutral600,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: LocalizedText(
-                        '${(progress * 100).toInt()}% of Target (${isOver
-                            ? "Over"
-                            : isUnder
-                            ? "Deficit"
-                            : "Optimal"})',
-                        style: TextStyle(
-                          fontSize: 10,
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    runSpacing: 8,
+                    spacing: 8,
+                    alignment: WrapAlignment.spaceBetween,
+                    children: [
+                      LocalizedText(
+                        row.crop,
+                        style: const TextStyle(
+                          fontSize: 15,
                           fontWeight: FontWeight.w800,
-                          color: color,
+                          color: AppTheme.ink,
                         ),
                       ),
+                      LocalizedText(
+                        '${row.reportedHa.toInt()} / ${row.recommendedHa.toInt()} ha',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: progress.clamp(0.0, 1.0),
+                      minHeight: 10,
+                      backgroundColor: AppTheme.neutral200,
+                      valueColor: AlwaysStoppedAnimation(color),
                     ),
-                  ],
-                ),
-              ],
-            ),
-          );
-        }),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    runSpacing: 8,
+                    spacing: 8,
+                    alignment: WrapAlignment.spaceBetween,
+                    children: [
+                      LocalizedText(
+                        'Recommended: ${row.recommendedHa.toInt()} ha',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.neutral600,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: LocalizedText(
+                          '${(progress * 100).toInt()}% of Target (${isOver
+                              ? "Over"
+                              : isUnder
+                              ? "Deficit"
+                              : "Optimal"})',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: color,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
         const SizedBox(height: 18),
 
         // Phase 6: Verified Farmer Declarations (Live Ground-Truth Stream)

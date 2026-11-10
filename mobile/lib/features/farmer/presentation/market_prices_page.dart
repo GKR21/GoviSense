@@ -25,7 +25,8 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
   String _selectedCategory = 'all';
   bool _isLoading = false;
   bool _isLive = false;
-  List<MarketPriceItem> _currentPrices = _allPrices;
+  String? _error;
+  List<MarketPriceItem> _currentPrices = const [];
 
   @override
   void initState() {
@@ -35,7 +36,10 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
   }
 
   Future<void> _fetchPrices() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
     try {
       final live = await _apiService.getMarketPrices(
         category: _selectedCategory,
@@ -46,6 +50,7 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
             _currentPrices = live;
             _isLive = true;
             _isLoading = false;
+            _error = null;
           });
         }
         return;
@@ -54,99 +59,13 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
 
     if (mounted) {
       setState(() {
-        _currentPrices = _allPrices;
+        _currentPrices = const [];
         _isLive = false;
         _isLoading = false;
+        _error = 'Live market prices are unavailable. Try again later.';
       });
     }
   }
-
-  static const List<MarketPriceItem> _allPrices = [
-    MarketPriceItem(
-      cropEn: 'Big Onion (Local Dambulla)',
-      cropSi: 'ලොකු ළූණු (දේශීය දඹුල්ල)',
-      cropTa: 'பெரிய வெங்காயம் (உள்ளூர்)',
-      category: 'vegetable',
-      wholesalePrice: 'Rs 320 – 365 / kg',
-      retailPrice: 'Rs 420 – 460 / kg',
-      economicCenterEn: 'Dambulla DEC',
-      economicCenterSi: 'දඹුල්ල ආර්ථික මධ්‍යස්ථානය',
-      economicCenterTa: 'தம்புள்ளை பொருளாதார மையம்',
-      trendPct: '+4% (Firming)',
-      isUp: true,
-      isStable: false,
-    ),
-    MarketPriceItem(
-      cropEn: 'Green Chilli (MICH 1)',
-      cropSi: 'අමු මිරිස් (MICH 1)',
-      cropTa: 'பச்சை மிளகாய் (MICH 1)',
-      category: 'vegetable',
-      wholesalePrice: 'Rs 240 – 280 / kg',
-      retailPrice: 'Rs 350 – 410 / kg',
-      economicCenterEn: 'Dambulla DEC',
-      economicCenterSi: 'දඹුල්ල ආර්ථික මධ්‍යස්ථානය',
-      economicCenterTa: 'தம்புள்ளை பொருளாதார மையம்',
-      trendPct: '±1% (Stable)',
-      isUp: false,
-      isStable: true,
-    ),
-    MarketPriceItem(
-      cropEn: 'Green Gram (MI-5 / MI-6)',
-      cropSi: 'මුං ඇට (MI-5 / MI-6)',
-      cropTa: 'பச்சைப் பயறு (MI-5)',
-      category: 'pulse',
-      wholesalePrice: 'Rs 390 – 440 / kg',
-      retailPrice: 'Rs 510 – 560 / kg',
-      economicCenterEn: 'Keppetipola DEC',
-      economicCenterSi: 'කැප්පෙටිපොල ආර්ථික මධ්‍යස්ථානය',
-      economicCenterTa: 'கெப்பெட்டிபொல பொருளாதார மையம்',
-      trendPct: '+2% (Upward)',
-      isUp: true,
-      isStable: false,
-    ),
-    MarketPriceItem(
-      cropEn: 'Maize (Feed Grade)',
-      cropSi: 'බඩඉරිඟු (සත්ත්ව ආහාර)',
-      cropTa: 'மக்காச்சோளம் (தீவனம்)',
-      category: 'grain',
-      wholesalePrice: 'Rs 115 – 128 / kg',
-      retailPrice: 'Rs 145 – 165 / kg',
-      economicCenterEn: 'Anuradhapura DEC',
-      economicCenterSi: 'අනුරාධපුර ආර්ථික මධ්‍යස්ථානය',
-      economicCenterTa: 'அனுராதபுர பொருளாதார மையம்',
-      trendPct: '±0% (Stable)',
-      isUp: false,
-      isStable: true,
-    ),
-    MarketPriceItem(
-      cropEn: 'Red Onion (Jaffna / Puttalam)',
-      cropSi: 'රතු ළූණු (යාපනය / පුත්තලම)',
-      cropTa: 'சின்ன வெங்காயம் (யாழ்ப்பாணம்)',
-      category: 'vegetable',
-      wholesalePrice: 'Rs 290 – 340 / kg',
-      retailPrice: 'Rs 390 – 450 / kg',
-      economicCenterEn: 'Meegoda DEC',
-      economicCenterSi: 'මීගොඩ ආර්ථික මධ්‍යස්ථානය',
-      economicCenterTa: 'மீகொட பொருளாதார மையம்',
-      trendPct: '+3% (Upward)',
-      isUp: true,
-      isStable: false,
-    ),
-    MarketPriceItem(
-      cropEn: 'Potato (Nuwara Eliya)',
-      cropSi: 'අර්තාපල් (නුවරඑළිය)',
-      cropTa: 'உருளைக்கிழங்கு (நுவரெலியா)',
-      category: 'tuber',
-      wholesalePrice: 'Rs 290 – 330 / kg',
-      retailPrice: 'Rs 380 – 440 / kg',
-      economicCenterEn: 'Keppetipola DEC',
-      economicCenterSi: 'කැප්පෙටිපොල ආර්ථික මධ්‍යස්ථානය',
-      economicCenterTa: 'கெப்பெட்டிபொல பொருளாதார மையம்',
-      trendPct: '-3% (Downward)',
-      isUp: false,
-      isStable: false,
-    ),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -186,7 +105,7 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
                 LocalizedText(
                   _isLive
                       ? 'CBSL & HARTI Live API Feed'
-                      : 'Offline Baseline Benchmark',
+                      : 'Live feed unavailable',
                   style: TextStyle(
                     fontSize: 11,
                     color: _isLive
@@ -306,7 +225,27 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
             const SizedBox(height: 14),
 
             // Price Cards List
-            ...filtered.map((item) => _buildPriceCard(item, lang)),
+            if (_error != null)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      LocalizedText(
+                        _error!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: AppTheme.neutral600),
+                      ),
+                      TextButton(
+                        onPressed: _isLoading ? null : _fetchPrices,
+                        child: const LocalizedText('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              ...filtered.map((item) => _buildPriceCard(item, lang)),
           ],
         ),
       ),
@@ -320,7 +259,10 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
       child: ChoiceChip(
         label: LocalizedText(label),
         selected: isSelected,
-        onSelected: (_) => setState(() => _selectedCategory = key),
+        onSelected: (_) {
+          setState(() => _selectedCategory = key);
+          _fetchPrices();
+        },
         selectedColor: AppTheme.primary,
         labelStyle: TextStyle(
           color: isSelected ? Colors.white : AppTheme.ink,
