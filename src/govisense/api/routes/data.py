@@ -7,7 +7,7 @@ Implements catalogue, adoption tracker, scoreboard, and market price endpoints r
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional, List, Dict, Any
 import pandas as pd
 
@@ -17,6 +17,12 @@ from sqlalchemy import func
 
 from govisense.api.deps import get_db
 from govisense.config import settings
+from govisense.db.lookups import (
+    ensure_crop_exists,
+    ensure_forecast_model,
+    ensure_pipeline_run,
+    format_month_str,
+)
 from govisense.db.session import get_session
 from govisense.db.models import (
     DataCatalogueModel,
@@ -26,6 +32,7 @@ from govisense.db.models import (
     MonthlyDataModel,
     ForecastSnapshotModel,
     PipelineRunModel,
+    SeasonModel,
 )
 from govisense.models.a2_price_forecast import compute_modeled_retail_price
 from govisense.provenance import compute_data_version, compute_model_version, get_git_commit, compute_dataset_provenance
@@ -51,7 +58,7 @@ def list_data_catalogue(db: Any = Depends(get_db)):
                 publisher="Central Bank of Sri Lanka (CBSL)",
                 source_url="https://www.cbsl.gov.lk/en/statistics/economic-indicators/weekly-indicators",
                 licence="Open Government Data Licence - Sri Lanka",
-                date_retrieved="2026-03-15",
+                date_retrieved=date(2026, 3, 15),
                 temporal_range="2020-01 to 2024-12",
                 is_primary=True,
             ),
@@ -61,7 +68,7 @@ def list_data_catalogue(db: Any = Depends(get_db)):
                 publisher="Hector Kobbekaduwa Agrarian Research and Training Institute (HARTI)",
                 source_url="http://www.harti.gov.lk",
                 licence="Government of Sri Lanka Open Data",
-                date_retrieved="2026-03-20",
+                date_retrieved=date(2026, 3, 20),
                 temporal_range="2020-01 to 2024-12",
                 is_primary=True,
             ),
@@ -71,7 +78,7 @@ def list_data_catalogue(db: Any = Depends(get_db)):
                 publisher="Department of Agriculture (DOA), Peradeniya",
                 source_url="https://www.doa.gov.lk",
                 licence="Open Government Data Licence - Sri Lanka",
-                date_retrieved="2026-02-10",
+                date_retrieved=date(2026, 2, 10),
                 temporal_range="Seasonal (Yala/Maha 2020-2026)",
                 is_primary=True,
             ),
@@ -81,7 +88,7 @@ def list_data_catalogue(db: Any = Depends(get_db)):
                 publisher="NASA POWER Project",
                 source_url="https://power.larc.nasa.gov",
                 licence="NASA Open Data Policy (Public Domain)",
-                date_retrieved="2026-03-01",
+                date_retrieved=date(2026, 3, 1),
                 temporal_range="2015-01 to 2024-12",
                 is_primary=True,
             ),
@@ -143,12 +150,15 @@ def get_adoption_summary(
     eff_season = season if isinstance(season, str) else getattr(season, "default", "Maha 2025/2026")
     reports = (
         db.query(PlantingReportModel)
-        .filter(PlantingReportModel.crop_id == eff_crop, PlantingReportModel.season == eff_season)
+        .join(SeasonModel, PlantingReportModel.season_id == SeasonModel.season_id)
+        .filter(PlantingReportModel.crop_id == eff_crop, SeasonModel.label == eff_season)
         .all()
     )
     harvests = (
         db.query(HarvestReportModel)
-        .filter(HarvestReportModel.crop_id == eff_crop, HarvestReportModel.season == eff_season)
+        .join(PlantingReportModel, HarvestReportModel.planting_report_id == PlantingReportModel.report_id)
+        .join(SeasonModel, PlantingReportModel.season_id == SeasonModel.season_id)
+        .filter(PlantingReportModel.crop_id == eff_crop, SeasonModel.label == eff_season)
         .all()
     )
 
@@ -200,7 +210,7 @@ def get_adoption_summary(
             "message": telemetry_msg,
         }
 
-    total_reported_ha = sum(r.actual_area_ha or r.planned_area_ha for r in reports)
+    total_reported_ha = sum(float(r.actual_area_ha or r.planned_area_ha) for r in reports)
     coverage_pct = round((total_reported_ha / target_area_ha) * 100.0, 1)
 
     followed_yes = sum(1 for r in reports if str(r.followed_recommendation).lower() in ("yes", "true", "followed"))
@@ -209,13 +219,13 @@ def get_adoption_summary(
     total_responses = followed_yes + followed_partly + followed_no
     adherence_pct = round((followed_yes / total_responses) * 100.0, 1) if total_responses > 0 else None
 
-    total_harvest_kg = sum(h.harvest_quantity_kg for h in harvests)
+    total_harvest_kg = sum(float(h.harvest_quantity_kg) for h in harvests)
     avg_yield = (
         round(sum(h.yield_mt_per_ha for h in harvests) / len(harvests), 2)
         if harvests
         else None
     )
-    sale_prices = [h.sale_price_rs_kg for h in harvests if h.sale_price_rs_kg is not None]
+    sale_prices = [float(h.sale_price_rs_kg) for h in harvests if h.sale_price_rs_kg is not None]
     avg_price = round(sum(sale_prices) / len(sale_prices), 1) if sale_prices else None
 
     return {
@@ -277,7 +287,8 @@ def get_latest_prices(db: Any = Depends(get_db)):
             .first()
         )
         if latest_row:
-            as_of_date = latest_row.month
+            month_str = format_month_str(latest_row.month)
+            as_of_date = month_str
             w_price = float(latest_row.wholesale_price_rs_kg)
             r_price = (
                 float(latest_row.retail_price_rs_kg)
@@ -287,7 +298,7 @@ def get_latest_prices(db: Any = Depends(get_db)):
             prices.append({
                 "crop": crop,
                 "market": "Dambulla Dedicated Economic Centre",
-                "date": latest_row.month,
+                "date": month_str,
                 "wholesale_price_rs_kg": w_price,
                 "retail_price_rs_kg": round(r_price, 2),
                 "data_quality": latest_row.source_type,
@@ -349,7 +360,9 @@ def get_evaluation_scoreboard(db: Any = Depends(get_db)):
         try:
             from govisense.evaluation.backtest import run_walk_forward_evaluation
             backtest_res = run_walk_forward_evaluation(crops=["big_onion", "chilli"])
+            ensure_pipeline_run(db, run_id=run_id, trigger_type="api", data_version=d_ver, model_version=m_ver)
             for crop in ["big_onion", "chilli"]:
+                cid = ensure_crop_exists(db, crop)
                 c_data = backtest_res.get(crop, {})
                 s_info = c_data.get("a3_supply_forecast", {})
                 p_info = c_data.get("a2_price_forecast", {})
@@ -360,13 +373,15 @@ def get_evaluation_scoreboard(db: Any = Depends(get_db)):
                     beat = bool(mw < bw) if (mw is not None and bw is not None) else False
                     cov = float(s_info.get("interval_80_coverage_pct", 80.0))
                     pts = int(s_info.get("eval_points", 0))
+                    m_name = ensure_forecast_model(db, "A3 Supply Forecast", model_kind="component")
+                    b_name = ensure_forecast_model(db, "seasonal_naive", model_kind="baseline", is_baseline=True) if bw is not None else None
                     rec = EvaluationResultModel(
                         run_id=run_id,
-                        crop_id=crop,
-                        model_name="A3 Supply Forecast",
+                        crop_id=cid,
+                        model_name=m_name,
                         metric_name="WAPE",
                         metric_value=mw,
-                        baseline_name="seasonal_naive",
+                        baseline_name=b_name,
                         baseline_value=bw,
                         beat_baseline=beat,
                         evaluation_period="walk-forward",
@@ -393,13 +408,15 @@ def get_evaluation_scoreboard(db: Any = Depends(get_db)):
                     beat = bool(mw < bw) if (mw is not None and bw is not None) else False
                     cov = float(p_info.get("interval_80_coverage_pct", 80.0)) if "interval_80_coverage_pct" in p_info else 80.0
                     pts = int(p_info.get("eval_points", 0))
+                    m_name = ensure_forecast_model(db, "A2 Price Forecast", model_kind="component")
+                    b_name = ensure_forecast_model(db, "SARIMAX", model_kind="baseline", is_baseline=True) if bw is not None else None
                     rec = EvaluationResultModel(
                         run_id=run_id,
-                        crop_id=crop,
-                        model_name="A2 Price Forecast",
+                        crop_id=cid,
+                        model_name=m_name,
                         metric_name="WAPE",
                         metric_value=mw,
-                        baseline_name="SARIMAX",
+                        baseline_name=b_name,
                         baseline_value=bw,
                         beat_baseline=beat,
                         evaluation_period="walk-forward",
@@ -420,14 +437,22 @@ def get_evaluation_scoreboard(db: Any = Depends(get_db)):
 
                 # Persist multi-horizon rows (t+1, t+2, t+3 against seasonal_naive, last_value, sarimax)
                 for mh_row in c_data.get("multi_horizon_rows", []):
+                    mh_cid = ensure_crop_exists(db, mh_row["crop_id"])
+                    mh_model = ensure_forecast_model(db, mh_row["model_name"], model_kind="price")
+                    mh_base = (
+                        ensure_forecast_model(db, mh_row["baseline_name"], model_kind="baseline", is_baseline=True)
+                        if mh_row.get("baseline_name") and mh_row.get("baseline_value") is not None
+                        else None
+                    )
+                    mh_base_val = mh_row.get("baseline_value") if mh_base is not None else None
                     rec_mh = EvaluationResultModel(
                         run_id=run_id,
-                        crop_id=mh_row["crop_id"],
-                        model_name=mh_row["model_name"],
+                        crop_id=mh_cid,
+                        model_name=mh_model,
                         metric_name=mh_row["metric_name"],
                         metric_value=mh_row["metric_value"],
-                        baseline_name=mh_row["baseline_name"],
-                        baseline_value=mh_row["baseline_value"],
+                        baseline_name=mh_base,
+                        baseline_value=mh_base_val,
                         beat_baseline=mh_row["beat_baseline"],
                         evaluation_period=mh_row["evaluation_period"],
                         details=mh_row["details"],

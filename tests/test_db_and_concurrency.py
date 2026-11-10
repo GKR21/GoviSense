@@ -9,20 +9,23 @@ import uuid
 import pytest
 from datetime import datetime, timezone
 
+from govisense.db.lookups import ensure_crop_exists, ensure_officer, ensure_user_for_actor, resolve_district_id
 from govisense.db.models import (
-    Base,
-    User,
-    PlantingReportRecord,
-    DecisionHistoryRecord,
     Alert,
     AlertInteraction,
+    AlertQuestionModel,
+    AlertTranslationModel,
+    Base,
+    DecisionHistoryRecord,
     MarketPriceRecord,
+    PlantingReportRecord,
+    User,
 )
 from govisense.db.session import (
-    engine,
+    db_write_lock,
     get_db_session,
+    get_engine,
     init_db,
-    sqlite_write_lock,
     migrate_legacy_json_files,
 )
 from govisense.feedback.planting_reports import PlantingReport, PlantingReportStore
@@ -149,36 +152,67 @@ def test_concurrent_writes_safety():
 
 
 def test_alerts_and_interactions_models():
-    """Verify Alert and AlertInteraction models operate cleanly with DB."""
+    """Verify normalized Alert, AlertTranslation, AlertStatus, and AlertQuestion models operate cleanly."""
     with get_db_session() as db:
         alert_id = f"ALT-{uuid.uuid4().hex[:8].upper()}"
+        cid = ensure_crop_exists(db, "big_onion")
+        dist_id = resolve_district_id(db, "Anuradhapura")
         alert = Alert(
             alert_id=alert_id,
-            crop_id="big_onion",
+            crop_id=cid,
+            district_id=dist_id,
+            type_code="GLUT_WARNING",
             severity="warning",
-            title_en="High Supply Warning",
-            title_si="අධික සැපයුම් අනතුරු ඇඟවීම",
-            title_ta="அதிக விநியோக எச்சரிக்கை",
-            message_en="Projected supply exceeds local hub capacity by 15%.",
-            message_si="ඇස්තමේන්තුගත සැපයුම කලාපීය ධාරිතාව ඉක්මවයි.",
-            message_ta="மதிப்பிடப்பட்ட விநியோகம் கொள்ளளவை விட அதிகமாக உள்ளது.",
+            message_key="GLUT_WARNING",
             target_role="farmer",
             status="active",
         )
         db.add(alert)
-        db.commit()
+        db.flush()
+        db.add_all(
+            [
+                AlertTranslationModel(
+                    alert_id=alert_id,
+                    lang_code="en",
+                    title="High Supply Warning",
+                    message="Projected supply exceeds local hub capacity by 15%.",
+                ),
+                AlertTranslationModel(
+                    alert_id=alert_id,
+                    lang_code="si",
+                    title="අධික සැපයුම් අනතුරු ඇඟවීම",
+                    message="ඇස්තමේන්තුගත සැපයුම කලාපීය ධාරිතාව ඉක්මවයි.",
+                ),
+                AlertTranslationModel(
+                    alert_id=alert_id,
+                    lang_code="ta",
+                    title="அதிக விநியோக எச்சரிக்கை",
+                    message="மதிப்பிடப்பட்ட விநியோகம் கொள்ளளவை விட அதிகமாக உள்ளது.",
+                ),
+            ]
+        )
 
+        uid = ensure_user_for_actor(db, "FARMER-TEST-001", default_role="farmer")
+        off = ensure_officer(db, officer_id="OFF-ALERT-TEST")
+        now = datetime.now(timezone.utc)
         interaction = AlertInteraction(
             alert_id=alert_id,
-            farmer_id="FARMER-TEST-001",
-            acknowledged=True,
-            question="Should I store in cool room?",
-            officer_response="Yes, hold for 2 weeks until prices recover.",
+            user_id=uid,
+            read_at=now,
+            acknowledged_at=now,
         )
         db.add(interaction)
+        db.add(
+            AlertQuestionModel(
+                alert_id=alert_id,
+                user_id=uid,
+                question="Should I store in cool room?",
+                answered_by=off.officer_id,
+                officer_response="Yes, hold for 2 weeks until prices recover.",
+            )
+        )
         db.commit()
 
-        # Query back
         fetched_alert = db.query(Alert).filter(Alert.alert_id == alert_id).first()
         assert fetched_alert is not None
         assert fetched_alert.to_dict(lang="si")["title"] == "අධික සැපයුම් අනතුරු ඇඟවීම"

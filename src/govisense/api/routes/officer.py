@@ -17,12 +17,20 @@ from sqlalchemy.orm import Session
 
 from govisense.api.deps import get_db, require_officer
 from govisense.config import settings
+from govisense.db.lookups import (
+    ensure_crop_exists,
+    ensure_officer,
+    ensure_pipeline_run,
+    normalize_decision_action,
+    resolve_season_id,
+)
 from govisense.db.session import get_session
 from govisense.db.models import (
     PipelineRunModel,
     DecisionRecordModel,
     ForecastSnapshotModel,
     OfficerModel,
+    SeasonModel,
     compute_sha256_hash,
 )
 from govisense.db.history import DecisionHistoryStore, DecisionRecord
@@ -149,25 +157,16 @@ def record_officer_decision(
     """
     # Verify officer exists or create record
     officer_id = payload.officer_id or (current_user.get("officer_id") if current_user else "OFF-001")
-    off = db.query(OfficerModel).filter(OfficerModel.officer_id == officer_id).first()
-    if not off:
-        off = OfficerModel(
-            officer_id=officer_id,
-            name=current_user.get("name", "Officer in Charge") if current_user else "Officer in Charge",
-            district="Anuradhapura",
-            role="Agricultural Extension Officer",
-        )
-        db.add(off)
-        db.commit()
-
-    run_id = payload.run_id
-    if not run_id:
-        latest_run = db.query(PipelineRunModel).order_by(PipelineRunModel.created_at.desc()).first()
-        run_id = latest_run.run_id if latest_run else f"RUN-{get_git_commit()[:7]}"
+    ensure_officer(
+        db,
+        officer_id=officer_id,
+        name=current_user.get("name", "Officer in Charge") if current_user else "Officer in Charge",
+        district="Anuradhapura",
+        role="Agricultural Extension Officer",
+    )
 
     m_ver = compute_model_version()
     d_ver = compute_data_version()
-
     assumptions = {
         "loss_pct": 0.15,
         "import_lead_weeks": settings.import_lead_time_weeks.get(payload.crop_id, 7),
@@ -175,11 +174,30 @@ def record_officer_decision(
         "cif_colombo": settings.cif_colombo_rs_per_mt.get(payload.crop_id, 140000.0),
     }
 
+    run_id = payload.run_id
+    if not run_id:
+        latest_run = db.query(PipelineRunModel).order_by(PipelineRunModel.created_at.desc()).first()
+        run_id = latest_run.run_id if latest_run else f"RUN-{get_git_commit()[:7]}"
+    run_id = ensure_pipeline_run(
+        db,
+        run_id=run_id,
+        trigger_type="api",
+        model_version=m_ver,
+        data_version=d_ver,
+        assumptions=assumptions,
+    )
+
+    cid = ensure_crop_exists(db, payload.crop_id)
+    season_id = resolve_season_id(db, payload.season)
+    action_code = normalize_decision_action(payload.action_type) or "NO_ACTION"
+    rec_action = normalize_decision_action(payload.model_recommended_action)
+    resp_val = payload.officer_response if payload.officer_response in ("accepted", "modified", "rejected") else "accepted"
+
     hash_payload = {
-        "crop_id": payload.crop_id,
+        "crop_id": cid,
         "season": payload.season,
         "officer_id": officer_id,
-        "action_type": payload.action_type,
+        "action_type": action_code,
         "quantity": payload.quantity,
         "model_version": m_ver,
         "data_version": d_ver,
@@ -194,19 +212,16 @@ def record_officer_decision(
         decision_id=decision_id,
         run_id=run_id,
         record_hash=record_hash,
-        crop_id=payload.crop_id,
-        season=payload.season,
+        crop_id=cid,
+        season_id=season_id,
         officer_id=officer_id,
-        model_recommended_action=payload.model_recommended_action,
-        officer_response=payload.officer_response,
-        action_type=payload.action_type,
+        model_recommended_action=rec_action,
+        officer_response=resp_val,
+        action_type=action_code,
         quantity=payload.quantity,
         unit=payload.unit,
         rationale=payload.rationale,
-        model_version=m_ver,
-        data_version=d_ver,
-        assumptions=assumptions,
-        timestamp=now,
+        decided_at=now,
     )
     db.add(db_decision)
     db.commit()
@@ -216,7 +231,7 @@ def record_officer_decision(
         "decision_id": decision_id,
         "run_id": run_id,
         "record_hash": record_hash,
-        "action_type": payload.action_type,
+        "action_type": action_code,
         "quantity": payload.quantity,
         "timestamp": now.isoformat(),
     }
@@ -243,9 +258,9 @@ def list_decisions(
     if eff_crop:
         q = q.filter(DecisionRecordModel.crop_id == eff_crop)
     if eff_season:
-        q = q.filter(DecisionRecordModel.season == eff_season)
+        q = q.join(SeasonModel).filter(SeasonModel.label == eff_season)
 
-    records = q.order_by(DecisionRecordModel.timestamp.desc()).limit(eff_limit).all()
+    records = q.order_by(DecisionRecordModel.decided_at.desc()).limit(eff_limit).all()
     return [r.to_dict() for r in records]
 
 
@@ -264,10 +279,9 @@ def list_runs(
     eff_limit = limit if isinstance(limit, int) else getattr(limit, "default", 20)
     runs = db.query(PipelineRunModel).order_by(PipelineRunModel.created_at.desc()).limit(eff_limit).all()
     if not runs:
-        # Create baseline run from current system state
         baseline_run = PipelineRunModel(
             run_id=f"RUN-{get_git_commit()[:7]}",
-            trigger="system_init",
+            trigger_type="api",
             model_version=compute_model_version(),
             data_version=compute_data_version(),
             assumptions={

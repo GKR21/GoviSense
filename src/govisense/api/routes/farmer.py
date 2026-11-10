@@ -18,6 +18,13 @@ from sqlalchemy.orm import Session
 
 from govisense.api.deps import get_db, require_farmer, get_optional_current_user
 from govisense.config import settings
+from govisense.db.lookups import (
+    normalize_irrigation_code,
+    normalize_lang_code,
+    normalize_soil_code,
+    resolve_district_id,
+    resolve_division_id,
+)
 from govisense.db.session import get_session
 from govisense.db.models import (
     FarmerProfileModel,
@@ -334,13 +341,14 @@ def get_farmer_history(
     plantings = (
         db.query(PlantingReportModel)
         .filter(PlantingReportModel.pseudonymous_id == farmer_id)
-        .order_by(PlantingReportModel.timestamp.desc())
+        .order_by(PlantingReportModel.submitted_at.desc())
         .all()
     )
     harvests = (
         db.query(HarvestReportModel)
-        .filter(HarvestReportModel.pseudonymous_id == farmer_id)
-        .order_by(HarvestReportModel.timestamp.desc())
+        .join(PlantingReportModel, HarvestReportModel.planting_report_id == PlantingReportModel.report_id)
+        .filter(PlantingReportModel.pseudonymous_id == farmer_id)
+        .order_by(HarvestReportModel.submitted_at.desc())
         .all()
     )
 
@@ -367,31 +375,37 @@ def upsert_farmer_profile(
         .first()
     )
     now = datetime.now(timezone.utc)
+    dist_id = resolve_district_id(db, payload.district)
+    div_id = resolve_division_id(db, dist_id, payload.divisional_secretariat)
+    irr_code = normalize_irrigation_code(payload.irrigation_type, payload.irrigation_subtype)
+    soil_code = normalize_soil_code(payload.soil_type)
+    lang_code = normalize_lang_code(payload.language)
+
     if existing:
-        existing.district = payload.district
-        existing.divisional_secretariat = payload.divisional_secretariat
+        existing.district_id = dist_id
+        existing.division_id = div_id
         existing.total_land_ha = payload.total_land_ha
-        existing.irrigation_type = payload.irrigation_type
-        existing.irrigation_subtype = payload.irrigation_subtype
-        existing.soil_type = payload.soil_type
+        existing.irrigation_code = irr_code
+        existing.soil_code = soil_code
         existing.soil_ph = payload.soil_ph
-        existing.language = payload.language
+        existing.lang_code = lang_code
         existing.consent_given = payload.consent_given
         db.commit()
         return {"status": "UPDATED", "profile": existing.to_dict()}
     else:
         profile = FarmerProfileModel(
             pseudonymous_id=payload.pseudonymous_id,
-            district=payload.district,
-            divisional_secretariat=payload.divisional_secretariat,
+            district_id=dist_id,
+            division_id=div_id,
             total_land_ha=payload.total_land_ha,
-            irrigation_type=payload.irrigation_type,
-            irrigation_subtype=payload.irrigation_subtype,
-            soil_type=payload.soil_type,
+            irrigation_code=irr_code,
+            soil_code=soil_code,
             soil_ph=payload.soil_ph,
             consent_given=payload.consent_given,
-            language=payload.language,
+            consent_at=now,
+            lang_code=lang_code,
             created_at=now,
+            updated_at=now,
         )
         db.add(profile)
         db.commit()

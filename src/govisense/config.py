@@ -230,17 +230,12 @@ class GoviSenseSettings:
     # Available land constraint for pilot area (hectares)
     max_arable_land_ha: float = 12_500.0
 
-    # PostgreSQL Database persistence configuration
+    # PostgreSQL Database persistence configuration (strictly PostgreSQL via db.sql)
+    db_schema_path: Path = DATABASE_DIR / "db.sql"
     database_url: str = field(
         default_factory=lambda: os.getenv(
             "DATABASE_URL",
             "postgresql+psycopg2://postgres:postgres@localhost:5432/govisense",
-        )
-    )
-    fallback_sqlite_url: str = field(
-        default_factory=lambda: os.getenv(
-            "FALLBACK_DATABASE_URL",
-            f"sqlite:///{DATABASE_DIR / 'govisense.db'}",
         )
     )
     db_echo: bool = field(

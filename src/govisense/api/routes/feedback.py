@@ -21,12 +21,30 @@ from sqlalchemy import func
 
 from govisense.api.deps import rate_limiter, get_db, require_officer
 from govisense.config import settings
-from govisense.db.session import get_session, sqlite_write_lock
+from govisense.db.lookups import (
+    ensure_crop_exists,
+    ensure_farmer_profile,
+    ensure_forecast_model,
+    ensure_pipeline_run,
+    normalize_data_quality,
+    normalize_irrigation_code,
+    normalize_sale_channel,
+    parse_month_date,
+    resolve_district_id,
+    resolve_season_id,
+)
+from govisense.db.session import db_write_lock, get_session
 from govisense.db.models import (
-    PlantingReportModel,
-    HarvestReportModel,
+    DistrictModel,
+    FarmerProfileModel,
     ForecastSnapshotModel,
+    HarvestReportFlagModel,
+    HarvestReportModel,
+    HarvestReportProblemModel,
     PipelineRunModel,
+    PlantingReportFlagModel,
+    PlantingReportModel,
+    SeasonModel,
     validate_season_format,
 )
 from govisense.feedback.planting_reports import PlantingReportStore, PlantingReport
@@ -157,23 +175,31 @@ def submit_planting_report(payload: Dict[str, Any] = Body(...), db: Any = Depend
     if actual_ha is None:
         actual_ha = planned_ha
 
+    cid = ensure_crop_exists(db, payload.crop_id)
+    district = getattr(payload, "district", "Anuradhapura")
+    irr_code = normalize_irrigation_code(getattr(payload, "irrigation_type", "irrigated"))
+    soil_ph = getattr(payload, "soil_ph", None)
+    season_id = resolve_season_id(db, payload.season)
+
     # 4. Enforce farmer rate limiting and duplicate-report checks (Task 12 & Task 18)
     existing_dup_id: Optional[str] = None
+    existing_season_row: Optional[PlantingReportModel] = None
     try:
-        with sqlite_write_lock:
+        with db_write_lock:
             report_store.check_rate_limit(payload.pseudonymous_id)
-            existing_dup = (
+            existing_season_row = (
                 db.query(PlantingReportModel)
                 .filter(
                     PlantingReportModel.pseudonymous_id == payload.pseudonymous_id,
-                    PlantingReportModel.crop_id == payload.crop_id,
-                    PlantingReportModel.season == payload.season,
-                    PlantingReportModel.actual_area_ha == actual_ha,
+                    PlantingReportModel.crop_id == cid,
+                    PlantingReportModel.season_id == season_id,
                 )
                 .first()
             )
-            if existing_dup:
-                existing_dup_id = existing_dup.report_id
+            if existing_season_row and (
+                float(existing_season_row.actual_area_ha or existing_season_row.planned_area_ha) == float(actual_ha)
+            ):
+                existing_dup_id = existing_season_row.report_id
                 raise ValueError(
                     f"Duplicate planting report detected for farmer '{payload.pseudonymous_id}', "
                     f"crop '{payload.crop_id}', season '{payload.season}', area {actual_ha} ha."
@@ -185,7 +211,6 @@ def submit_planting_report(payload: Dict[str, Any] = Body(...), db: Any = Depend
         return resp_err
 
     flags = []
-    # Anomaly flags
     if planned_ha > 20.0 or actual_ha > 20.0:
         flags.append("FLAG_LARGE_HOLDING")
 
@@ -212,40 +237,63 @@ def submit_planting_report(payload: Dict[str, Any] = Body(...), db: Any = Depend
         except Exception:
             pass
 
-    district = getattr(payload, "district", "Anuradhapura")
-    irr_type = getattr(payload, "irrigation_type", "irrigated")
-    soil_ph = getattr(payload, "soil_ph", None)
     reason = getattr(payload, "reason", None)
-    followed_rec = getattr(payload, "followed_recommendation", None)
     rec_crop_shown = getattr(payload, "recommended_crop_shown", None)
+    if rec_crop_shown:
+        rec_crop_shown = ensure_crop_exists(db, rec_crop_shown)
     notes = getattr(payload, "notes", None)
 
-    report_id = f"REP-{uuid.uuid4().hex[:8].upper()}"
-    report_model = PlantingReportModel(
-        report_id=report_id,
+    ensure_farmer_profile(
+        db,
         pseudonymous_id=payload.pseudonymous_id,
-        crop_id=payload.crop_id,
-        season=payload.season,
-        planned_area_ha=planned_ha,
-        actual_area_ha=actual_ha,
         district=district,
-        irrigation_type=irr_type,
+        total_land_ha=max(50.0, float(planned_ha), float(actual_ha)),
+        irrigation_type=irr_code,
         soil_ph=soil_ph,
-        planting_date=p_date,
-        expected_harvest_date=eh_date,
-        recommended_crop_shown=rec_crop_shown,
-        followed_recommendation=followed_rec,
-        reason=reason,
-        expected_price_rs_kg=exp_price,
-        harvest_outcome_mt=getattr(payload, "harvest_outcome_mt", None),
-        sale_price_rs_kg=getattr(payload, "sale_price_rs_kg", None),
-        sale_channel=getattr(payload, "sale_channel", None),
-        consent_given=getattr(payload, "consent_given", True),
-        flags=flags,
-        notes=notes,
-        timestamp=now,
+        consent_given=bool(getattr(payload, "consent_given", True)),
     )
-    db.add(report_model)
+
+    if existing_season_row:
+        report_id = existing_season_row.report_id
+        existing_season_row.planned_area_ha = planned_ha
+        existing_season_row.actual_area_ha = actual_ha
+        existing_season_row.irrigation_code = irr_code
+        existing_season_row.planting_date = p_date
+        existing_season_row.expected_harvest_date = eh_date
+        existing_season_row.recommended_crop_shown = rec_crop_shown
+        existing_season_row.reason = reason
+        existing_season_row.expected_price_rs_kg = exp_price
+        existing_season_row.notes = notes
+        existing_season_row.submitted_at = now
+        if "FLAG_UPDATED_REPORT" not in flags:
+            flags.append("FLAG_UPDATED_REPORT")
+        for fc in flags:
+            if not db.query(PlantingReportFlagModel).filter_by(report_id=report_id, flag_code=fc).first():
+                db.add(PlantingReportFlagModel(report_id=report_id, flag_code=fc))
+    else:
+        report_id = f"REP-{uuid.uuid4().hex[:8].upper()}"
+        report_model = PlantingReportModel(
+            report_id=report_id,
+            pseudonymous_id=payload.pseudonymous_id,
+            crop_id=cid,
+            season_id=season_id,
+            planned_area_ha=planned_ha,
+            actual_area_ha=actual_ha,
+            irrigation_code=irr_code,
+            planting_date=p_date,
+            expected_harvest_date=eh_date,
+            recommended_crop_shown=rec_crop_shown,
+            reason=reason,
+            expected_price_rs_kg=exp_price,
+            consent_given=getattr(payload, "consent_given", True),
+            notes=notes,
+            submitted_at=now,
+        )
+        db.add(report_model)
+        db.flush()
+        for fc in flags:
+            db.add(PlantingReportFlagModel(report_id=report_id, flag_code=fc))
+
     db.commit()
     status_code_msg = "ACCEPTED"
 
@@ -258,25 +306,35 @@ def submit_planting_report(payload: Dict[str, Any] = Body(...), db: Any = Depend
 
     # Persist the snapshot from retrigger
     try:
+        ensure_pipeline_run(
+            db,
+            run_id=new_run_id,
+            trigger_type="retrigger_feedback",
+            assumptions={"crop_id": cid, "season": payload.season, "report_id": report_id},
+        )
+        dist_id = resolve_district_id(db, district)
+        p_mod = ensure_forecast_model(db, "SARIMAX-LightGBM-ensemble", model_kind="price")
+        s_mod = ensure_forecast_model(db, "A1-Baseline-Lagged-SMA", model_kind="baseline", is_baseline=True)
         snap = ForecastSnapshotModel(
             run_id=new_run_id,
-            crop_id=payload.crop_id,
-            district=district,
-            season=payload.season,
-            forecast_for_month=datetime.now(timezone.utc).strftime("%Y-%m"),
+            crop_id=cid,
+            district_id=dist_id,
+            forecast_for_month=now.date().replace(day=1),
             horizon_months=3,
             price_p50=exp_price or 150.0,
             retail_price_rs_kg=round((exp_price or 150.0) * 1.25, 2),
             supply_mid_mt=float(retrigger_res.total_reported_ha * 15.0 * 0.85),
             demand_mt=float(retrigger_res.previous_target_ha * 15.0 * 0.85),
             spi_ratio_mid=float(max(0.4, 1.0 + retrigger_res.new_spi)),
-            spi_label=retrigger_res.new_spi_label,
-            confidence_badge="medium",
+            price_model_used=p_mod,
+            supply_model_used=s_mod,
             confidence_score=65.0,
+            data_quality=normalize_data_quality("verified"),
         )
         db.add(snap)
         db.commit()
     except Exception as e:
+        db.rollback()
         logger.warning("Failed to save retrigger snapshot: %s", e)
 
     from dataclasses import asdict
@@ -338,13 +396,33 @@ def submit_harvest_report(payload: Dict[str, Any] = Body(...), db: Any = Depends
         except Exception:
             pass
 
+    cid = ensure_crop_exists(db, payload.crop_id)
+    season_id = resolve_season_id(db, payload.season)
+    parent_pr = db.query(PlantingReportModel).filter(PlantingReportModel.report_id == payload.planting_report_id).first()
+    if not parent_pr:
+        ensure_farmer_profile(
+            db,
+            pseudonymous_id=payload.pseudonymous_id,
+            total_land_ha=max(50.0, float(payload.area_harvested_ha)),
+            consent_given=True,
+        )
+        parent_pr = PlantingReportModel(
+            report_id=payload.planting_report_id,
+            pseudonymous_id=payload.pseudonymous_id,
+            crop_id=cid,
+            season_id=season_id,
+            planned_area_ha=payload.area_harvested_ha,
+            actual_area_ha=payload.area_harvested_ha,
+            irrigation_code="irrigated",
+            consent_given=True,
+        )
+        db.add(parent_pr)
+        db.flush()
+
     harvest_id = f"HVST-{uuid.uuid4().hex[:8].upper()}"
     harvest = HarvestReportModel(
         harvest_id=harvest_id,
         planting_report_id=payload.planting_report_id,
-        pseudonymous_id=payload.pseudonymous_id,
-        crop_id=payload.crop_id,
-        season=payload.season,
         area_harvested_ha=payload.area_harvested_ha,
         harvest_date=h_date,
         harvest_quantity_kg=payload.harvest_quantity_kg,
@@ -352,28 +430,23 @@ def submit_harvest_report(payload: Dict[str, Any] = Body(...), db: Any = Depends
         quantity_sold_kg=payload.quantity_sold_kg,
         quantity_stored_kg=payload.quantity_stored_kg,
         sale_price_rs_kg=payload.sale_price_rs_kg,
-        sale_channel=payload.sale_channel,
+        channel_code=normalize_sale_channel(payload.sale_channel),
         sale_month=payload.sale_month,
-        problems=payload.problems or [],
-        flags=flags,
         notes=payload.notes,
     )
     db.add(harvest)
+    db.flush()
+    for fc in flags:
+        db.add(HarvestReportFlagModel(harvest_id=harvest_id, flag_code=fc))
+    for pc in (payload.problems or []):
+        db.add(HarvestReportProblemModel(harvest_id=harvest_id, problem_code=str(pc)[:50]))
 
-    # Fill actuals in forecast_snapshots for walk-forward evaluation
-    current_month = datetime.now(timezone.utc).strftime("%Y-%m")
+    # Count matching snapshots for crop/month (actuals derived dynamically in v_forecast_latest)
     matching_snapshots = (
         db.query(ForecastSnapshotModel)
-        .filter(
-            ForecastSnapshotModel.crop_id == payload.crop_id,
-            ForecastSnapshotModel.season == payload.season,
-        )
+        .filter(ForecastSnapshotModel.crop_id == cid)
         .all()
     )
-    for snap in matching_snapshots:
-        if payload.sale_price_rs_kg is not None:
-            snap.actual_price_rs_kg = payload.sale_price_rs_kg
-        snap.actual_production_mt = payload.harvest_quantity_kg / 1000.0
 
     db.commit()
 
@@ -404,9 +477,9 @@ def get_planting_reports(
     if eff_crop:
         q = q.filter(PlantingReportModel.crop_id == eff_crop)
     if eff_season:
-        q = q.filter(PlantingReportModel.season == eff_season)
+        q = q.join(SeasonModel).filter(SeasonModel.label == eff_season)
 
-    rows = q.order_by(PlantingReportModel.timestamp.desc()).all()
+    rows = q.order_by(PlantingReportModel.submitted_at.desc()).all()
     return [r.to_dict() for r in rows]
 
 
@@ -444,9 +517,12 @@ def retrigger_pipeline(payload: Dict[str, Any] = Body(...), db: Any = Depends(ge
     updated_price = round(base_price * (1.0 - 0.20 * result.new_spi), 1)
 
     try:
-        run_rec = PipelineRunModel(
+        cid = ensure_crop_exists(db, payload.crop_id)
+        dist_id = resolve_district_id(db, "Anuradhapura")
+        ensure_pipeline_run(
+            db,
             run_id=new_run_id,
-            trigger="retrigger_feedback",
+            trigger_type="retrigger_feedback",
             model_version=m_ver,
             data_version=d_ver,
             git_commit=g_commit[:40],
@@ -457,27 +533,28 @@ def retrigger_pipeline(payload: Dict[str, Any] = Body(...), db: Any = Depends(ge
                 "recalculated_spi": result.new_spi,
             },
         )
-        db.add(run_rec)
-
+        p_mod = ensure_forecast_model(db, "SARIMAX-LightGBM-ensemble", model_kind="price")
+        s_mod = ensure_forecast_model(db, "A1-Baseline-Lagged-SMA", model_kind="baseline", is_baseline=True)
         snap = ForecastSnapshotModel(
             run_id=new_run_id,
-            crop_id=payload.crop_id,
-            district="Anuradhapura",
-            season=payload.season,
-            forecast_for_month=datetime.now(timezone.utc).strftime("%Y-%m"),
+            crop_id=cid,
+            district_id=dist_id,
+            forecast_for_month=datetime.now(timezone.utc).date().replace(day=1),
             horizon_months=3,
             price_p50=updated_price,
             retail_price_rs_kg=compute_modeled_retail_price(updated_price, crop=payload.crop_id),
             supply_mid_mt=eff_supply,
             demand_mt=eff_demand,
             spi_ratio_mid=spi_ratio,
-            spi_label=result.new_spi_label,
-            confidence_badge="high" if result.total_reported_ha > 100 else "medium",
+            price_model_used=p_mod,
+            supply_model_used=s_mod,
             confidence_score=75.0,
+            data_quality=normalize_data_quality("verified"),
         )
         db.add(snap)
         db.commit()
     except Exception as e:
+        db.rollback()
         logger.warning("Could not persist retrigger snapshot: %s", e)
 
     from dataclasses import asdict
@@ -526,7 +603,11 @@ def list_ground_reports(
     if eff_crop:
         q = q.filter(PlantingReportModel.crop_id == eff_crop)
     if eff_district:
-        q = q.filter(PlantingReportModel.district == eff_district)
+        q = (
+            q.join(FarmerProfileModel, PlantingReportModel.pseudonymous_id == FarmerProfileModel.pseudonymous_id)
+            .join(DistrictModel, FarmerProfileModel.district_id == DistrictModel.district_id)
+            .filter(DistrictModel.name == eff_district)
+        )
 
     total_count = q.count()
     if total_count < 5:
@@ -538,11 +619,11 @@ def list_ground_reports(
             "message": "Reporting cohort has fewer than 5 submissions. Individual records are suppressed to guarantee farmer anonymity.",
         }
 
-    rows = q.order_by(PlantingReportModel.timestamp.desc()).limit(eff_limit).all()
+    rows = q.order_by(PlantingReportModel.submitted_at.desc()).limit(eff_limit).all()
 
     formatted = []
     for r in rows:
-        ha = r.actual_area_ha if r.actual_area_ha is not None else r.planned_area_ha
+        ha = float(r.actual_area_ha if r.actual_area_ha is not None else r.planned_area_ha)
         acres = round(ha * 2.47105, 2)
         crop_name = settings.crops.get(r.crop_id, settings.crops.get("big_onion")).name_en if r.crop_id in settings.crops else r.crop_id
         formatted.append({
@@ -551,12 +632,12 @@ def list_ground_reports(
             "crop_id": r.crop_id,
             "areaAcres": acres,
             "areaHa": ha,
-            "date": str(r.planting_date) if r.planting_date else str(r.timestamp)[:10],
+            "date": str(r.planting_date) if r.planting_date else str(r.submitted_at)[:10],
             "district": r.district,
-            "timestamp": str(r.timestamp)[:16],
+            "timestamp": str(r.submitted_at)[:16],
             "farmer": r.pseudonymous_id,
             "status": "Verified" if r.actual_area_ha is not None else "Pending",
-            "flags": r.flags or [],
+            "flags": r.flags,
         })
 
     return {
