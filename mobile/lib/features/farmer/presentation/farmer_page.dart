@@ -1,4 +1,6 @@
+import 'widgets/planting_receipt_widget.dart';
 import '../../auth/data/auth_repository.dart';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -36,6 +38,7 @@ class _FarmerPageState extends State<FarmerPage> {
   String _selectedIrrigation = 'Minor Tank';
   String _selectedSeedSource = 'Certified DOA Seed';
   bool _isSuccessView = false;
+  DateTime _plantingDate = DateTime.now();
 
   // Post-Harvest & Marketing Telemetry (from farmer_app)
   final TextEditingController _harvestOutcomeController =
@@ -79,7 +82,16 @@ class _FarmerPageState extends State<FarmerPage> {
   }
 
   void _onRepoUpdated() {
-    if (mounted) setState(() {});
+    if (mounted) {
+      final current = _latestSubmittedReport;
+      if (current != null) {
+        _latestSubmittedReport = _repo.reports.firstWhere(
+          (report) => report.clientId == current.clientId,
+          orElse: () => current,
+        );
+      }
+      setState(() {});
+    }
   }
 
   void _onLanguageChange(AppLanguage lang) {
@@ -1438,6 +1450,23 @@ class _FarmerPageState extends State<FarmerPage> {
 
         // STEP 3: Date & Seed
         if (_reportStep == 3) ...[
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Planting date'),
+            subtitle: Text(_plantingDate.toIso8601String().substring(0, 10)),
+            trailing: const Icon(Icons.calendar_month),
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _plantingDate,
+                firstDate: DateTime(2020),
+                lastDate: DateTime(DateTime.now().year + 2),
+              );
+              if (picked != null && mounted) {
+                setState(() => _plantingDate = picked);
+              }
+            },
+          ),
           const Text(
             'Seed Variety & Origin',
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
@@ -1481,7 +1510,7 @@ class _FarmerPageState extends State<FarmerPage> {
               ),
               const SizedBox(width: 6),
               const Text(
-                'Post-Harvest & Marketing Telemetry (Optional)',
+                'Post-Harvest Details (Not submitted here)',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
@@ -1492,7 +1521,7 @@ class _FarmerPageState extends State<FarmerPage> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Record realized yield outcome and sale price to help verify and improve AI market forecasts.',
+            'This declaration records planting only. Harvest outcomes require a separate harvest report.',
             style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
           ),
           const SizedBox(height: 10),
@@ -1631,7 +1660,10 @@ class _FarmerPageState extends State<FarmerPage> {
                     final rep = await _repo.submitPlantingReport(
                       cropId: _selectedCropId,
                       areaAcres: _reportedAreaAcres,
-                      plantingDate: '2026-10-25',
+                      plantingDate: _plantingDate.toIso8601String().substring(
+                        0,
+                        10,
+                      ),
                       irrigationType: _selectedIrrigation,
                       seedSource: _selectedSeedSource,
                       harvestOutcomeMt: double.tryParse(
@@ -1662,7 +1694,7 @@ class _FarmerPageState extends State<FarmerPage> {
 
   Widget _buildSuccessReceiptView() {
     final rep = _latestSubmittedReport!;
-    final bool isPending = rep.status == 'pending';
+    final bool isPending = !rep.hasVerifiedReceipt;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
@@ -1692,7 +1724,7 @@ class _FarmerPageState extends State<FarmerPage> {
                       ? 'වාර්තාව දේශීයව සුරැකිණි (පොරොත්තු)'
                       : _language == AppLanguage.ta
                       ? 'உள்ளூரில் சேமிக்கப்பட்டது (நிலுவையில்)'
-                      : 'Saved Locally (Pending Sync)')
+                      : 'Pending Server Confirmation')
                 : AppTranslations.t(_language, 'reportSuccessTitle'),
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
@@ -1767,13 +1799,13 @@ class _FarmerPageState extends State<FarmerPage> {
               const Divider(height: 24),
               _buildReceiptRow(
                 'Submission Status',
-                isPending ? 'PENDING (Saved Locally)' : 'VERIFIED & SYNCED',
+                isPending ? 'PENDING (This app session)' : 'VERIFIED & SYNCED',
               ),
               _buildReceiptRow('Recorded Crop', rep.cropNameEn),
               _buildReceiptRow('Declared Area', '${rep.areaAcres} Acres'),
               _buildReceiptRow('Irrigation', rep.irrigationType),
               _buildReceiptRow('District', rep.district),
-              _buildReceiptRow('Record Hash', rep.receiptHash),
+              PlantingReceiptWidget(report: rep),
             ],
           ),
         ),
@@ -1792,7 +1824,7 @@ class _FarmerPageState extends State<FarmerPage> {
               final synced = await _repo.retryPendingReports();
               if (synced > 0) {
                 final updated = _repo.reports.firstWhere(
-                  (r) => r.id == rep.id,
+                  (r) => r.clientId == rep.clientId,
                   orElse: () => rep,
                 );
                 setState(() => _latestSubmittedReport = updated);
@@ -2229,7 +2261,10 @@ class _FarmerPageState extends State<FarmerPage> {
         const SizedBox(height: 14),
 
         // Digital Card
-        DigitalFarmerCardWidget(profile: profile),
+        DigitalFarmerCardWidget(
+          profile: profile,
+          report: _repo.reports.isEmpty ? null : _repo.reports.first,
+        ),
         const SizedBox(height: 18),
 
         // Language Switcher Tile
@@ -2798,7 +2833,9 @@ class _FarmerPageState extends State<FarmerPage> {
       confirmText: confirmText,
       cancelText: cancelText,
       icon: Icons.logout_rounded,
-      onConfirm: () async { await AuthRepository.instance.logout(); },
+      onConfirm: () async {
+        await AuthRepository.instance.logout();
+      },
     );
   }
 
