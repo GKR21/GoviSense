@@ -1,0 +1,13 @@
+# M-03: Server-confirmed cultivation receipts
+
+Implemented planting submission against the existing singular POST /api/feedback/planting-report route. Requests include normalized crop, season and irrigation codes, hectare values, actual selected planting date, district, consent, pseudonymous farmer ID, and seed source in notes. Optional harvest telemetry is not part of this backend planting schema; the UI identifies it as requiring a separate harvest report. Wiring that separate workflow is not included here.
+
+The server returns receipt_hash alongside report_id only for an accepted report after database commit. SHA-256 covers a canonical representation of stored declaration fields with normalized numeric precision. Existing report-list serialization includes the same checksum. No new database column or migration is required because the checksum is reconstructed from persisted fields.
+
+GET /api/feedback/planting-reports/{report_id}/receipt?receipt_hash=<64-character-hash> returns report_id and verified without exposing farmer data. A changed report invalidates a previous checksum; an unknown report returns 404. This is an online integrity check, not a signed credential, immutable ledger, or verification of a farmer's government registration.
+
+The app keeps a stable local clientId for matching pending reports, replaces the display ID with the server report ID on acceptance, and shows the full hash plus a real QR encoding the verification endpoint URL. The pass displays a verified badge only for a server-confirmed report matching the profile's farmer ID. The seeded fake report, locally fabricated hashes, and decorative QR icon are removed. Pending, failed, duplicate-error and malformed responses never generate a verified receipt or QR. Concurrent retries skip submissions already in flight.
+
+Validation: Flutter analysis reports no issues; all 17 mobile tests pass. Four dependency-free Python checksum tests pass, and modified backend files pass syntax validation. Full FastAPI/database endpoint integration and live device verification remain pending because FastAPI is not installed in the default Python runtime. No APK was built.
+
+Remaining dependencies: reports are currently kept in memory, so restart-safe receipt/queue storage remains M-04. Existing backend duplicate rejection remains unchanged; a response lost after a successful save can leave a pending local report requiring server reconciliation. The QR URL uses the configured API_BASE_URL, which must be reachable from the scanning device. Release HTTPS enforcement remains M-06. New receipt/date text still needs the M-05 translation audit.

@@ -9,6 +9,7 @@ from __future__ import annotations
 from govisense.models.a2_price_forecast import compute_modeled_retail_price
 
 import logging
+import hmac
 import re
 import uuid
 from datetime import datetime, timezone, date
@@ -19,6 +20,7 @@ from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+from govisense.feedback.receipts import planting_receipt
 from govisense.api.deps import rate_limiter, get_db, require_officer
 from govisense.config import settings
 from govisense.db.lookups import (
@@ -337,16 +339,30 @@ def submit_planting_report(payload: Dict[str, Any] = Body(...), db: Any = Depend
         db.rollback()
         logger.warning("Failed to save retrigger snapshot: %s", e)
 
+    saved_report = db.query(PlantingReportModel).filter_by(report_id=report_id).one()
+    receipt = planting_receipt(saved_report)
     from dataclasses import asdict
     return {
         "status": status_code_msg,
-        "report_id": report_id,
+        **receipt,
         "crop_id": payload.crop_id,
         "season": payload.season,
         "flags": flags,
         "run_id": new_run_id,
         "retrigger": asdict(retrigger_res),
     }
+
+
+@router.get("/api/feedback/planting-reports/{report_id}/receipt")
+def verify_planting_receipt(report_id: str, receipt_hash: str = Query(..., pattern=r"^[a-fA-F0-9]{64}$"),
+                            db: Session = Depends(get_db)):
+    """Verify a checksum without exposing farmer identifiers or report content."""
+    report = db.query(PlantingReportModel).filter_by(report_id=report_id).first()
+    if report is None:
+        raise HTTPException(status_code=404, detail="Planting report not found")
+    current = planting_receipt(report)
+    return {"report_id": report_id,
+            "verified": hmac.compare_digest(current["receipt_hash"], receipt_hash.lower())}
 
 
 @router.post("/api/feedback/harvest-report", dependencies=[Depends(rate_limiter)])
