@@ -29,8 +29,9 @@ import {
 } from "lucide-react"
 import type { PolicyDecision } from "../../types"
 import { cx } from "../../types"
+import { ApiDataState } from "../../components/common/ApiDataState"
 import { Button, PageHeading } from "../../components/common"
-import { fetchDecisionHistory, mapApiRecordToPolicyDecision } from "../../api"
+import { useDecisionHistory, mapApiRecordToPolicyDecision } from "../../api"
 
 export interface HistoryScreenProps {
   decision?: string
@@ -51,45 +52,12 @@ export function HistoryScreen({
   const [selectedRun, setSelectedRun] = useState<PolicyDecision | null>(null)
   const [copiedHash, setCopiedHash] = useState<string | null>(null)
   const [exportNotice, setExportNotice] = useState(false)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [apiDecisions, setApiDecisions] = useState<PolicyDecision[]>([])
-  const [hasLiveStore, setHasLiveStore] = useState(false)
-
-  // Fetch real decisions from FastAPI store
-  const loadHistory = useCallback(async () => {
-    setIsRefreshing(true)
-    try {
-      const res = await fetchDecisionHistory(
-        cropFilter === "All crops" ? undefined : cropFilter
-      )
-      if (res.isLive && res.records.length > 0) {
-        const mapped = res.records.map(mapApiRecordToPolicyDecision)
-        setApiDecisions(mapped)
-        setHasLiveStore(true)
-      } else {
-        setHasLiveStore(res.isLive)
-      }
-    } catch {
-      // offline fallback
-    } finally {
-      setIsRefreshing(false)
-    }
-  }, [cropFilter])
-
-  useEffect(() => {
-    loadHistory()
-  }, [loadHistory])
-
-  // Merge live API records with any local session decisions
-  const allRuns = useMemo(() => {
-    if (apiDecisions.length > 0) {
-      // Combine API decisions and any local props decisions not in API
-      const apiIds = new Set(apiDecisions.map((d) => d.id))
-      const extraLocal = decisionHistory.filter((d) => !apiIds.has(d.id))
-      return [...extraLocal, ...apiDecisions]
-    }
-    return decisionHistory
-  }, [apiDecisions, decisionHistory])
+  const { data: history, loading: isRefreshing, error: historyError, refetch: loadHistory } = useDecisionHistory(
+    cropFilter === "All crops" ? undefined : cropFilter,
+  )
+  const hasLiveStore = history?.isLive === true
+  const allRuns = useMemo(() => history?.records.map(mapApiRecordToPolicyDecision) || [], [history])
+  useEffect(() => setSelectedRun(null), [cropFilter])
 
   // Real-time filtering across metadata, category, and crop
   const filteredRuns = useMemo(() => {
@@ -182,6 +150,13 @@ export function HistoryScreen({
     document.body.removeChild(link)
     setExportNotice(true)
     setTimeout(() => setExportNotice(false), 3000)
+  }
+
+  if (isRefreshing || historyError || allRuns.length === 0) {
+    return <>
+      <ApiDataState loading={isRefreshing} error={historyError} empty={allRuns.length === 0} onRetry={loadHistory} />
+      {cropFilter !== "All crops" && <Button variant="secondary" onClick={() => setCropFilter("All crops")}>Show all crops</Button>}
+    </>
   }
 
   return (
