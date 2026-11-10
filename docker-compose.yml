@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build:
@@ -15,8 +13,8 @@ services:
       - ALGORITHM=HS256
       - ACCESS_TOKEN_EXPIRE_MINUTES=30
       - REFRESH_TOKEN_EXPIRE_DAYS=7
-      - DATABASE_URL=sqlite:///./data/govisense.db
-      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL must be set in the server environment}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173}
       - PILOT_DISTRICT=Anuradhapura
       - DATA_DIR=/app/data
       - MODELS_DIR=/app/models_store
@@ -53,26 +51,3 @@ networks:
 volumes:
   govisense-data:
   govisense-models:
-  db:
-    image: postgres:16-alpine
-    container_name: govisense_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-govisense}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      PGDATA: /var/lib/postgresql/data/pgdata
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    volumes:
-      - govisense_pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d govisense"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  govisense_pgdata:
-    driver: local
-
