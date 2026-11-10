@@ -33,11 +33,12 @@ class _AuthPageState extends State<AuthPage> {
     try {
       await AuthRepository.instance.login(_username.text, _password.text);
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => _error =
               'Unable to sign in. Check your credentials and connection.',
         );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }

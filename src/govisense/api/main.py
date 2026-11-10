@@ -249,13 +249,16 @@ def health():
 
 
 @app.get("/api/forecasts/latest")
-def get_latest_forecasts():
+def get_latest_forecasts(crop: Optional[str] = None):
     """Returns real-time outputs from AI 1, AI 2, AI 3, and AI 4."""
     _ensure_models_loaded()
     results = {}
     spi_list = []
 
-    for crop in ["big_onion", "chilli"]:
+    requested_crop = crop if isinstance(crop, str) else None
+    if requested_crop is not None and requested_crop not in ("big_onion", "chilli"):
+        raise HTTPException(status_code=400, detail="Unsupported forecast crop")
+    for crop in ([requested_crop] if requested_crop else ["big_onion", "chilli"]):
         latest_row = cached_df[cached_df["crop"] == crop].sort_values("date").iloc[-1]
         
         # AI 1
@@ -295,7 +298,15 @@ def get_latest_forecasts():
             )
         a2_res = a2_models[crop].forecast_step(latest_row, horizon=1)
 
+        from govisense.api.monthly_forecasts import build_monthly_series
+        history = cached_df[cached_df["crop"] == crop].sort_values("date")
+        history = history.dropna(subset=a1_models[crop].features).tail(12)
+        monthly_series = build_monthly_series(
+            (row for _, row in history.iterrows()), a1_models[crop], spi_engine, crop
+        )
         results[crop] = {
+            "monthly_series": monthly_series,
+            "monthly_series_note": "Model estimates for the latest available data periods; not future forecasts or out-of-sample validation.",
             "crop": crop,
             "crop_name": settings.crops[crop].name_en,
             "crop_name_si": settings.crops[crop].name_si,
