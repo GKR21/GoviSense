@@ -21,11 +21,13 @@ class AppRouter {
         final path = state.uri.path;
         if (!auth.initialized) return path == '/splash' ? null : '/splash';
         if (!auth.authenticated) return path == '/login' ? null : '/login';
-        if (path == '/login' || path == '/splash' || path == '/home')
+        if (path == '/login' || path == '/splash' || path == '/home') {
           return auth.home;
+        }
         if (auth.role == 'farmer' && path == '/officer') return auth.home;
-        if (auth.role != 'farmer' && (path == '/farmer' || path == '/prices'))
+        if (auth.role != 'farmer' && (path == '/farmer' || path == '/prices')) {
           return auth.home;
+        }
         return null;
       },
       routes: [

@@ -6,4 +6,17 @@ The mounted JWT auth router precedes the legacy auth router; this implementation
 
 Tests cover credential validation, server-validated role selection, storage/restoration/logout, and unsupported role rejection.
 
-Validation: Dart formatting and git diff whitespace checks completed. `flutter pub get`, `flutter analyze`, and `flutter test` cannot run because the installed Dart SDK is 3.13.0 while pubspec requires ^3.13.1. Install a compatible Flutter SDK, then rerun those commands from mobile/. Device validation against a running backend remains pending, including app restart and expired-token behavior. Keep the current SDK constraint until a compatible toolchain is available.
+Validation: Flutter was updated from 3.47.0 (Dart 3.13.0) to 3.47.9 (Dart 3.13.7), satisfying the existing ^3.13.1 constraint. Dependency resolution succeeds. Flutter analysis reports no issues and all three tests pass. Removed the obsolete demo-login assertions from the widget test and fixed five authentication style findings.
+
+On this Windows installation, native-asset hooks fail when invoked through the SDK path containing spaces. An ignored local junction, `.local-flutter/`, points to the installed SDK and provides a path without spaces. From the repository root, reproduce the passing checks with:
+
+```powershell
+Set-Location mobile
+& '..\.local-flutter\bin\flutter.bat' pub get
+& '..\.local-flutter\bin\flutter.bat' analyze --no-pub
+& '..\.local-flutter\bin\flutter.bat' test --no-pub
+```
+
+The junction is local machine configuration and is not committed. On another machine, create it pointing to that machine's Flutter SDK, or install Flutter at a path without spaces. Optional Android engine precaching was interrupted after the SDK update; Flutter will fetch any remaining target artifacts when needed. A signed Android build was not tested.
+
+Device validation against a running backend remains pending, including app restart and expired-token behavior. Passing mocked tests does not establish live authentication success.

@@ -43,8 +43,9 @@ class ApiClient {
         options: _authOptions,
       );
     } on DioException catch (error) {
-      if (error.response?.statusCode == 401)
+      if (error.response?.statusCode == 401) {
         await AuthRepository.instance.logout();
+      }
       throw ApiRequestException(
         error.message ?? 'The request could not be completed.',
       );
@@ -64,8 +65,9 @@ class ApiClient {
         options: _authOptions,
       );
     } on DioException catch (error) {
-      if (error.response?.statusCode == 401)
+      if (error.response?.statusCode == 401) {
         await AuthRepository.instance.logout();
+      }
       throw ApiRequestException(
         error.message ?? 'The request could not be completed.',
       );
