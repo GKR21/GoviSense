@@ -1,6 +1,10 @@
+import 'dart:math' as math;
+
 import '../../auth/data/auth_repository.dart';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/premium_confirm_dialog.dart';
 import '../../farmer/data/farmer_repository.dart';
@@ -21,6 +25,12 @@ class _OfficerPageState extends State<OfficerPage> {
   void initState() {
     super.initState();
     _repo.addListener(_onRepoUpdated);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _repo.loadForecast();
+        _repo.simulate();
+      }
+    });
   }
 
   @override
@@ -33,122 +43,113 @@ class _OfficerPageState extends State<OfficerPage> {
     if (mounted) setState(() {});
   }
 
-  void _showRecordDecisionModal(String decisionText) {
-    showDialog(
+  Future<void> _showRecordDecisionModal(
+    String decisionText, {
+    String actionType = 'adjust_area',
+    String unit = 'ha',
+    double? quantity,
+  }) async {
+    final amount = TextEditingController(
+      text: (quantity ?? _repo.area).toStringAsFixed(2),
+    );
+    final form = GlobalKey<FormState>();
+    bool saving = false;
+    String? error;
+    await showDialog<void>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryTint,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.gavel_rounded, color: AppTheme.primary, size: 20),
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'Record Policy Directive',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryTint.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
-                ),
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, update) => PopScope(
+          canPop: !saving,
+          child: AlertDialog(
+            title: const Text('Record Policy Directive'),
+            content: Form(
+              key: form,
+              child: SingleChildScrollView(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'DIRECTIVE ACTION',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.primary,
-                        letterSpacing: 0.8,
+                    Text(decisionText),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: amount,
+                      enabled: !saving,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
                       ),
+                      decoration: InputDecoration(
+                        labelText: 'Quantity ($unit)',
+                      ),
+                      validator: (value) {
+                        final number = double.tryParse(value ?? '');
+                        return number == null || !number.isFinite || number < 0
+                            ? 'Enter a valid non-negative quantity'
+                            : null;
+                      },
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      decisionText,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.ink),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'The server will return a run ID and SHA-256 receipt. This action records a directive; it does not send farmer notifications.',
                     ),
+                    if (error != null)
+                      Text(
+                        error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-              const Text(
-                'This policy decision will be permanently logged to the Agrarian Governance Ledger with run ID RUN-260404-xx, calibrated against model parameters, and automatically broadcast as an official advisory to all registered Anuradhapura farmers.',
-                style: TextStyle(fontSize: 12, color: AppTheme.neutral600, height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: saving ? null : () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
               ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  const Icon(Icons.cell_tower_rounded, size: 14, color: AppTheme.balanced),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Target Audience: 1,428 Registered Farmers',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.green.shade800),
-                  ),
-                ],
+              FilledButton(
+                onPressed: saving
+                    ? null
+                    : () async {
+                        if (!form.currentState!.validate()) return;
+                        update(() {
+                          saving = true;
+                          error = null;
+                        });
+                        final result = await _repo.recordDecision(
+                          decisionText,
+                          actionType: actionType,
+                          quantity: double.parse(amount.text),
+                          unit: unit,
+                        );
+                        if (!dialogContext.mounted) return;
+                        if (result == null) {
+                          update(() {
+                            saving = false;
+                            error = _repo.decisionError;
+                          });
+                        } else {
+                          Navigator.pop(dialogContext);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Directive recorded: ${result.runId}',
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                child: Text(saving ? 'Recording...' : 'Record directive'),
               ),
             ],
           ),
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel', style: TextStyle(color: AppTheme.neutral600, fontWeight: FontWeight.w600)),
-            ),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-              onPressed: () {
-                _repo.recordDecision(decisionText);
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    backgroundColor: AppTheme.primary,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    content: const Row(
-                      children: [
-                        Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Policy Directive recorded & broadcasted to farmer inboxes!',
-                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.send_rounded, size: 16),
-              label: const Text('Broadcast Directive', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        );
-      },
+        ),
+      ),
     );
+    amount.dispose();
   }
 
   void _showOfficerProfileSheet() {
@@ -225,20 +226,35 @@ class _OfficerPageState extends State<OfficerPage> {
                         children: [
                           Text(
                             'Dr. K. M. Wickramasinghe',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppTheme.ink),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.ink,
+                            ),
                           ),
                           SizedBox(width: 6),
-                          Icon(Icons.verified_rounded, size: 16, color: AppTheme.primary),
+                          Icon(
+                            Icons.verified_rounded,
+                            size: 16,
+                            color: AppTheme.primary,
+                          ),
                         ],
                       ),
                       SizedBox(height: 2),
                       Text(
                         'Senior Agrarian Planning Officer',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primary),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.primary,
+                        ),
                       ),
                       Text(
                         'Department of Agriculture · Anuradhapura',
-                        style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.neutral600,
+                        ),
                       ),
                     ],
                   ),
@@ -258,32 +274,83 @@ class _OfficerPageState extends State<OfficerPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Officer Staff ID', style: TextStyle(fontSize: 11, color: AppTheme.neutral600)),
-                      Text('DOA-OFF-0084', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+                      Text(
+                        'Officer Staff ID',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.neutral600,
+                        ),
+                      ),
+                      Text(
+                        'DOA-OFF-0084',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
                     ],
                   ),
                   SizedBox(height: 6),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Planning Division', style: TextStyle(fontSize: 11, color: AppTheme.neutral600)),
-                      Text('Anuradhapura North (Zone 2)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      Text(
+                        'Planning Division',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.neutral600,
+                        ),
+                      ),
+                      Text(
+                        'Anuradhapura North (Zone 2)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ],
                   ),
                   SizedBox(height: 6),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Model Calibration', style: TextStyle(fontSize: 11, color: AppTheme.neutral600)),
-                      Text('Maha 2026 · Calibration v2.4', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary)),
+                      Text(
+                        'Model Calibration',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.neutral600,
+                        ),
+                      ),
+                      Text(
+                        'Maha 2026 · Calibration v2.4',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primary,
+                        ),
+                      ),
                     ],
                   ),
                   SizedBox(height: 6),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Security Key ID', style: TextStyle(fontSize: 11, color: AppTheme.neutral600)),
-                      Text('ED25519 · 8f9b...a12c', style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppTheme.neutral600)),
+                      Text(
+                        'Security Key ID',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.neutral600,
+                        ),
+                      ),
+                      Text(
+                        'ED25519 · 8f9b...a12c',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontFamily: 'monospace',
+                          color: AppTheme.neutral600,
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -320,7 +387,11 @@ class _OfficerPageState extends State<OfficerPage> {
                   const SizedBox(height: 4),
                   const Text(
                     'Signed in as Dr. K. M. Wickramasinghe (DOA-OFF-0084)',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.neutral600),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.neutral600,
+                    ),
                   ),
                   const SizedBox(height: 14),
                   Material(
@@ -332,19 +403,30 @@ class _OfficerPageState extends State<OfficerPage> {
                         _confirmLogout(context);
                       },
                       borderRadius: BorderRadius.circular(16),
-                      splashColor: const Color(0xFFFCA5A5).withValues(alpha: 0.3),
+                      splashColor: const Color(0xFFFCA5A5)
+                          .withValues(alpha: 0.3),
                       highlightColor: const Color(0xFFFEE2E2),
                       child: Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 14,
+                          horizontal: 16,
+                        ),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFFECACA), width: 1.2),
+                          border: Border.all(
+                            color: const Color(0xFFFECACA),
+                            width: 1.2,
+                          ),
                         ),
                         child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.logout_rounded, size: 18, color: Color(0xFFB91C1C)),
+                            Icon(
+                              Icons.logout_rounded,
+                              size: 18,
+                              color: Color(0xFFB91C1C),
+                            ),
                             SizedBox(width: 8),
                             Text(
                               'පද්ධතියෙන් ඉවත් වන්න (Log Out)',
@@ -378,7 +460,9 @@ class _OfficerPageState extends State<OfficerPage> {
       confirmText: 'Log Out',
       cancelText: 'Cancel',
       icon: Icons.logout_rounded,
-      onConfirm: () async { await AuthRepository.instance.logout(); },
+      onConfirm: () async {
+        await AuthRepository.instance.logout();
+      },
     );
   }
 
@@ -408,7 +492,11 @@ class _OfficerPageState extends State<OfficerPage> {
                   ),
                 ],
               ),
-              child: const Icon(Icons.analytics_rounded, color: Colors.white, size: 19),
+              child: const Icon(
+                Icons.analytics_rounded,
+                color: Colors.white,
+                size: 19,
+              ),
             ),
             const SizedBox(width: 10),
             Column(
@@ -418,15 +506,24 @@ class _OfficerPageState extends State<OfficerPage> {
                   children: [
                     const Text(
                       'DOA Command',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: -0.2),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.2,
+                      ),
                     ),
                     const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 1.5,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.primaryTint,
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+                        border: Border.all(
+                          color: AppTheme.primary.withValues(alpha: 0.2),
+                        ),
                       ),
                       child: const Row(
                         children: [
@@ -448,7 +545,11 @@ class _OfficerPageState extends State<OfficerPage> {
                 ),
                 const Text(
                   'Anuradhapura · Maha 2026 Season',
-                  style: TextStyle(fontSize: 11, color: AppTheme.neutral600, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.neutral600,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
@@ -465,10 +566,17 @@ class _OfficerPageState extends State<OfficerPage> {
                 onTap: () => context.go('/farmer'),
                 borderRadius: BorderRadius.circular(20),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   child: Row(
                     children: [
-                      const Icon(Icons.spa_rounded, size: 14, color: AppTheme.primary),
+                      const Icon(
+                        Icons.spa_rounded,
+                        size: 14,
+                        color: AppTheme.primary,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         'Farmer View',
@@ -542,7 +650,10 @@ class _OfficerPageState extends State<OfficerPage> {
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.stacked_bar_chart_rounded),
-            selectedIcon: Icon(Icons.stacked_bar_chart_rounded, color: AppTheme.primary),
+            selectedIcon: Icon(
+              Icons.stacked_bar_chart_rounded,
+              color: AppTheme.primary,
+            ),
             label: 'Supply',
           ),
           NavigationDestination(
@@ -557,12 +668,18 @@ class _OfficerPageState extends State<OfficerPage> {
           ),
           NavigationDestination(
             icon: Icon(Icons.pie_chart_outline_rounded),
-            selectedIcon: Icon(Icons.pie_chart_rounded, color: AppTheme.primary),
+            selectedIcon: Icon(
+              Icons.pie_chart_rounded,
+              color: AppTheme.primary,
+            ),
             label: 'Adoption',
           ),
           NavigationDestination(
             icon: Icon(Icons.verified_user_outlined),
-            selectedIcon: Icon(Icons.verified_user_rounded, color: AppTheme.primary),
+            selectedIcon: Icon(
+              Icons.verified_user_rounded,
+              color: AppTheme.primary,
+            ),
             label: 'Directives',
           ),
         ],
@@ -575,910 +692,236 @@ class _OfficerPageState extends State<OfficerPage> {
   // -------------------------------------------------------------
   Widget _buildSupplyChartTab() {
     final points = _repo.getMonthlyPoints();
-    final selectedPoint = points[_repo.selectedMonthIndex];
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
-      children: [
-        // Phase 6: Closed-Loop Real-Time Telemetry Bar
-        if (_repo.totalFarmerReportsCount > 0) ...[
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.white, AppTheme.primaryTint.withValues(alpha: 0.4)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.primary.withValues(alpha: 0.06),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(9),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.primary.withValues(alpha: 0.3),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(Icons.sync_alt_rounded, color: Colors.white, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: AppTheme.balanced,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          const Text(
-                            'LIVE TELEMETRY ACTIVE',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.primary,
-                              letterSpacing: 0.8,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        '${_repo.totalFarmerReportsCount} Farmer Declarations (+${_repo.totalReportedHectares.toStringAsFixed(2)} ha)',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppTheme.ink),
-                      ),
-                      const Text(
-                        'Ground-truth field data updating SPI in real-time.',
-                        style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
-                      ),
-                    ],
-                  ),
-                ),
-                Column(
-                  children: [
-                    Text(
-                      _repo.showGroundTruthOverlay ? 'Field View' : 'Model View',
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.neutral600),
-                    ),
-                    Switch(
-                      value: _repo.showGroundTruthOverlay,
-                      activeThumbColor: AppTheme.primary,
-                      onChanged: (val) => _repo.toggleGroundTruthOverlay(),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-        ],
-
-        // Key Insight Alert: Oversupply Glut Risk Callout
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: const Color(0xFFFDE68A)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.amber.withValues(alpha: 0.06),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
+    if (points.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_repo.loadingForecast) const CircularProgressIndicator(),
+              Text(_repo.forecastError ?? 'Loading monthly estimates...'),
+              TextButton(
+                onPressed: _repo.loadingForecast ? null : _repo.loadForecast,
+                child: const Text('Retry'),
               ),
             ],
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppTheme.oversupplyTint,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.warning_amber_rounded, color: AppTheme.oversupply, size: 24),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        ),
+      );
+    }
+    final selected = points[_repo.selectedMonthIndex];
+    final maximum = points.fold<double>(
+      1,
+      (value, point) => math.max(value, math.max(point.supply, point.demand)),
+    );
+    return RefreshIndicator(
+      onRefresh: _repo.loadForecast,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text(
+            'Big Onion: Supply vs Demand',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          Text(_repo.forecastNote ?? 'Monthly model estimates'),
+          Text('${points.first.month} to ${points.last.month}'),
+          if (_repo.loadingForecast) const LinearProgressIndicator(),
+          if (_repo.forecastError != null)
+            Text('${_repo.forecastError} Showing previously loaded estimates.'),
+          const SizedBox(height: 16),
+          const Text('Green: supply ? Orange: demand ? Tonnes'),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 210,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: List.generate(points.length, (index) {
+                final point = points[index];
+                return Expanded(
+                  child: InkWell(
+                    onTap: () => _repo.setSelectedMonth(index),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        const Text(
-                          'KEY MARKET INSIGHT',
+                        SizedBox(
+                          height: 155,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  height: 150 * point.supply / maximum,
+                                  color: AppTheme.primary,
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 1,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Container(
+                                  height: 150 * point.demand / maximum,
+                                  color: Colors.orange,
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 1,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          point.month.substring(5),
                           style: TextStyle(
                             fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.oversupply,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppTheme.oversupplyTint,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text(
-                            'HIGH RISK',
-                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: AppTheme.oversupply),
+                            fontWeight: index == _repo.selectedMonthIndex
+                                ? FontWeight.bold
+                                : FontWeight.normal,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'July–August harvest projected at 1.47× national demand.',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppTheme.ink),
-                    ),
-                    const SizedBox(height: 3),
-                    const Text(
-                      'Supply glut of +1,430 tonnes will collapse farmgate prices below cost unless private import permits are delayed.',
-                      style: TextStyle(fontSize: 11.5, color: AppTheme.neutral600, height: 1.35),
-                    ),
-                    const SizedBox(height: 10),
-                    InkWell(
-                      onTap: () => setState(() => _selectedIndex = 1),
-                      borderRadius: BorderRadius.circular(8),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Simulate Policy Fix in What-If',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
-                          ),
-                          SizedBox(width: 4),
-                          Icon(Icons.arrow_forward_rounded, size: 14, color: AppTheme.primary),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Interactive 12-Month Harvest vs Demand Chart
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppTheme.cardBorder),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 12,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Monthly Supply vs Demand',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.ink),
-                      ),
-                      Text(
-                        'Metric: Metric Tonnes (t) · Tap bar to inspect',
-                        style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
-                      ),
-                    ],
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppTheme.neutral100,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppTheme.cardBorder),
-                    ),
-                    child: const Text(
-                      'Demand: ~3,000 t',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.neutral700),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // Chart Canvas with Demand Baseline Guide
-              Stack(
-                children: [
-                  // Dotted National Demand Threshold Line at ~60% height
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    top: 60,
-                    child: Container(
-                      height: 1,
-                      decoration: const BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(
-                            color: Color(0xFFCBD5E1),
-                            width: 1,
-                            style: BorderStyle.solid,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 150,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: List.generate(points.length, (i) {
-                        final pt = points[i];
-                        final isSelected = _repo.selectedMonthIndex == i;
-                        final heightFactor = (pt.supply / 5000).clamp(0.12, 1.0);
-
-                        final isGlut = pt.spi > 1.15;
-                        final isDeficit = pt.spi < 0.85;
-
-                        final gradientColors = isGlut
-                            ? [const Color(0xFFF59E0B), const Color(0xFFD97706)]
-                            : isDeficit
-                                ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
-                                : [const Color(0xFF22C55E), const Color(0xFF0A5C36)];
-
-                        return Expanded(
-                          child: GestureDetector(
-                            onTap: () => _repo.setSelectedMonth(i),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                if (isSelected)
-                                  Container(
-                                    margin: const EdgeInsets.only(bottom: 4),
-                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.ink,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      '${pt.supply.toInt()}t',
-                                      style: const TextStyle(fontSize: 8, color: Colors.white, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                Container(
-                                  height: 110 * heightFactor,
-                                  margin: const EdgeInsets.symmetric(horizontal: 2.5),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: isSelected
-                                          ? gradientColors
-                                          : [
-                                              gradientColors[0].withValues(alpha: 0.55),
-                                              gradientColors[1].withValues(alpha: 0.55),
-                                            ],
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                    ),
-                                    borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-                                    border: isSelected
-                                        ? Border.all(color: AppTheme.ink, width: 2)
-                                        : null,
-                                    boxShadow: isSelected
-                                        ? [
-                                            BoxShadow(
-                                              color: gradientColors[1].withValues(alpha: 0.4),
-                                              blurRadius: 6,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ]
-                                        : null,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  pt.month,
-                                  style: TextStyle(
-                                    fontSize: 9.5,
-                                    fontWeight: isSelected ? FontWeight.w900 : FontWeight.w500,
-                                    color: isSelected ? AppTheme.ink : AppTheme.neutral600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
-                ],
-              ),
-
-              const Divider(height: 28),
-
-              // Selected Month Focus Spotlight Card
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppTheme.background,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.cardBorder),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${selectedPoint.month} 2026 Focus',
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.ink),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Harvest: ${selectedPoint.supply.toInt()} t · Demand: ${selectedPoint.demand.toInt()} t',
-                          style: const TextStyle(fontSize: 11.5, color: AppTheme.neutral600),
-                        ),
-                        Text(
-                          selectedPoint.supply > selectedPoint.demand
-                              ? 'Surplus: +${(selectedPoint.supply - selectedPoint.demand).toInt()} t'
-                              : 'Deficit: -${(selectedPoint.demand - selectedPoint.supply).toInt()} t',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: selectedPoint.supply > selectedPoint.demand ? AppTheme.oversupply : AppTheme.shortage,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: selectedPoint.spi > 1.15
-                            ? AppTheme.oversupplyTint
-                            : selectedPoint.spi < 0.85
-                                ? AppTheme.shortageTint
-                                : AppTheme.balancedTint,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: selectedPoint.spi > 1.15
-                              ? AppTheme.oversupplyBorder
-                              : selectedPoint.spi < 0.85
-                                  ? AppTheme.shortageBorder
-                                  : AppTheme.balancedBorder,
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            'SPI ${selectedPoint.spi.toStringAsFixed(2)}×',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w900,
-                              color: selectedPoint.spi > 1.15
-                                  ? AppTheme.oversupply
-                                  : selectedPoint.spi < 0.85
-                                      ? AppTheme.shortage
-                                      : AppTheme.balanced,
-                            ),
-                          ),
-                          Text(
-                            selectedPoint.spi > 1.15
-                                ? 'Glut Risk'
-                                : selectedPoint.spi < 0.85
-                                    ? 'Shortage'
-                                    : 'Balanced',
-                            style: TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.bold,
-                              color: selectedPoint.spi > 1.15
-                                  ? AppTheme.oversupply
-                                  : selectedPoint.spi < 0.85
-                                      ? AppTheme.shortage
-                                      : AppTheme.balanced,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Quick Strategic Policy Levers
-        const Text(
-          'Strategic Policy Actions',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.ink),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: _buildQuickActionCard(
-                icon: Icons.timer_outlined,
-                title: 'Delay Imports',
-                sub: 'Defer private permits',
-                onTap: () => _showRecordDecisionModal('Delay import quotas to Sept 2026'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _buildQuickActionCard(
-                icon: Icons.warehouse_outlined,
-                title: 'Buffer Storage',
-                sub: '30% cooling rebate',
-                onTap: () => _showRecordDecisionModal('Incentivize Anuradhapura on-farm cold storage'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _buildQuickActionCard(
-                icon: Icons.swap_horiz_rounded,
-                title: 'Pulse Shift',
-                sub: 'Green Gram transition',
-                onTap: () => _showRecordDecisionModal('Broadcast Green Gram crop shift advisory'),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildQuickActionCard({
-    required IconData icon,
-    required String title,
-    required String sub,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.cardBorder),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, size: 20, color: AppTheme.primary),
-              const SizedBox(height: 6),
-              Text(title, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AppTheme.ink)),
-              Text(sub, style: const TextStyle(fontSize: 9.5, color: AppTheme.neutral600)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // -------------------------------------------------------------
-  // TAB 1: WHAT-IF SIMULATION DECK
-  // -------------------------------------------------------------
-  Widget _buildWhatIfTab() {
-    final area = _repo.area;
-    final yieldValue = _repo.yieldValue;
-    final projected = _repo.projectedAnnualHarvest;
-    final delta = _repo.percentageChange;
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'What-If Simulation Deck',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.ink),
-                ),
-                Text(
-                  'Calibrate planted area and yield scenarios against DOA model',
-                  style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
-                ),
-              ],
-            ),
-            IconButton(
-              icon: const Icon(Icons.restart_alt_rounded, color: AppTheme.primary),
-              tooltip: 'Reset to model baseline',
-              onPressed: () {
-                _repo.resetWhatIf();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Simulation reset to baseline (2,131 ha · 16.45 t/ha)')),
                 );
-              },
+              }),
             ),
-          ],
-        ),
-        const SizedBox(height: 14),
-
-        // Executive Impact Card
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF093F25), Color(0xFF0B2F1D)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.primary.withValues(alpha: 0.35),
-                blurRadius: 14,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'PROJECTED ANNUAL HARVEST',
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF86EFAC), letterSpacing: 0.8),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: delta.abs() < 1
-                          ? Colors.white12
-                          : delta > 0
-                              ? const Color(0xFFFDE68A)
-                              : const Color(0xFFBBF7D0),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      delta.abs() < 1 ? 'Baseline' : '${delta > 0 ? "+" : ""}${delta.toStringAsFixed(1)}%',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        color: delta.abs() < 1
-                            ? Colors.white
-                            : delta > 0
-                                ? Colors.amber.shade900
-                                : Colors.green.shade900,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${projected.toInt()}',
-                    style: const TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      fontFamily: 'monospace',
-                    ),
+                    selected.month,
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
-                  const SizedBox(width: 6),
-                  const Text(
-                    'tonnes',
-                    style: TextStyle(fontSize: 14, color: Colors.white70, fontWeight: FontWeight.bold),
-                  ),
+                  Text('Supply: ${selected.supply.toStringAsFixed(1)} t'),
+                  Text('Demand: ${selected.demand.toStringAsFixed(1)} t'),
+                  Text('SPI: ${selected.spi.toStringAsFixed(3)}?'),
                 ],
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Baseline Reference: 35,051 t (National Allocation: 33,500 t)',
-                style: TextStyle(fontSize: 11, color: Colors.white60),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Slider Card 1: Planted Area (Target)
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppTheme.cardBorder),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Planted Area (Target)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryTint,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '${area.toInt()} ha',
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppTheme.primary, fontFamily: 'monospace'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Slider(
-                value: area,
-                min: 1200,
-                max: 3000,
-                divisions: 36,
-                activeColor: AppTheme.primary,
-                inactiveColor: AppTheme.neutral200,
-                onChanged: (val) => _repo.updateWhatIf(area: val, yieldValue: yieldValue),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildSliderPresetChip('1,200 ha', () => _repo.updateWhatIf(area: 1200, yieldValue: yieldValue)),
-                  _buildSliderPresetChip('1,880 ha (Field)', () => _repo.updateWhatIf(area: 1880, yieldValue: yieldValue)),
-                  _buildSliderPresetChip('2,131 ha (Target)', () => _repo.updateWhatIf(area: 2131, yieldValue: yieldValue)),
-                  _buildSliderPresetChip('3,000 ha', () => _repo.updateWhatIf(area: 3000, yieldValue: yieldValue)),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-
-        // Slider Card 2: Expected Yield
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppTheme.cardBorder),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Expected Yield', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryTint,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '${yieldValue.toStringAsFixed(2)} t/ha',
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppTheme.primary, fontFamily: 'monospace'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Slider(
-                value: yieldValue,
-                min: 10.0,
-                max: 22.0,
-                divisions: 24,
-                activeColor: AppTheme.primary,
-                inactiveColor: AppTheme.neutral200,
-                onChanged: (val) => _repo.updateWhatIf(area: area, yieldValue: val),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildSliderPresetChip('12.0 (Low Rain)', () => _repo.updateWhatIf(area: area, yieldValue: 12.0)),
-                  _buildSliderPresetChip('16.45 (Model)', () => _repo.updateWhatIf(area: area, yieldValue: 16.45)),
-                  _buildSliderPresetChip('20.0 (High)', () => _repo.updateWhatIf(area: area, yieldValue: 20.0)),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Market Consequences Matrix
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppTheme.cardBorder),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Simulated Market Consequences',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppTheme.ink),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildMetricMiniBox(
-                      label: 'Est. Farmgate Price',
-                      value: delta > 5 ? 'Rs. 195/kg' : 'Rs. 245/kg',
-                      sub: delta > 5 ? '-18% Glut Impact' : 'Fair Margin',
-                      color: delta > 5 ? AppTheme.oversupply : AppTheme.balanced,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildMetricMiniBox(
-                      label: 'Buffer Storage Need',
-                      value: delta > 5 ? '7,800 t' : '3,200 t',
-                      sub: delta > 5 ? '88% Capacity' : 'Normal Buffer',
-                      color: delta > 5 ? AppTheme.oversupply : AppTheme.primary,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 18),
-
-        // Primary Action Controls
-        Row(
-          children: [
-            Expanded(
-              flex: 3,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 2,
-                ),
-                onPressed: () => _showRecordDecisionModal(
-                  'Adjusted targets: ${area.toInt()} ha at ${yieldValue.toStringAsFixed(2)} t/ha (${projected.toInt()} t)',
-                ),
-                icon: const Icon(Icons.bookmark_added_rounded, size: 18),
-                label: const Text('Record & Broadcast', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               ),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 2,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  side: const BorderSide(color: AppTheme.primary),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-                onPressed: () {
-                  final reportedHa = 1880 + _repo.getExtraReportedHaForCrop('onion');
-                  _repo.updateWhatIf(area: reportedHa, yieldValue: yieldValue);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('What-If synced to ground-truth field reported area (${reportedHa.toInt()} ha)'),
-                      backgroundColor: AppTheme.primary,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.sync_rounded, size: 16),
-                label: const Text('Sync Field Ha', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-              ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: () => _showRecordDecisionModal(
+              'Adjust Big Onion imports',
+              actionType: 'adjust_import',
+              unit: 'MT',
+              quantity: 0,
             ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSliderPresetChip(String label, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-        decoration: BoxDecoration(
-          color: AppTheme.neutral100,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(fontSize: 9.5, color: AppTheme.neutral600, fontWeight: FontWeight.w600),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMetricMiniBox({
-    required String label,
-    required String value,
-    required String sub,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: AppTheme.background,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.cardBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 10, color: AppTheme.neutral600)),
-          const SizedBox(height: 2),
-          Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: color, fontFamily: 'monospace')),
-          Text(sub, style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: color)),
+            child: const Text('Record import adjustment'),
+          ),
+          OutlinedButton(
+            onPressed: () => _showRecordDecisionModal(
+              'Set Big Onion storage buffer',
+              actionType: 'storage_buffer',
+              unit: 'MT',
+              quantity: 0,
+            ),
+            child: const Text('Record storage buffer'),
+          ),
         ],
       ),
     );
   }
 
-  // -------------------------------------------------------------
-  // TAB 2: GAP TIMELINE & SEA FREIGHT LEAD TIME INTELLIGENCE
-  // -------------------------------------------------------------
+  Widget _buildWhatIfTab() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(
+          'What-If Simulation',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const Text(
+          'Big Onion ? server simulation ? includes backend loss assumptions',
+        ),
+        Text('Planted area: ${_repo.area.toStringAsFixed(0)} ha'),
+        Slider(
+          value: _repo.area,
+          min: 1000,
+          max: 4000,
+          divisions: 300,
+          onChanged: (value) =>
+              _repo.updateWhatIf(area: value, yieldValue: _repo.yieldValue),
+        ),
+        Text('Expected yield: ${_repo.yieldValue.toStringAsFixed(2)} t/ha'),
+        Slider(
+          value: _repo.yieldValue,
+          min: 5,
+          max: 25,
+          divisions: 200,
+          onChanged: (value) =>
+              _repo.updateWhatIf(area: _repo.area, yieldValue: value),
+        ),
+        if (_repo.simulating) const LinearProgressIndicator(),
+        if (_repo.simulationError != null) ...[
+          Text(_repo.simulationError!),
+          TextButton(
+            onPressed: _repo.simulate,
+            child: const Text('Retry simulation'),
+          ),
+        ],
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('SIMULATED HARVEST'),
+                Text(
+                  _repo.hasSimulation
+                      ? '${_repo.simulatedSupply!.toStringAsFixed(1)} tonnes'
+                      : 'Awaiting server result',
+                ),
+                Text(
+                  _repo.hasSimulation
+                      ? 'SPI: ${_repo.simulatedSpi!.toStringAsFixed(3)}?'
+                      : 'SPI: ?',
+                ),
+                Text(
+                  _repo.hasSimulation
+                      ? 'Supply gap: ${_repo.simulatedGap!.toStringAsFixed(1)} tonnes'
+                      : 'Supply gap: ?',
+                ),
+              ],
+            ),
+          ),
+        ),
+        OutlinedButton(
+          onPressed: _repo.resetWhatIf,
+          child: const Text('Reset inputs'),
+        ),
+        FilledButton(
+          onPressed: !_repo.hasSimulation || _repo.savingDecision
+              ? null
+              : () => _showRecordDecisionModal(
+                  'Adjusted Big Onion targets: ${_repo.area.toInt()} ha at ${_repo.yieldValue.toStringAsFixed(2)} t/ha; simulated supply ${_repo.simulatedSupply!.toStringAsFixed(1)} t',
+                ),
+          child: const Text('Record simulated targets'),
+        ),
+      ],
+    );
+  }
+
   Widget _buildGapTimelineTab() {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
       children: [
         const Text(
           'Sea Freight & Policy Timeline',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.ink),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            color: AppTheme.ink,
+          ),
         ),
         const Text(
-          'Lead-time intelligence & critical import permit freeze deadlines',
+          'Planning examples ? illustrative dates and values, not live forecast output',
           style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
         ),
         const SizedBox(height: 16),
@@ -1506,16 +949,28 @@ class _OfficerPageState extends State<OfficerPage> {
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.hourglass_top_rounded, size: 18, color: AppTheme.oversupply),
+                      Icon(
+                        Icons.hourglass_top_rounded,
+                        size: 18,
+                        color: AppTheme.oversupply,
+                      ),
                       SizedBox(width: 6),
                       Text(
                         'CRITICAL IMPORT DECISION DEADLINE',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppTheme.oversupply, letterSpacing: 0.8),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.oversupply,
+                          letterSpacing: 0.8,
+                        ),
                       ),
                     ],
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.oversupplyTint,
                       borderRadius: BorderRadius.circular(8),
@@ -1523,7 +978,11 @@ class _OfficerPageState extends State<OfficerPage> {
                     ),
                     child: const Text(
                       '7 WEEKS LEAD TIME',
-                      style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, color: AppTheme.oversupply),
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        color: AppTheme.oversupply,
+                      ),
                     ),
                   ),
                 ],
@@ -1531,12 +990,20 @@ class _OfficerPageState extends State<OfficerPage> {
               const SizedBox(height: 8),
               const Text(
                 'Freeze Deadline: 14 May 2026',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.ink),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.ink,
+                ),
               ),
               const SizedBox(height: 6),
               const Text(
                 'Due to maritime transit delays from ports in India/Pakistan to Colombo, private import permits destined for July must be decided before May 14. Any uncoordinated import shipments landing in July will trigger destructive farmgate price collapse.',
-                style: TextStyle(fontSize: 12, color: AppTheme.neutral600, height: 1.45),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.neutral600,
+                  height: 1.45,
+                ),
               ),
             ],
           ),
@@ -1556,7 +1023,11 @@ class _OfficerPageState extends State<OfficerPage> {
             children: [
               const Text(
                 'Maritime Supply Chain Timeline',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppTheme.ink),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.ink,
+                ),
               ),
               const SizedBox(height: 14),
 
@@ -1591,7 +1062,11 @@ class _OfficerPageState extends State<OfficerPage> {
         // Action Directives Trigger Cards
         const Text(
           'Actionable Policy Interventions',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.ink),
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: AppTheme.ink,
+          ),
         ),
         const SizedBox(height: 10),
 
@@ -1600,7 +1075,12 @@ class _OfficerPageState extends State<OfficerPage> {
           title: 'Delay Sea Freight Import Permits',
           desc: 'Recommend Ministry of Trade freeze private Big Onion import licenses until Sept 2026.',
           actionLabel: 'Apply Delay Directive',
-          onTap: () => _showRecordDecisionModal('Delay private import quotas until late harvest (Sept 2026)'),
+          onTap: () => _showRecordDecisionModal(
+            'Delay private import quotas until late harvest',
+            actionType: 'delay_import',
+            quantity: 0,
+            unit: 'MT',
+          ),
         ),
         const SizedBox(height: 10),
 
@@ -1609,7 +1089,12 @@ class _OfficerPageState extends State<OfficerPage> {
           title: 'Incentivize Cold Storage Buffer',
           desc: 'Authorize 30% storage subsidy for Anuradhapura agrarian farmer co-operatives.',
           actionLabel: 'Incentivize Storage',
-          onTap: () => _showRecordDecisionModal('Incentivize on-farm cold storage with 30% subsidy'),
+          onTap: () => _showRecordDecisionModal(
+            'Incentivize on-farm cold storage with 30% subsidy',
+            actionType: 'storage_subsidy',
+            quantity: 30,
+            unit: 'percent',
+          ),
         ),
         const SizedBox(height: 10),
 
@@ -1618,7 +1103,12 @@ class _OfficerPageState extends State<OfficerPage> {
           title: 'Direct Green Gram Crop Shifting',
           desc: 'Issue advisory to divert 350 hectares in zone 2 toward high-value pulses.',
           actionLabel: 'Broadcast Crop Shift',
-          onTap: () => _showRecordDecisionModal('Trigger Green Gram crop shifting advisory in Zone 2'),
+          onTap: () => _showRecordDecisionModal(
+            'Shift Big Onion land toward Green Gram in Zone 2',
+            actionType: 'crop_shift',
+            quantity: 350,
+            unit: 'ha',
+          ),
         ),
       ],
     );
@@ -1644,18 +1134,19 @@ class _OfficerPageState extends State<OfficerPage> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: isActive ? AppTheme.primary : Colors.white,
-                border: Border.all(color: isActive ? AppTheme.primary : AppTheme.neutral400, width: 2),
+                border: Border.all(
+                  color: isActive ? AppTheme.primary : AppTheme.neutral400,
+                  width: 2,
+                ),
               ),
               child: isActive
-                  ? const Center(child: Icon(Icons.circle, size: 6, color: Colors.white))
+                  ? const Center(
+                      child: Icon(Icons.circle, size: 6, color: Colors.white),
+                    )
                   : null,
             ),
             if (!isLast)
-              Container(
-                width: 2,
-                height: 48,
-                color: AppTheme.neutral200,
-              ),
+              Container(width: 2, height: 48, color: AppTheme.neutral200),
           ],
         ),
         const SizedBox(width: 12),
@@ -1665,12 +1156,24 @@ class _OfficerPageState extends State<OfficerPage> {
             children: [
               Row(
                 children: [
-                  Text(date, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppTheme.ink)),
+                  Text(
+                    date,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.ink,
+                    ),
+                  ),
                   const SizedBox(width: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 1.5,
+                    ),
                     decoration: BoxDecoration(
-                      color: isActive ? AppTheme.primaryTint : AppTheme.neutral100,
+                      color: isActive
+                          ? AppTheme.primaryTint
+                          : AppTheme.neutral100,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
@@ -1678,14 +1181,28 @@ class _OfficerPageState extends State<OfficerPage> {
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.bold,
-                        color: isActive ? AppTheme.primary : AppTheme.neutral600,
+                        color: isActive
+                            ? AppTheme.primary
+                            : AppTheme.neutral600,
                       ),
                     ),
                   ),
                 ],
               ),
-              Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              Text(desc, style: const TextStyle(fontSize: 11, color: AppTheme.neutral600)),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                desc,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppTheme.neutral600,
+                ),
+              ),
               const SizedBox(height: 12),
             ],
           ),
@@ -1724,9 +1241,23 @@ class _OfficerPageState extends State<OfficerPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.ink)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.ink,
+                  ),
+                ),
                 const SizedBox(height: 2),
-                Text(desc, style: const TextStyle(fontSize: 11, color: AppTheme.neutral600, height: 1.35)),
+                Text(
+                  desc,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.neutral600,
+                    height: 1.35,
+                  ),
+                ),
                 const SizedBox(height: 10),
                 Align(
                   alignment: Alignment.centerRight,
@@ -1736,10 +1267,18 @@ class _OfficerPageState extends State<OfficerPage> {
                       foregroundColor: Colors.white,
                       minimumSize: const Size(130, 34),
                       visualDensity: VisualDensity.compact,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                     onPressed: onTap,
-                    child: Text(actionLabel, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    child: Text(
+                      actionLabel,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -1768,7 +1307,11 @@ class _OfficerPageState extends State<OfficerPage> {
               children: [
                 Text(
                   'Adoption & Quota Tracker',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.ink),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.ink,
+                  ),
                 ),
                 Text(
                   'Recommended target vs Farmer-Reported area (ha)',
@@ -1781,11 +1324,17 @@ class _OfficerPageState extends State<OfficerPage> {
               decoration: BoxDecoration(
                 color: AppTheme.primaryTint,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+                border: Border.all(
+                  color: AppTheme.primary.withValues(alpha: 0.2),
+                ),
               ),
               child: Text(
                 '$totalReports Reports Live',
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: AppTheme.primary),
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.primary,
+                ),
               ),
             ),
           ],
@@ -1794,15 +1343,18 @@ class _OfficerPageState extends State<OfficerPage> {
 
         // Live Adoption Cards
         ...rows.map((row) {
-          final progress = (row.reportedHa / row.recommendedHa).clamp(0.0, 1.25);
+          final progress = (row.reportedHa / row.recommendedHa).clamp(
+            0.0,
+            1.25,
+          );
           final isOver = progress > 1.05;
           final isUnder = progress < 0.85;
 
           final color = isOver
               ? AppTheme.oversupply
               : isUnder
-                  ? AppTheme.shortage
-                  : AppTheme.balanced;
+              ? AppTheme.shortage
+              : AppTheme.balanced;
 
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
@@ -1827,11 +1379,19 @@ class _OfficerPageState extends State<OfficerPage> {
                   children: [
                     Text(
                       row.crop,
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppTheme.ink),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.ink,
+                      ),
                     ),
                     Text(
                       '${row.reportedHa.toInt()} / ${row.recommendedHa.toInt()} ha',
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'monospace',
+                      ),
                     ),
                   ],
                 ),
@@ -1851,17 +1411,31 @@ class _OfficerPageState extends State<OfficerPage> {
                   children: [
                     Text(
                       'Recommended: ${row.recommendedHa.toInt()} ha',
-                      style: const TextStyle(fontSize: 11, color: AppTheme.neutral600),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.neutral600,
+                      ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: color.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        '${(progress * 100).toInt()}% of Target (${isOver ? "Over" : isUnder ? "Deficit" : "Optimal"})',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color),
+                        '${(progress * 100).toInt()}% of Target (${isOver
+                            ? "Over"
+                            : isUnder
+                            ? "Deficit"
+                            : "Optimal"})',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: color,
+                        ),
                       ),
                     ),
                   ],
@@ -1878,7 +1452,11 @@ class _OfficerPageState extends State<OfficerPage> {
           children: [
             const Text(
               'Decentralized Field Stream',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.ink),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.ink,
+              ),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -1886,7 +1464,14 @@ class _OfficerPageState extends State<OfficerPage> {
                 color: AppTheme.balancedTint,
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Text('Live Cryptographic Audit', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: AppTheme.balanced)),
+              child: const Text(
+                'Live Cryptographic Audit',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.balanced,
+                ),
+              ),
             ),
           ],
         ),
@@ -1926,7 +1511,11 @@ class _OfficerPageState extends State<OfficerPage> {
                       color: AppTheme.primaryTint,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.receipt_long_rounded, color: AppTheme.primary, size: 20),
+                    child: const Icon(
+                      Icons.receipt_long_rounded,
+                      color: AppTheme.primary,
+                      size: 20,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1938,22 +1527,37 @@ class _OfficerPageState extends State<OfficerPage> {
                           children: [
                             Text(
                               report.id,
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'monospace', color: AppTheme.ink),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'monospace',
+                                color: AppTheme.ink,
+                              ),
                             ),
                             Text(
                               report.timestamp,
-                              style: const TextStyle(fontSize: 9.5, color: AppTheme.neutral400),
+                              style: const TextStyle(
+                                fontSize: 9.5,
+                                color: AppTheme.neutral400,
+                              ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 3),
                         Text(
                           '${report.cropNameEn} · ${report.areaAcres} acres (${(report.areaAcres * 0.404686).toStringAsFixed(2)} ha)',
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppTheme.primary),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.primary,
+                          ),
                         ),
                         Text(
                           '${report.district} · ${report.irrigationType} · Hash: ${report.receiptHash}',
-                          style: const TextStyle(fontSize: 10, color: AppTheme.neutral600),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: AppTheme.neutral600,
+                          ),
                         ),
                       ],
                     ),
@@ -1977,14 +1581,20 @@ class _OfficerPageState extends State<OfficerPage> {
       children: [
         const Text(
           'Policy Directives Ledger',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.ink),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            color: AppTheme.ink,
+          ),
         ),
         const Text(
-          'Logged executive directives with model run IDs and broadcast receipts',
+          'Server-confirmed directives with run IDs and SHA-256 receipts',
           style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
         ),
         const SizedBox(height: 16),
 
+        if (decisions.isEmpty)
+          const Text('No directives recorded in this session.'),
         ...decisions.map((d) {
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
@@ -2004,53 +1614,62 @@ class _OfficerPageState extends State<OfficerPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.primaryTint,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         d.runId,
-                        style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: AppTheme.primary, fontFamily: 'monospace'),
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.primary,
+                          fontFamily: 'monospace',
+                        ),
                       ),
                     ),
-                    Text(d.date, style: const TextStyle(fontSize: 10, color: AppTheme.neutral600)),
+                    Text(
+                      d.date,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: AppTheme.neutral600,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Text(
                   d.decision,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.ink),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.ink,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   d.assumptions,
-                  style: const TextStyle(fontSize: 11.5, color: AppTheme.neutral600),
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: AppTheme.neutral600,
+                  ),
                 ),
                 const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: AppTheme.balancedTint,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppTheme.balancedBorder),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.check_circle_rounded, size: 14, color: AppTheme.balanced),
-                      SizedBox(width: 6),
-                      Text(
-                        'Dispatched to All Registered Farmers via GoviSense Engine',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppTheme.balanced),
-                      ),
-                    ],
-                  ),
+                const Text('Server record hash (SHA-256)'),
+                SelectableText(
+                  d.recordHash,
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
                 ),
+                SelectableText('Decision: ${d.id}'),
               ],
             ),
           );
