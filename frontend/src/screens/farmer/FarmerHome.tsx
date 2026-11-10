@@ -24,6 +24,9 @@ export function FarmerHome({
   onAlerts,
 }: FarmerHomeProps) {
   const t = getTranslations(language)
+  const displayName = profile?.name?.includes("@")
+    ? profile.name.split("@")[0].replace(/[._-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
+    : profile?.name
 
   return (
     <div className="space-y-5 p-4 pb-12">
@@ -35,7 +38,7 @@ export function FarmerHome({
             {t.seasonPeriod}
           </span>
           <h2 className="text-xl font-extrabold tracking-tight text-white pt-1">
-            {profile?.name ? `Ayubowan, ${profile.name}` : "Welcome"}
+            {displayName ? `Ayubowan, ${displayName}!` : "Welcome"}
           </h2>
           <p className="text-xs text-emerald-100 font-medium">
             {t.home.greetingSub}

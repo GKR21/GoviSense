@@ -53,6 +53,34 @@ class AuthRepository extends ChangeNotifier {
       '/api/auth/login',
       data: {'username': username.trim(), 'password': password},
     );
+    await _finishSignIn(response);
+  }
+
+  /// Self-service sign-up for farmers and officers; signs the user in on success.
+  Future<void> register({
+    required String username,
+    required String password,
+    required String fullName,
+    required String role,
+    required String district,
+    String? officerCode,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/api/auth/register',
+      data: {
+        'username': username.trim(),
+        'password': password,
+        'full_name': fullName.trim(),
+        'role': role,
+        'district': district,
+        if (officerCode != null && officerCode.trim().isNotEmpty)
+          'officer_code': officerCode.trim(),
+      },
+    );
+    await _finishSignIn(response);
+  }
+
+  Future<void> _finishSignIn(Response<Map<String, dynamic>> response) async {
     final token = response.data?['access_token'];
     if (token is! String) throw const FormatException('Missing token');
     await _validate(token);
@@ -92,7 +120,10 @@ class AuthRepository extends ChangeNotifier {
     _accessToken = token;
     _role = verifiedRole;
     _username = claims['sub']?.toString();
-    _name = claims['name']?.toString();
+    final claimName = claims['name']?.toString();
+    _name = (claimName == null || claimName.isEmpty)
+        ? claims['sub']?.toString()
+        : claimName;
     _district = claims['district']?.toString();
     _timer?.cancel();
     _timer = Timer(remaining, () {

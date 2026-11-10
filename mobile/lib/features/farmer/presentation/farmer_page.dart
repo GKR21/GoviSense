@@ -422,7 +422,7 @@ class _FarmerPageState extends State<FarmerPage> {
               Text(
                 _repo.profile.name.isEmpty
                     ? AppTranslations.t(_language, 'greeting')
-                    : 'Ayubowan, ${_repo.profile.name}',
+                    : 'Ayubowan, ${_repo.profile.name.replaceAll(RegExp(r'@.*$'), '')}!',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 20,

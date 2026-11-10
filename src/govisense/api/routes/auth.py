@@ -219,7 +219,7 @@ def login(req: LoginRequest):
             user_info = {
                 "email": db_user.username,
                 "role": db_user.role.title(),
-                "name": off_name or db_user.username.split("@")[0].replace(".", " ").title(),
+                "name": db_user.full_name or off_name or db_user.username.split("@")[0].replace(".", " ").title(),
                 "designation": f"Verified {db_user.role.title()}",
                 "district": district,
                 "officer_id": db_user.officer_id or db_user.pseudonymous_id or "USR-0001",

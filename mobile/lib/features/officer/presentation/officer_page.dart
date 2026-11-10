@@ -27,6 +27,15 @@ class _OfficerPageState extends State<OfficerPage> {
     _repo.addListener(_onRepoUpdated);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        final who = AuthRepository.instance.name ??
+            AuthRepository.instance.username ??
+            '';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(who.isEmpty ? 'Ayubowan!' : 'Ayubowan, $who'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
         _repo.loadForecast();
         _repo.simulate();
       }
