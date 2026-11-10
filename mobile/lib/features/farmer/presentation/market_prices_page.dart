@@ -222,7 +222,7 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: AppTheme.primary.withOpacity(0.2),
+                  color: AppTheme.primary.withValues(alpha: 0.2),
                   blurRadius: 10,
                   offset: const Offset(0, 3),
                 ),
@@ -233,7 +233,7 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(Icons.storefront_rounded, color: Colors.white, size: 22),
@@ -262,7 +262,7 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
                             : lang == AppLanguage.ta
                                 ? 'தம்புள்ளை மற்றும் கெப்பெட்டிபொல தினசரி விலை விபரம்'
                                 : 'Official farmgate & wholesale arrivals from Dambulla & Keppetipola',
-                        style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 11),
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 11),
                       ),
                     ],
                   ),
@@ -337,7 +337,7 @@ class _MarketPricesPageState extends State<MarketPricesPage> {
         border: Border.all(color: AppTheme.cardBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),

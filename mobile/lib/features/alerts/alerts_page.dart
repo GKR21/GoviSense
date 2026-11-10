@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../core/theme/app_theme.dart';
 import '../../core/localization/app_translations.dart';
 import '../farmer/data/farmer_repository.dart';
@@ -53,7 +54,11 @@ class _AlertsPageState extends State<AlertsPage> {
           children: [
             Text(
               alert.localizedTitle(_language),
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.primary,
+              ),
             ),
             const SizedBox(height: 10),
             TextField(
@@ -79,7 +84,9 @@ class _AlertsPageState extends State<AlertsPage> {
                 _repo.askOfficer(alert.id, text);
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(AppTranslations.t(_language, 'questionSent'))),
+                  SnackBar(
+                    content: Text(AppTranslations.t(_language, 'questionSent')),
+                  ),
                 );
               }
             },
@@ -114,7 +121,10 @@ class _AlertsPageState extends State<AlertsPage> {
             items: AppLanguage.values.map((l) {
               return DropdownMenuItem(
                 value: l,
-                child: Text(l.nativeLabel, style: const TextStyle(fontSize: 12)),
+                child: Text(
+                  l.nativeLabel,
+                  style: const TextStyle(fontSize: 12),
+                ),
               );
             }).toList(),
           ),
@@ -135,10 +145,26 @@ class _AlertsPageState extends State<AlertsPage> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _buildFilterChip(AppTranslations.t(_language, 'filterAll'), 'all', allAlerts.length),
-                _buildFilterChip(AppTranslations.t(_language, 'filterUnread'), 'unread', _repo.unreadAlertsCount),
-                _buildFilterChip(AppTranslations.t(_language, 'filterMarket'), 'market', null),
-                _buildFilterChip(AppTranslations.t(_language, 'filterWeather'), 'weather', null),
+                _buildFilterChip(
+                  AppTranslations.t(_language, 'filterAll'),
+                  'all',
+                  allAlerts.length,
+                ),
+                _buildFilterChip(
+                  AppTranslations.t(_language, 'filterUnread'),
+                  'unread',
+                  _repo.unreadAlertsCount,
+                ),
+                _buildFilterChip(
+                  AppTranslations.t(_language, 'filterMarket'),
+                  'market',
+                  null,
+                ),
+                _buildFilterChip(
+                  AppTranslations.t(_language, 'filterWeather'),
+                  'weather',
+                  null,
+                ),
               ],
             ),
           ),
@@ -180,18 +206,18 @@ class _AlertsPageState extends State<AlertsPage> {
     final iconData = alert.type == AlertType.weather
         ? Icons.cloudy_snowing
         : alert.type == AlertType.market
-            ? Icons.trending_up_rounded
-            : alert.type == AlertType.success
-                ? Icons.check_circle_outline
-                : Icons.campaign_rounded;
+        ? Icons.trending_up_rounded
+        : alert.type == AlertType.success
+        ? Icons.check_circle_outline
+        : Icons.campaign_rounded;
 
     final color = alert.type == AlertType.weather
         ? const Color(0xFF2563EB)
         : alert.type == AlertType.market
-            ? AppTheme.oversupply
-            : alert.type == AlertType.success
-                ? AppTheme.balanced
-                : AppTheme.primary;
+        ? AppTheme.oversupply
+        : alert.type == AlertType.success
+        ? AppTheme.balanced
+        : AppTheme.primary;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -200,7 +226,9 @@ class _AlertsPageState extends State<AlertsPage> {
         color: alert.isRead ? AppTheme.background : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: alert.isRead ? AppTheme.cardBorder : AppTheme.primary.withOpacity(0.4),
+          color: alert.isRead
+              ? AppTheme.cardBorder
+              : AppTheme.primary.withValues(alpha: 0.4),
           width: alert.isRead ? 1 : 1.5,
         ),
       ),
@@ -216,7 +244,9 @@ class _AlertsPageState extends State<AlertsPage> {
                   alert.localizedTitle(_language),
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: alert.isRead ? FontWeight.w600 : FontWeight.bold,
+                    fontWeight: alert.isRead
+                        ? FontWeight.w600
+                        : FontWeight.bold,
                     color: AppTheme.ink,
                   ),
                 ),
@@ -235,7 +265,11 @@ class _AlertsPageState extends State<AlertsPage> {
           const SizedBox(height: 6),
           Text(
             alert.localizedMessage(_language),
-            style: const TextStyle(fontSize: 11, color: AppTheme.neutral600, height: 1.4),
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppTheme.neutral600,
+              height: 1.4,
+            ),
           ),
           if (alert.questionAsked != null) ...[
             const SizedBox(height: 8),
@@ -251,48 +285,95 @@ class _AlertsPageState extends State<AlertsPage> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.help_outline_rounded, size: 12, color: AppTheme.primary),
+                      const Icon(
+                        Icons.help_outline_rounded,
+                        size: 12,
+                        color: AppTheme.primary,
+                      ),
                       const SizedBox(width: 4),
                       Text(
-                        _language == AppLanguage.si ? 'ඔබගේ විමසීම:' : _language == AppLanguage.ta ? 'உங்கள் கேள்வி:' : 'Your Inquiry:',
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                        _language == AppLanguage.si
+                            ? 'ඔබගේ විමසීම:'
+                            : _language == AppLanguage.ta
+                            ? 'உங்கள் கேள்வி:'
+                            : 'Your Inquiry:',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primary,
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 2),
-                  Text(alert.questionAsked!, style: const TextStyle(fontSize: 11, color: AppTheme.ink)),
+                  Text(
+                    alert.questionAsked!,
+                    style: const TextStyle(fontSize: 11, color: AppTheme.ink),
+                  ),
                   if (alert.officerResponse != null) ...[
                     const Divider(height: 12),
                     Text(
-                      _language == AppLanguage.si ? 'නිලධාරී පිළිතුර:' : _language == AppLanguage.ta ? 'அதிகாரியின் பதில்:' : 'Officer Response:',
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.balanced),
+                      _language == AppLanguage.si
+                          ? 'නිලධාරී පිළිතුර:'
+                          : _language == AppLanguage.ta
+                          ? 'அதிகாரியின் பதில்:'
+                          : 'Officer Response:',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.balanced,
+                      ),
                     ),
                     const SizedBox(height: 2),
-                    Text(alert.officerResponse!, style: const TextStyle(fontSize: 11, color: AppTheme.balanced)),
+                    Text(
+                      alert.officerResponse!,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.balanced,
+                      ),
+                    ),
                   ],
                 ],
               ),
             ),
           ],
           const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(alert.timestamp, style: const TextStyle(fontSize: 10, color: AppTheme.neutral400)),
+              Text(
+                alert.timestamp,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: AppTheme.neutral400,
+                ),
+              ),
+              const SizedBox(height: 8),
               Wrap(
+                alignment: WrapAlignment.start,
                 spacing: 6,
+                runSpacing: 6,
                 children: [
                   if (alert.isAcknowledged)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.balancedTint,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppTheme.balanced.withOpacity(0.3)),
+                        border: Border.all(
+                          color: AppTheme.balanced.withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Text(
                         AppTranslations.t(_language, 'acknowledgedBadge'),
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.balanced),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.balanced,
+                        ),
                       ),
                     )
                   else
@@ -314,7 +395,10 @@ class _AlertsPageState extends State<AlertsPage> {
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                     ),
                     onPressed: () => _showAskOfficerDialog(alert),
-                    icon: const Icon(Icons.chat_bubble_outline_rounded, size: 12),
+                    icon: const Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      size: 12,
+                    ),
                     label: Text(
                       AppTranslations.t(_language, 'askOfficerBtn'),
                       style: const TextStyle(fontSize: 11),
@@ -328,7 +412,11 @@ class _AlertsPageState extends State<AlertsPage> {
                       ),
                       onPressed: () {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Calling officer at ${alert.officerPhone}')),
+                          SnackBar(
+                            content: Text(
+                              'Calling officer at ${alert.officerPhone}',
+                            ),
+                          ),
                         );
                       },
                       icon: const Icon(Icons.phone, size: 12),

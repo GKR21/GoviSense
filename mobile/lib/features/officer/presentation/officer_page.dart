@@ -1,3 +1,4 @@
+import '../../auth/data/auth_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
@@ -63,9 +64,9 @@ class _OfficerPageState extends State<OfficerPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryTint.withOpacity(0.5),
+                  color: AppTheme.primaryTint.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -197,7 +198,7 @@ class _OfficerPageState extends State<OfficerPage> {
                     borderRadius: BorderRadius.circular(18),
                     boxShadow: [
                       BoxShadow(
-                        color: AppTheme.primary.withOpacity(0.3),
+                        color: AppTheme.primary.withValues(alpha: 0.3),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -298,7 +299,7 @@ class _OfficerPageState extends State<OfficerPage> {
                 border: Border.all(color: AppTheme.cardBorder),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 10,
                     offset: const Offset(0, 3),
                   ),
@@ -331,7 +332,7 @@ class _OfficerPageState extends State<OfficerPage> {
                         _confirmLogout(context);
                       },
                       borderRadius: BorderRadius.circular(16),
-                      splashColor: const Color(0xFFFCA5A5).withOpacity(0.3),
+                      splashColor: const Color(0xFFFCA5A5).withValues(alpha: 0.3),
                       highlightColor: const Color(0xFFFEE2E2),
                       child: Container(
                         width: double.infinity,
@@ -377,7 +378,7 @@ class _OfficerPageState extends State<OfficerPage> {
       confirmText: 'Log Out',
       cancelText: 'Cancel',
       icon: Icons.logout_rounded,
-      onConfirm: () => context.go('/login'),
+      onConfirm: () async { await AuthRepository.instance.logout(); },
     );
   }
 
@@ -387,7 +388,7 @@ class _OfficerPageState extends State<OfficerPage> {
       backgroundColor: AppTheme.background,
       appBar: AppBar(
         scrolledUnderElevation: 2,
-        shadowColor: Colors.black.withOpacity(0.08),
+        shadowColor: Colors.black.withValues(alpha: 0.08),
         title: Row(
           children: [
             Container(
@@ -401,7 +402,7 @@ class _OfficerPageState extends State<OfficerPage> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.primary.withOpacity(0.25),
+                    color: AppTheme.primary.withValues(alpha: 0.25),
                     blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
@@ -425,7 +426,7 @@ class _OfficerPageState extends State<OfficerPage> {
                       decoration: BoxDecoration(
                         color: AppTheme.primaryTint,
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+                        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
                       ),
                       child: const Row(
                         children: [
@@ -501,7 +502,7 @@ class _OfficerPageState extends State<OfficerPage> {
                 border: Border.all(color: Colors.white, width: 2),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.primary.withOpacity(0.2),
+                    color: AppTheme.primary.withValues(alpha: 0.2),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -585,15 +586,15 @@ class _OfficerPageState extends State<OfficerPage> {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.white, AppTheme.primaryTint.withOpacity(0.4)],
+                colors: [Colors.white, AppTheme.primaryTint.withValues(alpha: 0.4)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppTheme.primary.withOpacity(0.25)),
+              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
               boxShadow: [
                 BoxShadow(
-                  color: AppTheme.primary.withOpacity(0.06),
+                  color: AppTheme.primary.withValues(alpha: 0.06),
                   blurRadius: 10,
                   offset: const Offset(0, 3),
                 ),
@@ -608,7 +609,7 @@ class _OfficerPageState extends State<OfficerPage> {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: AppTheme.primary.withOpacity(0.3),
+                        color: AppTheme.primary.withValues(alpha: 0.3),
                         blurRadius: 6,
                         offset: const Offset(0, 2),
                       ),
@@ -663,7 +664,7 @@ class _OfficerPageState extends State<OfficerPage> {
                     ),
                     Switch(
                       value: _repo.showGroundTruthOverlay,
-                      activeColor: AppTheme.primary,
+                      activeThumbColor: AppTheme.primary,
                       onChanged: (val) => _repo.toggleGroundTruthOverlay(),
                     ),
                   ],
@@ -683,7 +684,7 @@ class _OfficerPageState extends State<OfficerPage> {
             border: Border.all(color: const Color(0xFFFDE68A)),
             boxShadow: [
               BoxShadow(
-                color: Colors.amber.withOpacity(0.06),
+                color: Colors.amber.withValues(alpha: 0.06),
                 blurRadius: 10,
                 offset: const Offset(0, 3),
               ),
@@ -773,7 +774,7 @@ class _OfficerPageState extends State<OfficerPage> {
             border: Border.all(color: AppTheme.cardBorder),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 12,
                 offset: const Offset(0, 3),
               ),
@@ -880,8 +881,8 @@ class _OfficerPageState extends State<OfficerPage> {
                                       colors: isSelected
                                           ? gradientColors
                                           : [
-                                              gradientColors[0].withOpacity(0.55),
-                                              gradientColors[1].withOpacity(0.55),
+                                              gradientColors[0].withValues(alpha: 0.55),
+                                              gradientColors[1].withValues(alpha: 0.55),
                                             ],
                                       begin: Alignment.topCenter,
                                       end: Alignment.bottomCenter,
@@ -893,7 +894,7 @@ class _OfficerPageState extends State<OfficerPage> {
                                     boxShadow: isSelected
                                         ? [
                                             BoxShadow(
-                                              color: gradientColors[1].withOpacity(0.4),
+                                              color: gradientColors[1].withValues(alpha: 0.4),
                                               blurRadius: 6,
                                               offset: const Offset(0, 2),
                                             ),
@@ -1141,7 +1142,7 @@ class _OfficerPageState extends State<OfficerPage> {
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.primary.withOpacity(0.35),
+                color: AppTheme.primary.withValues(alpha: 0.35),
                 blurRadius: 14,
                 offset: const Offset(0, 4),
               ),
@@ -1222,7 +1223,7 @@ class _OfficerPageState extends State<OfficerPage> {
             border: Border.all(color: AppTheme.cardBorder),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 10,
                 offset: const Offset(0, 3),
               ),
@@ -1281,7 +1282,7 @@ class _OfficerPageState extends State<OfficerPage> {
             border: Border.all(color: AppTheme.cardBorder),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 10,
                 offset: const Offset(0, 3),
               ),
@@ -1491,7 +1492,7 @@ class _OfficerPageState extends State<OfficerPage> {
             border: Border.all(color: AppTheme.oversupplyBorder),
             boxShadow: [
               BoxShadow(
-                color: Colors.amber.withOpacity(0.06),
+                color: Colors.amber.withValues(alpha: 0.06),
                 blurRadius: 10,
                 offset: const Offset(0, 3),
               ),
@@ -1780,7 +1781,7 @@ class _OfficerPageState extends State<OfficerPage> {
               decoration: BoxDecoration(
                 color: AppTheme.primaryTint,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
               ),
               child: Text(
                 '$totalReports Reports Live',
@@ -1812,7 +1813,7 @@ class _OfficerPageState extends State<OfficerPage> {
               border: Border.all(color: AppTheme.cardBorder),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
+                  color: Colors.black.withValues(alpha: 0.02),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -1855,7 +1856,7 @@ class _OfficerPageState extends State<OfficerPage> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: color.withOpacity(0.12),
+                        color: color.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
@@ -1994,7 +1995,7 @@ class _OfficerPageState extends State<OfficerPage> {
               border: Border.all(color: AppTheme.cardBorder),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
+                  color: Colors.black.withValues(alpha: 0.02),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),

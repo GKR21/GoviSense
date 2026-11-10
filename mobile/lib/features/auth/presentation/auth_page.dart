@@ -1,152 +1,141 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/app_card.dart';
+import '../data/auth_repository.dart';
 import '../../../shared/widgets/brand_mark.dart';
+import '../../../shared/widgets/app_card.dart';
 
 class AuthPage extends StatefulWidget {
   const AuthPage({super.key});
-
   @override
   State<AuthPage> createState() => _AuthPageState();
 }
 
 class _AuthPageState extends State<AuthPage> {
-  String _role = 'Officer';
-  bool _obscurePassword = true;
+  final _form = GlobalKey<FormState>();
+  final _username = TextEditingController();
+  final _password = TextEditingController();
+  bool _loading = false;
+  bool _obscure = true;
+  String? _error;
+  @override
+  void dispose() {
+    _username.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  Future<void> _login() async {
+    if (_loading || !_form.currentState!.validate()) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await AuthRepository.instance.login(_username.text, _password.text);
+    } catch (_) {
+      if (mounted)
+        setState(
+          () => _error =
+              'Unable to sign in. Check your credentials and connection.',
+        );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const BrandMark(),
-              const SizedBox(height: 46),
-              Text(
-                'SRI LANKA · PILOT WORKSPACE',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppTheme.primary,
-                  letterSpacing: 1.2,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Decisions grounded in supply, demand and uncertainty.',
-                style: Theme.of(context).textTheme.headlineLarge,
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'A shared monthly picture for agricultural planning officers and farming communities.',
-              ),
-              const SizedBox(height: 28),
-              AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Welcome back',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Choose your role and continue to the workspace.',
-                    ),
-                    const SizedBox(height: 20),
-                    SegmentedButton<String>(
-                      segments: const [
-                        ButtonSegment(
-                          value: 'Officer',
-                          label: Text('Officer'),
-                          icon: Icon(Icons.bar_chart_rounded),
-                        ),
-                        ButtonSegment(
-                          value: 'Farmer',
-                          label: Text('Farmer'),
-                          icon: Icon(Icons.spa_rounded),
-                        ),
-                      ],
-                      selected: {_role},
-                      onSelectionChanged: (value) =>
-                          setState(() => _role = value.first),
-                    ),
-                    const SizedBox(height: 20),
-                    const TextField(
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: InputDecoration(
-                        labelText: 'Email address',
-                        prefixIcon: Icon(Icons.mail_outline_rounded),
+  Widget build(BuildContext context) => Scaffold(
+    body: SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const BrandMark(),
+            const SizedBox(height: 46),
+            Text(
+              'Decisions grounded in supply, demand and uncertainty.',
+              style: Theme.of(context).textTheme.headlineLarge,
+            ),
+            const SizedBox(height: 28),
+            AppCard(
+              child: Form(
+                key: _form,
+                child: AutofillGroup(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Welcome back',
+                        style: Theme.of(context).textTheme.headlineSmall,
                       ),
-                    ),
-                    const SizedBox(height: 14),
-                    TextField(
-                      obscureText: _obscurePassword,
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        prefixIcon: const Icon(Icons.lock_outline_rounded),
-                        suffixIcon: IconButton(
-                          tooltip: 'Show password',
-                          onPressed: () => setState(
-                            () => _obscurePassword = !_obscurePassword,
-                          ),
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
+                      const SizedBox(height: 6),
+                      const Text('Sign in with your GoviSense account.'),
+                      const SizedBox(height: 20),
+                      TextFormField(
+                        controller: _username,
+                        enabled: !_loading,
+                        autocorrect: false,
+                        autofillHints: const [AutofillHints.username],
+                        decoration: const InputDecoration(
+                          labelText: 'Username / email',
+                          prefixIcon: Icon(Icons.person_outline),
+                        ),
+                        validator: (v) => v == null || v.trim().isEmpty
+                            ? 'Enter your username'
+                            : null,
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: _password,
+                        enabled: !_loading,
+                        obscureText: _obscure,
+                        autofillHints: const [AutofillHints.password],
+                        onFieldSubmitted: (_) => _login(),
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            tooltip: _obscure
+                                ? 'Show password'
+                                : 'Hide password',
+                            onPressed: () =>
+                                setState(() => _obscure = !_obscure),
+                            icon: Icon(
+                              _obscure
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
                           ),
                         ),
+                        validator: (v) => v == null || v.isEmpty
+                            ? 'Enter your password'
+                            : null,
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        if (_role == 'Farmer') {
-                          context.go('/farmer');
-                        } else {
-                          context.go('/officer');
-                        }
-                      },
-                      icon: const Icon(Icons.login_rounded),
-                      label: Text('Continue as $_role'),
-                    ),
-                    const SizedBox(height: 12),
-                    const Center(
-                      child: Text(
-                        'Demo only · No real credentials required',
-                        style: TextStyle(
-                          color: AppTheme.neutral400,
-                          fontSize: 12,
+                      const SizedBox(height: 20),
+                      ElevatedButton.icon(
+                        onPressed: _loading ? null : _login,
+                        icon: const Icon(Icons.login_rounded),
+                        label: Text(_loading ? 'Signing in...' : 'Sign in'),
+                      ),
+                      if (_error != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Text(
+                            _error!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 24),
-              const Row(
-                children: [
-                  Icon(
-                    Icons.verified_user_outlined,
-                    size: 18,
-                    color: AppTheme.primary,
-                  ),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Traceable by design · Every output includes confidence and data versions.',
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
 }
