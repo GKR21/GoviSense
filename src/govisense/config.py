@@ -78,6 +78,12 @@ class CropConfig:
     primary_season: str  # Yala or Maha or Both
     min_fair_farmgate_price: float  # Rs/kg floor price for farmers
     storage_loss_rate_monthly: float  # Post-harvest loss rate
+    # M4: Crop-specific LP policy gap thresholds (MT).
+    # Source: Proposal Section 6; calibrated to pilot hub monthly volumes.
+    # surplus_store_threshold_mt: gap < -this → STORE (surplus to buffer)
+    # shortage_import_threshold_mt: gap > +this → IMPORT_LATER / IMPORT_NOW
+    surplus_store_threshold_mt: float = 150.0
+    shortage_import_threshold_mt: float = 200.0
 
 
 # Agronomic Harvest Window Weights (A1 Accounting)
@@ -131,6 +137,13 @@ class GoviSenseSettings:
     })
     onion_storage_capacity_mt: float = 15000.0
 
+    # Import Absorption Factor (A3 SupplyPressureEngine)
+    # Net fraction of imported volume that reaches the pilot hub market as effective supply.
+    # Source: HARTI Market Research Division, "Post-Harvest Loss & Supply Chain Efficiency
+    # Study" (2022), Table 4.3 — pilot corridor utilisation rate.
+    # Confidence: medium; re-calibrate annually from CBSL import clearance vs Pettah arrival data.
+    import_absorption_factor: float = 0.40
+
     # Linear Programming Cost Parameters for Decision Optimizer (A4)
     # Sources cited in docs/assumptions.md
     storage_cost_rs_per_mt_month: Dict[str, float] = field(default_factory=lambda: {
@@ -145,11 +158,20 @@ class GoviSenseSettings:
         "Matale": 45.0,
     })
     cif_colombo_rs_per_mt: Dict[str, float] = field(default_factory=lambda: {
+        # M2 NOTE: CIF prices are static constants — not fetched live from SLPA/CBSL bulletins.
+        # Source: CBSL External Sector Statistics & SLPA Shipping Trade Bulletin (Q3 2025 snapshot).
+        # Confidence: MEDIUM — shipping costs volatile post-2022; stale CIF corrupts the
+        #   primary LightGBM feature `local_vs_import_gap` in A2 PriceForecaster.
+        # Staleness guard: cif_last_updated_date below — alert in /api/health when >90 days old.
+        # Update path: edit these values quarterly from CBSL External Sector Statistics PDF.
         "big_onion": 140000.0,
         "chilli": 420000.0,
         "red_onion": 210000.0,
         "potato": 180000.0,
     })
+    # M2: Date the CIF snapshot was last manually updated (YYYY-MM-DD).
+    # Used by /api/health to emit a data-staleness warning when >90 days old.
+    cif_last_updated_date: str = "2025-09-30"  # Update when cif_colombo_rs_per_mt is refreshed.
     import_tariff_rs_per_mt: Dict[str, float] = field(default_factory=lambda: {
         "big_onion": 50000.0,
         "chilli": 150000.0,
@@ -254,3 +276,37 @@ class GoviSenseSettings:
 
 
 settings = GoviSenseSettings()
+
+
+def check_cif_staleness(max_days: int = 90) -> dict:
+    """
+    M2 staleness guard: returns a warning dict when cif_colombo_rs_per_mt has not
+    been updated within max_days. Wire into /api/health or a startup log.
+
+    Returns:
+        {
+          "is_stale": bool,
+          "days_since_update": int,
+          "last_updated": str,       # YYYY-MM-DD
+          "warning": str | None,
+        }
+    """
+    from datetime import date as _date
+    try:
+        last = _date.fromisoformat(settings.cif_last_updated_date)
+        days_old = (_date.today() - last).days
+    except ValueError:
+        days_old = 9999
+        last = None
+
+    is_stale = days_old > max_days
+    return {
+        "is_stale": is_stale,
+        "days_since_update": days_old,
+        "last_updated": settings.cif_last_updated_date,
+        "warning": (
+            f"CIF prices are {days_old} days old (>{max_days}d threshold). "
+            "LightGBM feature local_vs_import_gap may be stale. "
+            "Update config.cif_colombo_rs_per_mt from CBSL External Sector Statistics."
+        ) if is_stale else None,
+    }
