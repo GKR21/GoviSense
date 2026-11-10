@@ -22,4 +22,5 @@ frontend/dist/
 *.db
 *.sqlite3
 *.sqlite*
+!data/database/govisense.db
 govisense_pgdata/
