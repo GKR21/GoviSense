@@ -1,11 +1,12 @@
-import 'package:flutter/foundation.dart' show kReleaseMode;
+import 'package:flutter/foundation.dart' show kDebugMode, kReleaseMode;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AppConfig {
   const AppConfig._();
 
   static const appName = 'GoviSense';
-  static const String deployedUrl = 'https://govisense-production.up.railway.app';
+  static const String deployedUrl =
+      'https://govisense-production.up.railway.app';
   static const String localEmulatorUrl = 'http://10.0.2.2:8000';
 
   // Override with: --dart-define=API_BASE_URL=http://<host>:8000

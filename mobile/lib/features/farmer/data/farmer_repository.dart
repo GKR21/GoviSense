@@ -141,6 +141,8 @@ class FarmerRepository extends ChangeNotifier {
       (c) => c.id == cropId,
       orElse: () => _crops.first,
     );
+    final rng = Random();
+    final hexCode = rng.nextInt(0xFFFFFF).toRadixString(16).padLeft(6, '0');
     final localId =
         'LOCAL-${DateTime.now().microsecondsSinceEpoch}-${++_localReportSequence}';
 
