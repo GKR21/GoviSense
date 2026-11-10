@@ -1,4 +1,8 @@
 const uiTranslationsExtra = <String, List<String>>{
+  "Enter a valid server address.": [
+    "වලංගු සේවාදායක ලිපිනයක් ඇතුළත් කරන්න.",
+    "செல்லுபடியான சேவையக முகவரியை உள்ளிடவும்.",
+  ],
   "Anuradhapura DEC": [
     "අනුරාධපුර ආර්ථික මධ්‍යස්ථානය",
     "அனுராதபுர பொருளாதார மையம்",
