@@ -1,3 +1,6 @@
+import '../../../../core/localization/app_locale.dart';
+import '../../../../core/localization/localized_text.dart';
+
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -13,14 +16,14 @@ class PlantingReceiptWidget extends StatelessWidget {
     if (declaration == null) {
       return const Padding(
         padding: EdgeInsets.all(12),
-        child: Text('No server-confirmed planting receipt.'),
+        child: LocalizedText('No server-confirmed planting receipt.'),
       );
     }
     if (!declaration.hasVerifiedReceipt) {
       return const Padding(
         padding: EdgeInsets.all(12),
-        child: Text(
-          'Pending server confirmation ? No verified receipt or QR code',
+        child: LocalizedText(
+          'Pending server confirmation · No verified receipt or QR code',
           style: TextStyle(color: Color(0xFF92400E)),
         ),
       );
@@ -32,20 +35,23 @@ class PlantingReceiptWidget extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            const LocalizedText(
               'Server-confirmed cultivation receipt',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: Colors.black,
               ),
             ),
-            SelectableText(
+            LocalizedSelectableText(
               'Report: ${declaration.id}',
               style: const TextStyle(color: Colors.black),
             ),
             const SizedBox(height: 8),
-            const Text('SHA-256', style: TextStyle(color: Colors.black)),
-            SelectableText(
+            const LocalizedText(
+              'SHA-256',
+              style: TextStyle(color: Colors.black),
+            ),
+            LocalizedSelectableText(
               declaration.receiptHash,
               style: const TextStyle(
                 fontFamily: 'monospace',
@@ -58,10 +64,12 @@ class PlantingReceiptWidget extends StatelessWidget {
                 data: declaration.verificationUrl!,
                 size: 210,
                 backgroundColor: Colors.white,
-                semanticsLabel: 'Verify planting receipt ${declaration.id}',
+                semanticsLabel: context.tr(
+                  'Verify planting receipt ${declaration.id}',
+                ),
               ),
             ),
-            const Text(
+            const LocalizedText(
               'Scan to check this receipt against the server. Internet required.',
               style: TextStyle(fontSize: 11, color: Colors.black),
             ),

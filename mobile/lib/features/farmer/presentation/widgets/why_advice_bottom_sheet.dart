@@ -1,4 +1,7 @@
+import '../../../../core/localization/localized_text.dart';
+
 import 'package:flutter/material.dart';
+
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/localization/app_translations.dart';
 
@@ -48,14 +51,18 @@ class WhyAdviceBottomSheet extends StatelessWidget {
                   color: AppTheme.primaryTint,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.auto_awesome, color: AppTheme.primary, size: 20),
+                child: const Icon(
+                  Icons.auto_awesome,
+                  color: AppTheme.primary,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    LocalizedText(
                       'Why Were These 3 Crops Selected?',
                       style: TextStyle(
                         fontSize: 16,
@@ -63,9 +70,12 @@ class WhyAdviceBottomSheet extends StatelessWidget {
                         color: AppTheme.ink,
                       ),
                     ),
-                    Text(
+                    LocalizedText(
                       'Department of Agriculture Crop Balancing Model',
-                      style: TextStyle(fontSize: 12, color: AppTheme.neutral600),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.neutral600,
+                      ),
                     ),
                   ],
                 ),
@@ -77,29 +87,26 @@ class WhyAdviceBottomSheet extends StatelessWidget {
             icon: Icons.terrain_rounded,
             color: AppTheme.primary,
             title: '1. Agro-Ecological Match',
-            body:
-                'Anuradhapura dry-zone reddish brown earth has moderate drainage. Legumes and alliums perform best with low root rotting risk.',
+            body: 'Anuradhapura dry-zone reddish brown earth has moderate drainage. Legumes and alliums perform best with low root rotting risk.',
           ),
           const SizedBox(height: 12),
           _buildFactorCard(
             icon: Icons.trending_up_rounded,
             color: AppTheme.oversupply,
             title: '2. Market Supply Pressure (SPI)',
-            body:
-                'Green gram has an expected national deficit, guaranteeing floor pricing. Big onion has high import competition.',
+            body: 'Green gram has an expected national deficit, guaranteeing floor pricing. Big onion has high import competition.',
           ),
           const SizedBox(height: 12),
           _buildFactorCard(
             icon: Icons.water_drop_outlined,
             color: const Color(0xFF2A88D8),
             title: '3. Minor Tank Water Budget',
-            body:
-                'With reservoir levels at 68%, these 3 crops require 30% less water than traditional paddy, preventing drought failure.',
+            body: 'With reservoir levels at 68%, these 3 crops require 30% less water than traditional paddy, preventing drought failure.',
           ),
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Understood'),
+            child: const LocalizedText('Understood'),
           ),
         ],
       ),
@@ -128,7 +135,7 @@ class WhyAdviceBottomSheet extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                LocalizedText(
                   title,
                   style: const TextStyle(
                     fontSize: 13,
@@ -137,9 +144,13 @@ class WhyAdviceBottomSheet extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 3),
-                Text(
+                LocalizedText(
                   body,
-                  style: const TextStyle(fontSize: 12, color: AppTheme.neutral600, height: 1.4),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.neutral600,
+                    height: 1.4,
+                  ),
                 ),
               ],
             ),
@@ -149,4 +160,3 @@ class WhyAdviceBottomSheet extends StatelessWidget {
     );
   }
 }
-

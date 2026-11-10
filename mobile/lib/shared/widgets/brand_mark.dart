@@ -1,3 +1,5 @@
+import '../../core/localization/localized_text.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -26,7 +28,7 @@ class BrandMark extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
-        Text(
+        LocalizedText(
           'GoviSense',
           style: Theme.of(context).textTheme.titleLarge
               ?.copyWith(color: AppTheme.ink, fontWeight: FontWeight.w700),

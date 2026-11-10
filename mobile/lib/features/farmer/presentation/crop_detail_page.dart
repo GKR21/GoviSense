@@ -1,4 +1,8 @@
+import '../../../core/localization/app_locale.dart';
+import '../../../core/localization/localized_text.dart';
+
 import 'package:flutter/material.dart';
+
 import '../../../core/theme/app_theme.dart';
 import '../../../core/localization/app_translations.dart';
 import '../models/crop_item.dart';
@@ -19,6 +23,7 @@ class CropDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final language = AppLocaleScope.of(context, fallback: this.language);
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -30,10 +35,7 @@ class CropDetailPage extends StatelessWidget {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.network(
-                    crop.imageUrl,
-                    fit: BoxFit.cover,
-                  ),
+                  Image.network(crop.imageUrl, fit: BoxFit.cover),
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -55,12 +57,15 @@ class CropDetailPage extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: AppTheme.primary,
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: Text(
+                          child: LocalizedText(
                             crop.localizedFitBadge(language),
                             style: const TextStyle(
                               color: Colors.white,
@@ -70,7 +75,7 @@ class CropDetailPage extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 6),
-                        Text(
+                        LocalizedText(
                           crop.localizedName(language),
                           style: const TextStyle(
                             color: Colors.white,
@@ -78,7 +83,7 @@ class CropDetailPage extends StatelessWidget {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        Text(
+                        LocalizedText(
                           crop.scientificName,
                           style: const TextStyle(
                             color: Colors.white70,
@@ -129,12 +134,16 @@ class CropDetailPage extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: AppTheme.primaryTint,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+                          border: Border.all(
+                            color: AppTheme.primary.withValues(alpha: 0.2),
+                          ),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          alignment: WrapAlignment.spaceBetween,
                           children: [
-                            const Text(
+                            const LocalizedText(
                               'Net Return / Acre',
                               style: TextStyle(
                                 fontSize: 13,
@@ -142,7 +151,7 @@ class CropDetailPage extends StatelessWidget {
                                 color: AppTheme.primary,
                               ),
                             ),
-                            Text(
+                            LocalizedText(
                               crop.localizedProfit(language),
                               style: const TextStyle(
                                 fontSize: 16,
@@ -168,22 +177,35 @@ class CropDetailPage extends StatelessWidget {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.calendar_today_rounded, size: 16, color: AppTheme.primary),
+                              const Icon(
+                                Icons.calendar_today_rounded,
+                                size: 16,
+                                color: AppTheme.primary,
+                              ),
                               const SizedBox(width: 8),
-                              Text(
+                              LocalizedText(
                                 crop.localizedPlantWindow(language),
-                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ],
                           ),
-                          const Text('→', style: TextStyle(color: AppTheme.neutral400)),
+                          const LocalizedText(
+                            '→',
+                            style: TextStyle(color: AppTheme.neutral400),
+                          ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: AppTheme.oversupplyTint,
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Text(
+                            child: LocalizedText(
                               crop.localizedHarvestWindow(language),
                               style: const TextStyle(
                                 fontSize: 13,
@@ -197,12 +219,19 @@ class CropDetailPage extends StatelessWidget {
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          const Text('Water Requirement: ', style: TextStyle(fontSize: 12)),
+                          const LocalizedText(
+                            'Water Requirement: ',
+                            style: TextStyle(fontSize: 12),
+                          ),
                           WaterDropsWidget(count: crop.waterNeed),
                           const Spacer(),
-                          Text(
+                          LocalizedText(
                             '${crop.maturityDays} Days Cycle',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.neutral600),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.neutral600,
+                            ),
                           ),
                         ],
                       ),
@@ -225,9 +254,13 @@ class CropDetailPage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: AppTheme.cardBorder),
                         ),
-                        child: Text(
+                        child: LocalizedText(
                           crop.localizedRiskText(language),
-                          style: const TextStyle(fontSize: 12, height: 1.4, fontWeight: FontWeight.w500),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            height: 1.4,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ],
@@ -244,20 +277,31 @@ class CropDetailPage extends StatelessWidget {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.tips_and_updates_rounded, color: AppTheme.primary, size: 20),
+                          const Icon(
+                            Icons.tips_and_updates_rounded,
+                            color: AppTheme.primary,
+                            size: 20,
+                          ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
+                                const LocalizedText(
                                   'Agrarian Service Center Field Tip',
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                                 const SizedBox(height: 3),
-                                Text(
+                                LocalizedText(
                                   crop.localizedFieldTip(language),
-                                  style: const TextStyle(fontSize: 12, color: AppTheme.neutral600, height: 1.4),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.neutral600,
+                                    height: 1.4,
+                                  ),
                                 ),
                               ],
                             ),
@@ -291,7 +335,9 @@ class CropDetailPage extends StatelessWidget {
           child: ElevatedButton.icon(
             onPressed: onChooseToPlant,
             icon: const Icon(Icons.check_circle_rounded),
-            label: Text('Declare & Record Planting (${crop.localizedName(language)})'),
+            label: LocalizedText(
+              'Declare & Record Planting (${crop.localizedName(language)})',
+            ),
           ),
         ),
       ),
@@ -309,7 +355,7 @@ class CropDetailPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          LocalizedText(
             title,
             style: const TextStyle(
               fontSize: 11,
@@ -343,20 +389,29 @@ class CropDetailPage extends StatelessWidget {
             children: [
               Icon(icon, size: 14, color: AppTheme.neutral600),
               const SizedBox(width: 4),
-              Text(
-                label,
-                style: const TextStyle(fontSize: 10, color: AppTheme.neutral600, fontWeight: FontWeight.w600),
+              Expanded(
+                child: LocalizedText(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppTheme.neutral600,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 4),
-          Text(
+          LocalizedText(
             value,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.ink),
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.ink,
+            ),
           ),
         ],
       ),
     );
   }
 }
-

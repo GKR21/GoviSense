@@ -1,3 +1,5 @@
+import '../../../core/localization/localized_text.dart';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -29,7 +31,7 @@ class _SplashPageState extends State<SplashPage> {
           children: [
             BrandMark(),
             SizedBox(height: 18),
-            Text(
+            LocalizedText(
               'Agricultural decision support',
               style: TextStyle(color: AppTheme.neutral600),
             ),

@@ -1,9 +1,11 @@
+import '../../../core/localization/app_locale.dart';
+import '../../../core/localization/localized_text.dart';
+
 import 'dart:math' as math;
 
 import '../../auth/data/auth_repository.dart';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/premium_confirm_dialog.dart';
@@ -11,7 +13,8 @@ import '../../farmer/data/farmer_repository.dart';
 import '../data/officer_repository.dart';
 
 class OfficerPage extends StatefulWidget {
-  const OfficerPage({super.key});
+  const OfficerPage({super.key, this.repository});
+  final OfficerRepository? repository;
 
   @override
   State<OfficerPage> createState() => _OfficerPageState();
@@ -19,7 +22,7 @@ class OfficerPage extends StatefulWidget {
 
 class _OfficerPageState extends State<OfficerPage> {
   int _selectedIndex = 0;
-  final _repo = OfficerRepository.instance;
+  late final _repo = widget.repository ?? OfficerRepository.instance;
 
   @override
   void initState() {
@@ -62,7 +65,7 @@ class _OfficerPageState extends State<OfficerPage> {
         builder: (dialogContext, update) => PopScope(
           canPop: !saving,
           child: AlertDialog(
-            title: const Text('Record Policy Directive'),
+            title: const LocalizedText('Record Policy Directive'),
             content: Form(
               key: form,
               child: SingleChildScrollView(
@@ -70,7 +73,7 @@ class _OfficerPageState extends State<OfficerPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(decisionText),
+                    LocalizedText(decisionText),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: amount,
@@ -79,21 +82,21 @@ class _OfficerPageState extends State<OfficerPage> {
                         decimal: true,
                       ),
                       decoration: InputDecoration(
-                        labelText: 'Quantity ($unit)',
+                        labelText: context.tr('Quantity ($unit)'),
                       ),
                       validator: (value) {
                         final number = double.tryParse(value ?? '');
                         return number == null || !number.isFinite || number < 0
-                            ? 'Enter a valid non-negative quantity'
+                            ? context.tr('Enter a valid non-negative quantity')
                             : null;
                       },
                     ),
                     const SizedBox(height: 12),
-                    const Text(
+                    const LocalizedText(
                       'The server will return a run ID and SHA-256 receipt. This action records a directive; it does not send farmer notifications.',
                     ),
                     if (error != null)
-                      Text(
+                      LocalizedText(
                         error!,
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.error,
@@ -106,7 +109,7 @@ class _OfficerPageState extends State<OfficerPage> {
             actions: [
               TextButton(
                 onPressed: saving ? null : () => Navigator.pop(dialogContext),
-                child: const Text('Cancel'),
+                child: const LocalizedText('Cancel'),
               ),
               FilledButton(
                 onPressed: saving
@@ -134,7 +137,7 @@ class _OfficerPageState extends State<OfficerPage> {
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text(
+                                content: LocalizedText(
                                   'Directive recorded: ${result.runId}',
                                 ),
                               ),
@@ -142,7 +145,9 @@ class _OfficerPageState extends State<OfficerPage> {
                           }
                         }
                       },
-                child: Text(saving ? 'Recording...' : 'Record directive'),
+                child: LocalizedText(
+                  saving ? 'Recording...' : 'Record directive',
+                ),
               ),
             ],
           ),
@@ -206,7 +211,7 @@ class _OfficerPageState extends State<OfficerPage> {
                     ],
                   ),
                   child: const Center(
-                    child: Text(
+                    child: LocalizedText(
                       'OW',
                       style: TextStyle(
                         fontSize: 20,
@@ -224,7 +229,7 @@ class _OfficerPageState extends State<OfficerPage> {
                     children: [
                       Row(
                         children: [
-                          Text(
+                          LocalizedText(
                             'Dr. K. M. Wickramasinghe',
                             style: TextStyle(
                               fontSize: 16,
@@ -241,7 +246,7 @@ class _OfficerPageState extends State<OfficerPage> {
                         ],
                       ),
                       SizedBox(height: 2),
-                      Text(
+                      LocalizedText(
                         'Senior Agrarian Planning Officer',
                         style: TextStyle(
                           fontSize: 12,
@@ -249,7 +254,7 @@ class _OfficerPageState extends State<OfficerPage> {
                           color: AppTheme.primary,
                         ),
                       ),
-                      Text(
+                      LocalizedText(
                         'Department of Agriculture · Anuradhapura',
                         style: TextStyle(
                           fontSize: 11,
@@ -271,17 +276,19 @@ class _OfficerPageState extends State<OfficerPage> {
               ),
               child: const Column(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Wrap(
+                    runSpacing: 8,
+                    spacing: 8,
+                    alignment: WrapAlignment.spaceBetween,
                     children: [
-                      Text(
+                      LocalizedText(
                         'Officer Staff ID',
                         style: TextStyle(
                           fontSize: 11,
                           color: AppTheme.neutral600,
                         ),
                       ),
-                      Text(
+                      LocalizedText(
                         'DOA-OFF-0084',
                         style: TextStyle(
                           fontSize: 11,
@@ -292,17 +299,19 @@ class _OfficerPageState extends State<OfficerPage> {
                     ],
                   ),
                   SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Wrap(
+                    runSpacing: 8,
+                    spacing: 8,
+                    alignment: WrapAlignment.spaceBetween,
                     children: [
-                      Text(
+                      LocalizedText(
                         'Planning Division',
                         style: TextStyle(
                           fontSize: 11,
                           color: AppTheme.neutral600,
                         ),
                       ),
-                      Text(
+                      LocalizedText(
                         'Anuradhapura North (Zone 2)',
                         style: TextStyle(
                           fontSize: 11,
@@ -312,17 +321,19 @@ class _OfficerPageState extends State<OfficerPage> {
                     ],
                   ),
                   SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Wrap(
+                    runSpacing: 8,
+                    spacing: 8,
+                    alignment: WrapAlignment.spaceBetween,
                     children: [
-                      Text(
+                      LocalizedText(
                         'Model Calibration',
                         style: TextStyle(
                           fontSize: 11,
                           color: AppTheme.neutral600,
                         ),
                       ),
-                      Text(
+                      LocalizedText(
                         'Maha 2026 · Calibration v2.4',
                         style: TextStyle(
                           fontSize: 11,
@@ -333,17 +344,19 @@ class _OfficerPageState extends State<OfficerPage> {
                     ],
                   ),
                   SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Wrap(
+                    runSpacing: 8,
+                    spacing: 8,
+                    alignment: WrapAlignment.spaceBetween,
                     children: [
-                      Text(
+                      LocalizedText(
                         'Security Key ID',
                         style: TextStyle(
                           fontSize: 11,
                           color: AppTheme.neutral600,
                         ),
                       ),
-                      Text(
+                      LocalizedText(
                         'ED25519 · 8f9b...a12c',
                         style: TextStyle(
                           fontSize: 11,
@@ -375,7 +388,7 @@ class _OfficerPageState extends State<OfficerPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  const LocalizedText(
                     'ACCOUNT & SESSION',
                     style: TextStyle(
                       fontSize: 11,
@@ -385,7 +398,7 @@ class _OfficerPageState extends State<OfficerPage> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  const Text(
+                  const LocalizedText(
                     'Signed in as Dr. K. M. Wickramasinghe (DOA-OFF-0084)',
                     style: TextStyle(
                       fontSize: 12,
@@ -428,7 +441,7 @@ class _OfficerPageState extends State<OfficerPage> {
                               color: Color(0xFFB91C1C),
                             ),
                             SizedBox(width: 8),
-                            Text(
+                            LocalizedText(
                               'පද්ධතියෙන් ඉවත් වන්න (Log Out)',
                               style: TextStyle(
                                 color: Color(0xFFB91C1C),
@@ -471,162 +484,16 @@ class _OfficerPageState extends State<OfficerPage> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        scrolledUnderElevation: 2,
-        shadowColor: Colors.black.withValues(alpha: 0.08),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppTheme.primaryDark, AppTheme.primary],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primary.withValues(alpha: 0.25),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.analytics_rounded,
-                color: Colors.white,
-                size: 19,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Text(
-                      'DOA Command',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 1.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryTint,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: AppTheme.primary.withValues(alpha: 0.2),
-                        ),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.circle, size: 6, color: AppTheme.primary),
-                          SizedBox(width: 4),
-                          Text(
-                            'LIVE',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w900,
-                              color: AppTheme.primary,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const Text(
-                  'Anuradhapura · Maha 2026 Season',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppTheme.neutral600,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ],
+        title: const LocalizedText(
+          'DOA Command',
+          style: TextStyle(fontSize: 16),
         ),
         actions: [
-          // Switch to Farmer View Pill Button
-          Container(
-            margin: const EdgeInsets.symmetric(vertical: 10),
-            child: Material(
-              color: AppTheme.primaryTint,
-              borderRadius: BorderRadius.circular(20),
-              child: InkWell(
-                onTap: () => context.go('/farmer'),
-                borderRadius: BorderRadius.circular(20),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.spa_rounded,
-                        size: 14,
-                        color: AppTheme.primary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Farmer View',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green.shade900,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          // Officer Avatar Profile Trigger
-          GestureDetector(
-            onTap: _showOfficerProfileSheet,
-            child: Container(
-              margin: const EdgeInsets.only(right: 8),
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [AppTheme.primary, AppTheme.primaryLight],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                border: Border.all(color: Colors.white, width: 2),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primary.withValues(alpha: 0.2),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Center(
-                child: Text(
-                  'OW',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
+          const LanguagePicker(),
+          IconButton(
+            tooltip: context.tr('Profile'),
+            onPressed: _showOfficerProfileSheet,
+            icon: const Icon(Icons.account_circle_outlined),
           ),
         ],
       ),
@@ -647,24 +514,24 @@ class _OfficerPageState extends State<OfficerPage> {
         indicatorColor: AppTheme.primaryTint,
         selectedIndex: _selectedIndex,
         onDestinationSelected: (idx) => setState(() => _selectedIndex = idx),
-        destinations: const [
+        destinations: [
           NavigationDestination(
             icon: Icon(Icons.stacked_bar_chart_rounded),
             selectedIcon: Icon(
               Icons.stacked_bar_chart_rounded,
               color: AppTheme.primary,
             ),
-            label: 'Supply',
+            label: context.tr('Supply'),
           ),
           NavigationDestination(
             icon: Icon(Icons.tune_rounded),
             selectedIcon: Icon(Icons.tune_rounded, color: AppTheme.primary),
-            label: 'What-If',
+            label: context.tr('What-If'),
           ),
           NavigationDestination(
             icon: Icon(Icons.route_rounded),
             selectedIcon: Icon(Icons.route_rounded, color: AppTheme.primary),
-            label: 'Timeline',
+            label: context.tr('Timeline'),
           ),
           NavigationDestination(
             icon: Icon(Icons.pie_chart_outline_rounded),
@@ -672,7 +539,7 @@ class _OfficerPageState extends State<OfficerPage> {
               Icons.pie_chart_rounded,
               color: AppTheme.primary,
             ),
-            label: 'Adoption',
+            label: context.tr('Adoption'),
           ),
           NavigationDestination(
             icon: Icon(Icons.verified_user_outlined),
@@ -680,7 +547,7 @@ class _OfficerPageState extends State<OfficerPage> {
               Icons.verified_user_rounded,
               color: AppTheme.primary,
             ),
-            label: 'Directives',
+            label: context.tr('Directives'),
           ),
         ],
       ),
@@ -700,10 +567,12 @@ class _OfficerPageState extends State<OfficerPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (_repo.loadingForecast) const CircularProgressIndicator(),
-              Text(_repo.forecastError ?? 'Loading monthly estimates...'),
+              LocalizedText(
+                _repo.forecastError ?? 'Loading monthly estimates...',
+              ),
               TextButton(
                 onPressed: _repo.loadingForecast ? null : _repo.loadForecast,
-                child: const Text('Retry'),
+                child: const LocalizedText('Retry'),
               ),
             ],
           ),
@@ -721,17 +590,19 @@ class _OfficerPageState extends State<OfficerPage> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         children: [
-          Text(
+          LocalizedText(
             'Big Onion: Supply vs Demand',
             style: Theme.of(context).textTheme.titleLarge,
           ),
-          Text(_repo.forecastNote ?? 'Monthly model estimates'),
-          Text('${points.first.month} to ${points.last.month}'),
+          LocalizedText(_repo.forecastNote ?? 'Monthly model estimates'),
+          LocalizedText('${points.first.month} to ${points.last.month}'),
           if (_repo.loadingForecast) const LinearProgressIndicator(),
           if (_repo.forecastError != null)
-            Text('${_repo.forecastError} Showing previously loaded estimates.'),
+            LocalizedText(
+              '${_repo.forecastError} Showing previously loaded estimates.',
+            ),
           const SizedBox(height: 16),
-          const Text('Green: supply ? Orange: demand ? Tonnes'),
+          const LocalizedText('Green: supply · Orange: demand · Tonnes'),
           const SizedBox(height: 12),
           SizedBox(
             height: 210,
@@ -772,7 +643,7 @@ class _OfficerPageState extends State<OfficerPage> {
                           ),
                         ),
                         const SizedBox(height: 6),
-                        Text(
+                        LocalizedText(
                           point.month.substring(5),
                           style: TextStyle(
                             fontSize: 10,
@@ -794,13 +665,17 @@ class _OfficerPageState extends State<OfficerPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  LocalizedText(
                     selected.month,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
-                  Text('Supply: ${selected.supply.toStringAsFixed(1)} t'),
-                  Text('Demand: ${selected.demand.toStringAsFixed(1)} t'),
-                  Text('SPI: ${selected.spi.toStringAsFixed(3)}?'),
+                  LocalizedText(
+                    'Supply: ${selected.supply.toStringAsFixed(1)} t',
+                  ),
+                  LocalizedText(
+                    'Demand: ${selected.demand.toStringAsFixed(1)} t',
+                  ),
+                  LocalizedText('SPI: ${selected.spi.toStringAsFixed(3)}×'),
                 ],
               ),
             ),
@@ -813,7 +688,7 @@ class _OfficerPageState extends State<OfficerPage> {
               unit: 'MT',
               quantity: 0,
             ),
-            child: const Text('Record import adjustment'),
+            child: const LocalizedText('Record import adjustment'),
           ),
           OutlinedButton(
             onPressed: () => _showRecordDecisionModal(
@@ -822,7 +697,7 @@ class _OfficerPageState extends State<OfficerPage> {
               unit: 'MT',
               quantity: 0,
             ),
-            child: const Text('Record storage buffer'),
+            child: const LocalizedText('Record storage buffer'),
           ),
         ],
       ),
@@ -833,14 +708,14 @@ class _OfficerPageState extends State<OfficerPage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(
+        LocalizedText(
           'What-If Simulation',
           style: Theme.of(context).textTheme.titleLarge,
         ),
-        const Text(
-          'Big Onion ? server simulation ? includes backend loss assumptions',
+        const LocalizedText(
+          'Big Onion · server simulation · includes backend loss assumptions',
         ),
-        Text('Planted area: ${_repo.area.toStringAsFixed(0)} ha'),
+        LocalizedText('Planted area: ${_repo.area.toStringAsFixed(0)} ha'),
         Slider(
           value: _repo.area,
           min: 1000,
@@ -849,7 +724,9 @@ class _OfficerPageState extends State<OfficerPage> {
           onChanged: (value) =>
               _repo.updateWhatIf(area: value, yieldValue: _repo.yieldValue),
         ),
-        Text('Expected yield: ${_repo.yieldValue.toStringAsFixed(2)} t/ha'),
+        LocalizedText(
+          'Expected yield: ${_repo.yieldValue.toStringAsFixed(2)} t/ha',
+        ),
         Slider(
           value: _repo.yieldValue,
           min: 5,
@@ -860,10 +737,10 @@ class _OfficerPageState extends State<OfficerPage> {
         ),
         if (_repo.simulating) const LinearProgressIndicator(),
         if (_repo.simulationError != null) ...[
-          Text(_repo.simulationError!),
+          LocalizedText(_repo.simulationError!),
           TextButton(
             onPressed: _repo.simulate,
-            child: const Text('Retry simulation'),
+            child: const LocalizedText('Retry simulation'),
           ),
         ],
         Card(
@@ -872,21 +749,21 @@ class _OfficerPageState extends State<OfficerPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('SIMULATED HARVEST'),
-                Text(
+                const LocalizedText('SIMULATED HARVEST'),
+                LocalizedText(
                   _repo.hasSimulation
                       ? '${_repo.simulatedSupply!.toStringAsFixed(1)} tonnes'
                       : 'Awaiting server result',
                 ),
-                Text(
+                LocalizedText(
                   _repo.hasSimulation
-                      ? 'SPI: ${_repo.simulatedSpi!.toStringAsFixed(3)}?'
-                      : 'SPI: ?',
+                      ? 'SPI: ${_repo.simulatedSpi!.toStringAsFixed(3)}×'
+                      : 'SPI: —',
                 ),
-                Text(
+                LocalizedText(
                   _repo.hasSimulation
                       ? 'Supply gap: ${_repo.simulatedGap!.toStringAsFixed(1)} tonnes'
-                      : 'Supply gap: ?',
+                      : 'Supply gap: —',
                 ),
               ],
             ),
@@ -894,7 +771,7 @@ class _OfficerPageState extends State<OfficerPage> {
         ),
         OutlinedButton(
           onPressed: _repo.resetWhatIf,
-          child: const Text('Reset inputs'),
+          child: const LocalizedText('Reset inputs'),
         ),
         FilledButton(
           onPressed: !_repo.hasSimulation || _repo.savingDecision
@@ -902,7 +779,7 @@ class _OfficerPageState extends State<OfficerPage> {
               : () => _showRecordDecisionModal(
                   'Adjusted Big Onion targets: ${_repo.area.toInt()} ha at ${_repo.yieldValue.toStringAsFixed(2)} t/ha; simulated supply ${_repo.simulatedSupply!.toStringAsFixed(1)} t',
                 ),
-          child: const Text('Record simulated targets'),
+          child: const LocalizedText('Record simulated targets'),
         ),
       ],
     );
@@ -912,7 +789,7 @@ class _OfficerPageState extends State<OfficerPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
       children: [
-        const Text(
+        const LocalizedText(
           'Sea Freight & Policy Timeline',
           style: TextStyle(
             fontSize: 18,
@@ -920,8 +797,8 @@ class _OfficerPageState extends State<OfficerPage> {
             color: AppTheme.ink,
           ),
         ),
-        const Text(
-          'Planning examples ? illustrative dates and values, not live forecast output',
+        const LocalizedText(
+          'Planning examples · illustrative dates and values, not live forecast output',
           style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
         ),
         const SizedBox(height: 16),
@@ -944,51 +821,26 @@ class _OfficerPageState extends State<OfficerPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              const Wrap(
+                spacing: 12,
+                runSpacing: 8,
                 children: [
-                  const Row(
-                    children: [
-                      Icon(
-                        Icons.hourglass_top_rounded,
-                        size: 18,
-                        color: AppTheme.oversupply,
-                      ),
-                      SizedBox(width: 6),
-                      Text(
-                        'CRITICAL IMPORT DECISION DEADLINE',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: AppTheme.oversupply,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                    ],
+                  LocalizedText(
+                    'CRITICAL IMPORT DECISION DEADLINE',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.oversupply,
+                    ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.oversupplyTint,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppTheme.oversupplyBorder),
-                    ),
-                    child: const Text(
-                      '7 WEEKS LEAD TIME',
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w900,
-                        color: AppTheme.oversupply,
-                      ),
-                    ),
+                  LocalizedText(
+                    '7 WEEKS LEAD TIME',
+                    style: TextStyle(fontSize: 10),
                   ),
                 ],
               ),
               const SizedBox(height: 8),
-              const Text(
+              const LocalizedText(
                 'Freeze Deadline: 14 May 2026',
                 style: TextStyle(
                   fontSize: 18,
@@ -997,7 +849,7 @@ class _OfficerPageState extends State<OfficerPage> {
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
+              const LocalizedText(
                 'Due to maritime transit delays from ports in India/Pakistan to Colombo, private import permits destined for July must be decided before May 14. Any uncoordinated import shipments landing in July will trigger destructive farmgate price collapse.',
                 style: TextStyle(
                   fontSize: 12,
@@ -1021,7 +873,7 @@ class _OfficerPageState extends State<OfficerPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              const LocalizedText(
                 'Maritime Supply Chain Timeline',
                 style: TextStyle(
                   fontSize: 13,
@@ -1060,7 +912,7 @@ class _OfficerPageState extends State<OfficerPage> {
         const SizedBox(height: 18),
 
         // Action Directives Trigger Cards
-        const Text(
+        const LocalizedText(
           'Actionable Policy Interventions',
           style: TextStyle(
             fontSize: 14,
@@ -1156,7 +1008,7 @@ class _OfficerPageState extends State<OfficerPage> {
             children: [
               Row(
                 children: [
-                  Text(
+                  LocalizedText(
                     date,
                     style: const TextStyle(
                       fontSize: 12,
@@ -1176,7 +1028,7 @@ class _OfficerPageState extends State<OfficerPage> {
                           : AppTheme.neutral100,
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: Text(
+                    child: LocalizedText(
                       tag,
                       style: TextStyle(
                         fontSize: 9,
@@ -1189,14 +1041,14 @@ class _OfficerPageState extends State<OfficerPage> {
                   ),
                 ],
               ),
-              Text(
+              LocalizedText(
                 title,
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              Text(
+              LocalizedText(
                 desc,
                 style: const TextStyle(
                   fontSize: 11,
@@ -1241,7 +1093,7 @@ class _OfficerPageState extends State<OfficerPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                LocalizedText(
                   title,
                   style: const TextStyle(
                     fontSize: 13,
@@ -1250,7 +1102,7 @@ class _OfficerPageState extends State<OfficerPage> {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
+                LocalizedText(
                   desc,
                   style: const TextStyle(
                     fontSize: 11,
@@ -1272,7 +1124,7 @@ class _OfficerPageState extends State<OfficerPage> {
                       ),
                     ),
                     onPressed: onTap,
-                    child: Text(
+                    child: LocalizedText(
                       actionLabel,
                       style: const TextStyle(
                         fontSize: 11,
@@ -1299,13 +1151,15 @@ class _OfficerPageState extends State<OfficerPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          runSpacing: 8,
+          spacing: 8,
+          alignment: WrapAlignment.spaceBetween,
           children: [
             const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                LocalizedText(
                   'Adoption & Quota Tracker',
                   style: TextStyle(
                     fontSize: 18,
@@ -1313,7 +1167,7 @@ class _OfficerPageState extends State<OfficerPage> {
                     color: AppTheme.ink,
                   ),
                 ),
-                Text(
+                LocalizedText(
                   'Recommended target vs Farmer-Reported area (ha)',
                   style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
                 ),
@@ -1328,7 +1182,7 @@ class _OfficerPageState extends State<OfficerPage> {
                   color: AppTheme.primary.withValues(alpha: 0.2),
                 ),
               ),
-              child: Text(
+              child: LocalizedText(
                 '$totalReports Reports Live',
                 style: const TextStyle(
                   fontSize: 11,
@@ -1374,10 +1228,12 @@ class _OfficerPageState extends State<OfficerPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  runSpacing: 8,
+                  spacing: 8,
+                  alignment: WrapAlignment.spaceBetween,
                   children: [
-                    Text(
+                    LocalizedText(
                       row.crop,
                       style: const TextStyle(
                         fontSize: 15,
@@ -1385,7 +1241,7 @@ class _OfficerPageState extends State<OfficerPage> {
                         color: AppTheme.ink,
                       ),
                     ),
-                    Text(
+                    LocalizedText(
                       '${row.reportedHa.toInt()} / ${row.recommendedHa.toInt()} ha',
                       style: const TextStyle(
                         fontSize: 13,
@@ -1406,10 +1262,12 @@ class _OfficerPageState extends State<OfficerPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  runSpacing: 8,
+                  spacing: 8,
+                  alignment: WrapAlignment.spaceBetween,
                   children: [
-                    Text(
+                    LocalizedText(
                       'Recommended: ${row.recommendedHa.toInt()} ha',
                       style: const TextStyle(
                         fontSize: 11,
@@ -1425,7 +1283,7 @@ class _OfficerPageState extends State<OfficerPage> {
                         color: color.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: Text(
+                      child: LocalizedText(
                         '${(progress * 100).toInt()}% of Target (${isOver
                             ? "Over"
                             : isUnder
@@ -1447,10 +1305,12 @@ class _OfficerPageState extends State<OfficerPage> {
         const SizedBox(height: 18),
 
         // Phase 6: Verified Farmer Declarations (Live Ground-Truth Stream)
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          runSpacing: 8,
+          spacing: 8,
+          alignment: WrapAlignment.spaceBetween,
           children: [
-            const Text(
+            const LocalizedText(
               'Decentralized Field Stream',
               style: TextStyle(
                 fontSize: 14,
@@ -1464,7 +1324,7 @@ class _OfficerPageState extends State<OfficerPage> {
                 color: AppTheme.balancedTint,
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Text(
+              child: const LocalizedText(
                 'Live Cryptographic Audit',
                 style: TextStyle(
                   fontSize: 9,
@@ -1486,7 +1346,7 @@ class _OfficerPageState extends State<OfficerPage> {
               border: Border.all(color: AppTheme.cardBorder),
             ),
             child: const Center(
-              child: Text(
+              child: LocalizedText(
                 'No field declarations filed yet.\nFarmer submissions will automatically appear here.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: AppTheme.neutral600),
@@ -1522,10 +1382,12 @@ class _OfficerPageState extends State<OfficerPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        Wrap(
+                          runSpacing: 8,
+                          spacing: 8,
+                          alignment: WrapAlignment.spaceBetween,
                           children: [
-                            Text(
+                            LocalizedText(
                               report.id,
                               style: const TextStyle(
                                 fontSize: 11,
@@ -1534,7 +1396,7 @@ class _OfficerPageState extends State<OfficerPage> {
                                 color: AppTheme.ink,
                               ),
                             ),
-                            Text(
+                            LocalizedText(
                               report.timestamp,
                               style: const TextStyle(
                                 fontSize: 9.5,
@@ -1544,7 +1406,7 @@ class _OfficerPageState extends State<OfficerPage> {
                           ],
                         ),
                         const SizedBox(height: 3),
-                        Text(
+                        LocalizedText(
                           '${report.cropNameEn} · ${report.areaAcres} acres (${(report.areaAcres * 0.404686).toStringAsFixed(2)} ha)',
                           style: const TextStyle(
                             fontSize: 13,
@@ -1552,7 +1414,7 @@ class _OfficerPageState extends State<OfficerPage> {
                             color: AppTheme.primary,
                           ),
                         ),
-                        Text(
+                        LocalizedText(
                           '${report.district} · ${report.irrigationType} · Hash: ${report.receiptHash}',
                           style: const TextStyle(
                             fontSize: 10,
@@ -1579,7 +1441,7 @@ class _OfficerPageState extends State<OfficerPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
       children: [
-        const Text(
+        const LocalizedText(
           'Policy Directives Ledger',
           style: TextStyle(
             fontSize: 18,
@@ -1587,14 +1449,14 @@ class _OfficerPageState extends State<OfficerPage> {
             color: AppTheme.ink,
           ),
         ),
-        const Text(
+        const LocalizedText(
           'Server-confirmed directives with run IDs and SHA-256 receipts',
           style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
         ),
         const SizedBox(height: 16),
 
         if (decisions.isEmpty)
-          const Text('No directives recorded in this session.'),
+          const LocalizedText('No directives recorded in this session.'),
         ...decisions.map((d) {
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
@@ -1627,7 +1489,7 @@ class _OfficerPageState extends State<OfficerPage> {
                         color: AppTheme.primaryTint,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(
+                      child: LocalizedText(
                         d.runId,
                         style: const TextStyle(
                           fontSize: 10.5,
@@ -1637,7 +1499,7 @@ class _OfficerPageState extends State<OfficerPage> {
                         ),
                       ),
                     ),
-                    Text(
+                    LocalizedText(
                       d.date,
                       style: const TextStyle(
                         fontSize: 10,
@@ -1647,7 +1509,7 @@ class _OfficerPageState extends State<OfficerPage> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text(
+                LocalizedText(
                   d.decision,
                   style: const TextStyle(
                     fontSize: 14,
@@ -1656,7 +1518,7 @@ class _OfficerPageState extends State<OfficerPage> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
+                LocalizedText(
                   d.assumptions,
                   style: const TextStyle(
                     fontSize: 11.5,
@@ -1664,12 +1526,12 @@ class _OfficerPageState extends State<OfficerPage> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                const Text('Server record hash (SHA-256)'),
-                SelectableText(
+                const LocalizedText('Server record hash (SHA-256)'),
+                LocalizedSelectableText(
                   d.recordHash,
                   style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
                 ),
-                SelectableText('Decision: ${d.id}'),
+                LocalizedSelectableText('Decision: ${d.id}'),
               ],
             ),
           );
