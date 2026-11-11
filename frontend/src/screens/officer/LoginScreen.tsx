@@ -10,8 +10,8 @@ import {
   Eye,
   EyeOff,
   ShieldCheck,
-  Settings,
   Sprout,
+  Settings,
   Database,
   Shield,
 } from "lucide-react"
@@ -23,7 +23,7 @@ export interface LoginScreenProps {
 }
 
 export function LoginScreen({ onLogin }: LoginScreenProps) {
-  const [role, setRole] = useState<"Officer" | "Admin" | "Farmer">("Officer")
+  const [role, setRole] = useState<"Officer" | "Admin">("Officer")
   const [mode, setMode] = useState<"signin" | "signup">("signin")
   const [fullName, setFullName] = useState("")
   const [district, setDistrict] = useState("Anuradhapura")
@@ -34,7 +34,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const handleRoleChange = (selectedRole: "Officer" | "Admin" | "Farmer") => {
+  const handleRoleChange = (selectedRole: "Officer" | "Admin") => {
     setRole(selectedRole)
     setErrorMessage(null)
   }
@@ -54,7 +54,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
     setIsLoading(true)
     try {
       const res = mode === "signup"
-        ? await registerUser({ full_name: fullName, role: role.toLowerCase() as "officer" | "farmer", district, username: email, password })
+        ? await registerUser({ full_name: fullName, role: "officer", district, username: email, password })
         : await loginUser(email, password, role)
       if (res.success && res.user) {
         onLogin(res.user.role, res.user)
@@ -117,13 +117,12 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
         <div className="role-picker">
           {[
             ["Officer", "Agricultural Officer", "Planning & Policy", BarChart3],
-            ["Farmer", "Registered Farmer", "Advisory & Declarations", Sprout],
             ["Admin", "Administrator", "Data Catalogue & Security", ShieldCheck],
           ].map(([value, name, detail, Icon]) => (
             <button
               className={role === value ? "active" : ""}
               type="button"
-              onClick={() => handleRoleChange(value as "Officer" | "Admin" | "Farmer")}
+              onClick={() => handleRoleChange(value as "Officer" | "Admin")}
               key={value as string}
             >
               <Icon size={19} /><span><strong>{name as string}</strong><small>{detail as string}</small></span>
@@ -154,8 +153,8 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
           {mode === "signup" && <label className="login-field"><span>District</span><select value={district} onChange={(e) => setDistrict(e.target.value)}><option>Anuradhapura</option><option>Polonnaruwa</option><option>Kurunegala</option><option>Matale</option><option>Hambantota</option><option>Jaffna</option></select></label>}
           <label className="login-field">
             <span>Email / username</span>
-            <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
-              <Mail size={16} />
+            <div className="auth-input-shell">
+              <Mail size={16} aria-hidden="true" />
               <input
                 type="email"
                 required
@@ -169,8 +168,8 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
 
           <label className="login-field">
             <span>Password</span>
-            <div>
-              <LockKeyhole size={16} />
+            <div className="auth-input-shell auth-password-shell">
+              <LockKeyhole size={16} aria-hidden="true" />
               <input
                 type={showPassword ? "text" : "password"}
                 required

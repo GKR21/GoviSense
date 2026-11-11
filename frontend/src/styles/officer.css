@@ -35,6 +35,8 @@
 .auth-gate .login-form-card { width: 100%; min-height: 610px; box-sizing: border-box; padding: 38px 42px; border: 0; border-radius: 0; background: #0f1b16; box-shadow: none; backdrop-filter: none; }
 .auth-gate .login-form-card h2 { color: #f4fbf8; }
 .auth-gate .login-form-card > p { color: #9eb2ad; }
+.auth-gate .login-form-card h2 { margin: 0 0 4px; }
+.auth-gate .login-form-card > p { margin: 0 0 24px; font-size: 14px; }
 .auth-gate .auth-mode-toggle { background: #071118; border: 1px solid #ffffff12; }
 .auth-gate .auth-mode-toggle button { color: #91a7a1; }
 .auth-gate .auth-mode-toggle button.active { color: #d9fff0; background: #10b9812b; box-shadow: inset 0 0 0 1px #10b98166; }
@@ -48,12 +50,16 @@
 .auth-gate .role-picker button.active { border-color: #10b981; background: #10b98118; box-shadow: 0 0 0 1px #10b98155, 0 0 20px #10b98118; }
 .auth-gate .role-picker button.active > svg:first-child { color: #34d399; }
 .auth-gate .role-picker button > svg:last-child { position: absolute; top: 9px; right: 9px; color: #6ee7b7; }
+.auth-gate .role-picker { gap: 12px; }
 .auth-gate .login-field > span { color: #b5c9c3; margin-bottom: 7px; }
 .auth-gate .login-field > input, .auth-gate .login-field > div, .auth-gate .login-field > select { min-height: 44px; box-sizing: border-box; border: 1px solid #ffffff18; border-radius: 11px; background: #ffffff08; color: #edf9f4; }
 .auth-gate .login-field > input, .auth-gate .login-field > select { width: 100%; padding: 0 12px; }
-.auth-gate .login-field > div { padding: 0 12px; gap: 9px; }
-.auth-gate .login-field > div > svg { color: #78938b; flex: 0 0 auto; }
-.auth-gate .login-field > div input { min-width: 0; flex: 1; color: #edf9f4; }
+.auth-gate .auth-input-shell { position: relative; display: flex; align-items: center; gap: 9px; width: 100%; padding: 0 12px; }
+.auth-gate .auth-input-shell > svg { color: #78938b; flex: 0 0 auto; }
+.auth-gate .auth-input-shell input { min-width: 0; flex: 1; padding-left: 0; color: #edf9f4; }
+.auth-gate .auth-input-shell input::placeholder { color: #6f8580; opacity: 1; }
+.auth-gate .auth-password-shell { padding-right: 42px; }
+.auth-gate .auth-password-shell .password-toggle { right: 12px; top: 50%; transform: translateY(-50%); }
 .auth-gate .login-field > input:focus, .auth-gate .login-field > div:focus-within, .auth-gate .login-field > select:focus { outline: none; border-color: #10b981; box-shadow: 0 0 0 3px #10b98122; }
 .auth-gate .login-form-card > .button { width: 100%; justify-content: center; min-height: 46px; border-radius: 11px; font-weight: 800; }
 .auth-gate .auth-inline-toggle { display: block; margin: 16px auto 0; border: 0; background: transparent; color: #6ee7b7; font-size: 11px; cursor: pointer; }
