@@ -340,8 +340,9 @@ export async function fetchGroundReports(cropId?: string, district?: string) {
 
 export async function fetchDataCatalogue() {
   const data = await readApi('/api/catalogue', {})
-  if (!Array.isArray(data) || data.some((item: any) => !item || typeof item.dataset_id !== "string" || typeof item.title !== "string")) throw new Error('Invalid catalogue response')
-  return data
+  const entries = Array.isArray(data) ? data : data.datasets
+  if (!Array.isArray(entries) || entries.some((item: any) => !item || typeof item.dataset_id !== "string" || typeof item.title !== "string")) throw new Error('Invalid catalogue response')
+  return entries
 }
 
 export async function fetchSourcesSummary() {
@@ -472,8 +473,8 @@ export function mapApiRecordToPolicyDecision(r: DecisionRecordApi): import("./ty
   const act = action.toUpperCase()
   const category = /STORAGE|HOLD|BUFFER/.test(act) ? "Storage buffer"
     : /TARIFF|DUTY|LEVY/.test(act) ? "Tariff adjustment"
-    : /ADVISORY|PLANT/.test(act) ? "Planting advisory"
-    : /IMPORT/.test(act) ? "Import quota" : "Other"
+      : /ADVISORY|PLANT/.test(act) ? "Planting advisory"
+        : /IMPORT/.test(act) ? "Import quota" : "Other"
   const assumptions = r.assumptions || {}
   const lead = assumptions.lead_time_weeks ?? assumptions.import_lead_time_weeks
   return {
@@ -595,7 +596,7 @@ export function saveAuthSession(token: string, user: AuthUser, persist: boolean 
       sessionStorage.setItem(AUTH_TOKEN_KEY, token)
       sessionStorage.setItem(AUTH_USER_KEY, JSON.stringify(user))
     }
-  } catch {}
+  } catch { }
 }
 
 export function clearAuthSession() {
@@ -605,7 +606,7 @@ export function clearAuthSession() {
     localStorage.removeItem(AUTH_USER_KEY)
     sessionStorage.removeItem(AUTH_TOKEN_KEY)
     sessionStorage.removeItem(AUTH_USER_KEY)
-  } catch {}
+  } catch { }
 }
 
 export function getAuthHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
@@ -867,4 +868,3 @@ export function usePricesLatest() {
 export function useFarmerTop3(params: Parameters<typeof fetchFarmerTop3>[0]) {
   return useApiQuery(() => fetchFarmerTop3(params), [JSON.stringify(params)])
 }
-
