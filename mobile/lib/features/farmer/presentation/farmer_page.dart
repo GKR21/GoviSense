@@ -66,6 +66,7 @@ class _FarmerPageState extends State<FarmerPage> {
     _profileSoilPh = _repo.profile.soilPh;
     _repo.addListener(_onRepoUpdated);
     _repo.checkBackendConnection();
+    _repo.refreshRecommendations();
   }
 
   @override
@@ -78,6 +79,10 @@ class _FarmerPageState extends State<FarmerPage> {
 
   void _onRepoUpdated() {
     if (mounted) {
+      if (_repo.crops.isNotEmpty &&
+          !_repo.crops.any((c) => c.id == _selectedCropId)) {
+        _selectedCropId = _repo.crops.first.id;
+      }
       final current = _latestSubmittedReport;
       if (current != null) {
         _latestSubmittedReport = _repo.reports.firstWhere(
@@ -525,7 +530,7 @@ class _FarmerPageState extends State<FarmerPage> {
                       ),
                       const SizedBox(height: 2),
                       const LocalizedText(
-                        'Dambulla DEC: Big Onion Rs. 320–365 · Chilli Rs. 240–280',
+                        'Live wholesale & retail prices across Sri Lankan DECs',
                         style: TextStyle(
                           fontSize: 11,
                           color: AppTheme.neutral600,

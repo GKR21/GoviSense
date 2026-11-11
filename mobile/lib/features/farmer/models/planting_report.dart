@@ -168,11 +168,13 @@ class PlantingReport {
   }
 
   static String _normalizeCropIdForBackend(String id) {
-    if (id.contains('onion')) return 'big_onion';
-    if (id.contains('chilli')) return 'chilli';
-    if (id.contains('gram')) return 'green_gram';
-    if (id.contains('maize')) return 'maize';
-    return id.replaceAll('crop-', '');
+    if (id == 'crop-bigonion' || id == 'big_onion') return 'big_onion';
+    if (id == 'crop-chilli' || id == 'chilli' || id == 'chilli_green') {
+      return 'chilli';
+    }
+    if (id == 'crop-greengram' || id == 'green_gram') return 'green_gram';
+    if (id == 'crop-maize' || id == 'maize') return 'maize';
+    return id.replaceFirst('crop-', '');
   }
 }
 

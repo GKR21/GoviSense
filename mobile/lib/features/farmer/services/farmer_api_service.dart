@@ -145,17 +145,30 @@ class FarmerApiService {
   }
 
   CropItem _mapJsonToCropItem(Map<String, dynamic> json) {
-    final cropId = (json['crop_id'] as String? ?? 'unknown').toLowerCase();
-    final fitScore = (json['fit_score'] as num?)?.toInt() ?? 80;
-    final spiBand = (json['spi_band_at_harvest'] as String? ?? 'Balanced')
+    final rawCropId = (json['crop_id'] as String? ?? 'unknown').trim().toLowerCase();
+    final fitScore = (json['fit_score'] as num?)?.round() ?? 0;
+    final spiBand = (json['spi_band_at_harvest'] as String? ?? 'Unknown')
         .toLowerCase();
+    final spiRatio = (json['spi_ratio_at_harvest'] as num?)?.toDouble();
+    final netProfit = json['expected_net_profit_per_acre'] as Map<String, dynamic>?;
     final priceRange = json['profit_range_rs_kg'] as Map<String, dynamic>?;
-    final p10 = (priceRange?['p10_rs_kg'] as num?)?.toDouble() ?? 200.0;
-    final p90 = (priceRange?['p90_rs_kg'] as num?)?.toDouble() ?? 350.0;
+    final p10PerAcre = (netProfit?['p10_rs_per_acre'] as num?)?.round();
+    final p90PerAcre = (netProfit?['p90_rs_per_acre'] as num?)?.round();
+    final p10Kg = (priceRange?['p10_rs_kg'] as num?)?.toDouble();
+    final p90Kg = (priceRange?['p90_rs_kg'] as num?)?.toDouble();
     final waterMm = (json['water_need_mm_season'] as num?)?.toInt() ?? 500;
+    final durationMonths = (json['duration_months'] as num?)?.round();
+    final yieldMtHa = (json['expected_yield_mt_ha'] as num?)?.toDouble();
+    final costPerAcre = (json['estimated_cost_per_acre_rs'] as num?)?.round();
+    final plantingWindow = json['planting_window'] as String?;
+    final harvestPeriod = json['harvest_period'] as String?;
+    final sourceNote = (json['source_note'] as String?)?.trim();
+    final imageUrl = (json['image_url'] as String?)?.trim();
+    final isTargetFull = json['is_target_full'] == true;
     final reasons =
         (json['suitability_reasons'] as List<dynamic>?)
             ?.map((e) => e.toString())
+            .where((e) => e.trim().isNotEmpty)
             .toList() ??
         [];
 
@@ -170,132 +183,145 @@ class FarmerApiService {
     if (waterMm <= 400) waterDrops = 1;
     if (waterMm >= 600) waterDrops = 3;
 
-    final firstReason = reasons.isNotEmpty
-        ? reasons.first
-        : 'Optimal conditions in Anuradhapura';
+    final suitabilityTip = reasons.isNotEmpty
+        ? reasons.take(2).join(' · ')
+        : 'Agronomic score $fitScore% for your parcel conditions';
 
-    if (cropId.contains('onion')) {
-      return CropItem(
-        id: 'crop-bigonion',
-        nameEn: 'Big Onion (Dambulla Selection)',
-        nameSi: 'ලොකු ලූනු (දඹුල්ල සිලෙක්ෂන්)',
-        nameTa: 'பெரிய வெங்காயம் (தம்புள்ளை)',
-        scientificName: 'Allium cepa',
-        imageUrl: 'https://images.unsplash.com/photo-1600807644626-fb3c8c8ba40d?auto=format&fit=crop&w=800&q=80',
-        photoCredit: 'Mufid Majnun',
-        profitMin: (p10 * 600).round(),
-        profitMax: (p90 * 600).round(),
-        profitFormattedEn: 'Rs ${p10.toInt() * 600} – ${p90.toInt() * 600}',
-        profitFormattedSi: 'රු. ${p10.toInt() * 600} – ${p90.toInt() * 600}',
-        profitFormattedTa: 'ரூ. ${p10.toInt() * 600} – ${p90.toInt() * 600}',
-        risk: risk,
-        spiScore: 1.38,
-        riskTextEn: 'Watch supply · Risk of peak harvest congestion & imports',
-        riskTextSi:
-            'සැපයුම ගැන විමසිලිමත් වන්න · අස්වනු සමයේ තොග තදබද අවදානමක්',
-        riskTextTa:
-            'வழங்கலைக் கவனிக்கவும் · அறுவடைக் காலத்தில் விலை சரிவு அபாயம்',
-        waterNeed: waterDrops,
-        plantWindowEn: 'Nov 01 – Nov 25',
-        plantWindowSi: 'නොවැ 01 – නොවැ 25',
-        plantWindowTa: 'நவ 01 – நவ 25',
-        harvestWindowEn: 'Mar 01 – Apr 20',
-        harvestWindowSi: 'මාර්තු 01 – අප්‍රේල් 20',
-        harvestWindowTa: 'மார் 01 – ஏப் 20',
-        maturityDays: 115,
-        fitBadgeEn: '$fitScore% Fit · Requires Staggered Sale',
-        fitBadgeSi: '$fitScore% ගැලපීම · කළමනාකරණය කළ විකිණීමක්',
-        fitBadgeTa: '$fitScore% பொருத்தம் · திட்டமிட்ட விற்பனை',
-        fieldTipEn: firstReason,
-        fieldTipSi: 'ගබඩා කුණුවීම වැළැක්වීමට අස්වනු නෙළීමට දින 12කට පෙර ජල සැපයුම නවත්වන්න.',
-        fieldTipTa: 'அழுகலைத் தடுக்க அறுவடைக்கு 10-14 நாட்களுக்கு முன் நீர்ப்பாசனத்தை நிறுத்தவும்.',
-        expectedYieldEn: '6,500 – 8,000 kg / acre',
-        expectedYieldSi: 'අක්කරයකට කි.ග්‍රෑ. 6,500 – 8,000',
-        expectedYieldTa: 'ஏக்கருக்கு 6,500 – 8,000 கிலோ',
-        cultivationCostEn: 'Rs 145,000 / acre',
-        cultivationCostSi: 'රු. 145,000 / අක්කරයකට',
-        cultivationCostTa: 'ரூ. 145,000 / ஏக்கருக்கு',
-      );
-    } else if (cropId.contains('chilli')) {
-      return CropItem(
-        id: 'crop-chilli',
-        nameEn: 'Green Chilli (MICH 1 / MICH 2)',
-        nameSi: 'අමු මිරිස් (MICH 1 / MICH 2)',
-        nameTa: 'பச்சை மிளகாய் (MICH 1)',
-        scientificName: 'Capsicum annuum',
-        imageUrl: 'https://images.unsplash.com/photo-1546860255-95536c19724e?auto=format&fit=crop&w=800&q=80',
-        photoCredit: 'Shane Kong',
-        profitMin: (p10 * 700).round(),
-        profitMax: (p90 * 700).round(),
-        profitFormattedEn: 'Rs ${p10.toInt() * 700} – ${p90.toInt() * 700}',
-        profitFormattedSi: 'රු. ${p10.toInt() * 700} – ${p90.toInt() * 700}',
-        profitFormattedTa: 'ரூ. ${p10.toInt() * 700} – ${p90.toInt() * 700}',
-        risk: risk,
-        spiScore: 0.74,
-        riskTextEn: 'Prices likely firm at harvest · National deficit expected',
-        riskTextSi: 'අස්වනු සමයේ ඉහළ මිලක් සහතිකයි · ජාතික සැපයුම් හිඟයක්',
-        riskTextTa: 'அறுவடையில் அதிக விலை சாத்தியம் · தேசிய பற்றாக்குறை',
-        waterNeed: waterDrops,
-        plantWindowEn: 'Oct 20 – Nov 15',
-        plantWindowSi: 'ඔක් 20 – නොවැ 15',
-        plantWindowTa: 'அக் 20 – நவ 15',
-        harvestWindowEn: 'Feb 01 – Apr 30',
-        harvestWindowSi: 'පෙබ 01 – අප්‍රේල් 30',
-        harvestWindowTa: 'பிப் 01 – ஏப் 30',
-        maturityDays: 110,
-        fitBadgeEn: '$fitScore% Fit · High Return Potential',
-        fitBadgeSi: '$fitScore% ගැලපීම · ඉහළ ආදායම් විභවයක්',
-        fitBadgeTa: '$fitScore% பொருத்தம் · அதிக இலாப வாய்ப்பு',
-        fieldTipEn: firstReason,
-        fieldTipSi: 'කොළ කොඩවීම පාලනය කිරීමට මුල් අවධියේදී පැළ තවාන පිදුරු ආවරණයකින් ආරක්ෂා කරන්න.',
-        fieldTipTa: 'இலை சுருட்டை நோயைத் தடுக்க நாற்று மேடைகளில் வைக்கோல் மூடாக்கு இடவும்.',
-        expectedYieldEn: '3,200 – 4,500 kg / acre',
-        expectedYieldSi: 'අක්කරයකට කි.ග්‍රෑ. 3,200 – 4,500',
-        expectedYieldTa: 'ஏக்கருக்கு 3,200 – 4,500 கிலோ',
-        cultivationCostEn: 'Rs 88,000 / acre',
-        cultivationCostSi: 'රු. 88,000 / අක්කරයකට',
-        cultivationCostTa: 'ரூ. 88,000 / ஏக்கருக்கு',
-      );
+    final displayEn =
+        (json['crop_name'] as String?)?.trim().isNotEmpty == true
+            ? (json['crop_name'] as String).trim()
+            : rawCropId.replaceAll('_', ' ');
+    final displaySi =
+        (json['crop_name_si'] as String?)?.trim().isNotEmpty == true
+            ? (json['crop_name_si'] as String).trim()
+            : displayEn;
+    final displayTa =
+        (json['crop_name_ta'] as String?)?.trim().isNotEmpty == true
+            ? (json['crop_name_ta'] as String).trim()
+            : displayEn;
+
+    final int profitMin;
+    final int profitMax;
+    final String profitFormattedEn;
+    final String profitFormattedSi;
+    final String profitFormattedTa;
+    if (p10PerAcre != null && p90PerAcre != null) {
+      profitMin = p10PerAcre;
+      profitMax = p90PerAcre;
+      profitFormattedEn = 'Rs $profitMin – $profitMax';
+      profitFormattedSi = 'රු. $profitMin – $profitMax';
+      profitFormattedTa = 'ரூ. $profitMin – $profitMax';
+    } else if (p10Kg != null && p90Kg != null) {
+      final kgPerAcre = ((yieldMtHa ?? 15.0) * 404.686).round();
+      profitMin = (p10Kg * kgPerAcre).round();
+      profitMax = (p90Kg * kgPerAcre).round();
+      profitFormattedEn = 'Rs $profitMin – $profitMax';
+      profitFormattedSi = 'රු. $profitMin – $profitMax';
+      profitFormattedTa = 'ரூ. $profitMin – $profitMax';
     } else {
-      return CropItem(
-        id: 'crop-greengram',
-        nameEn: 'Green Gram (Mung Bean)',
-        nameSi: 'මුං ඇට (MI-5 / MI-6)',
-        nameTa: 'பச்சைப் பயறு (MI-5)',
-        scientificName: 'Vigna radiata',
-        imageUrl: 'https://images.unsplash.com/photo-1719846923269-6fdf75444cb8?auto=format&fit=crop&w=800&q=80',
-        photoCredit: 'Hannah Shedrow',
-        profitMin: (p10 * 350).round(),
-        profitMax: (p90 * 350).round(),
-        profitFormattedEn: 'Rs ${p10.toInt() * 350} – ${p90.toInt() * 350}',
-        profitFormattedSi: 'රු. ${p10.toInt() * 350} – ${p90.toInt() * 350}',
-        profitFormattedTa: 'ரூ. ${p10.toInt() * 350} – ${p90.toInt() * 350}',
-        risk: risk,
-        spiScore: 0.98,
-        riskTextEn: 'Balanced supply · Stable harvest farmgate price',
-        riskTextSi: 'සමබර ජාතික සැපයුම · ස්ථාවර ගොවිපළ මිලක්',
-        riskTextTa: 'சமநிலையான வழங்கல் · நிலையான சந்தை விலை',
-        waterNeed: waterDrops,
-        plantWindowEn: 'Oct 15 – Nov 05',
-        plantWindowSi: 'ඔක් 15 – නොවැ 05',
-        plantWindowTa: 'அக் 15 – நவ 05',
-        harvestWindowEn: 'Jan 10 – Feb 15',
-        harvestWindowSi: 'ජන 10 – පෙබ 15',
-        harvestWindowTa: 'ஜன 10 – பிப் 15',
-        maturityDays: 68,
-        fitBadgeEn: '$fitScore% Fit · Optimal Maha Match',
-        fitBadgeSi: '$fitScore% ගැලපීම · විශිෂ්ටතම මහ තේරීම',
-        fitBadgeTa: '$fitScore% பொருத்தம் · சிறந்த மகா தேர்வு',
-        fieldTipEn: firstReason,
-        fieldTipSi: 'බීජ වැපිරීමට පෙර රයිසෝබියම් මිශ්‍ර කිරීමෙන් රසායනික පොහොර පිරිවැය 40%කින් අඩුකර ගත හැක.',
-        fieldTipTa: 'விதைப்பதற்கு முன் ரைசோபியம் பாக்டீரியா சேர்ப்பதன் மூலம் உரச் செலவை 40% குறைக்கலாம்.',
-        expectedYieldEn: '850 – 1,100 kg / acre',
-        expectedYieldSi: 'අක්කරයකට කි.ග්‍රෑ. 850 – 1,100',
-        expectedYieldTa: 'ஏக்கருக்கு 850 – 1,100 கிலோ',
-        cultivationCostEn: 'Rs 42,000 / acre',
-        cultivationCostSi: 'රු. 42,000 / අක්කරයකට',
-        cultivationCostTa: 'ரூ. 42,000 / ஏக்கருக்கு',
-      );
+      profitMin = 0;
+      profitMax = 0;
+      profitFormattedEn = 'Price forecast unavailable';
+      profitFormattedSi = 'මිල පුරෝකථනය නොමැත';
+      profitFormattedTa = 'விலை முன்னறிவிப்பு இல்லை';
     }
+
+    final yieldKgAcre = yieldMtHa != null ? (yieldMtHa * 404.686).round() : null;
+    final expectedYieldEn =
+        yieldKgAcre != null ? '$yieldKgAcre kg / acre' : 'Data unavailable';
+    final expectedYieldSi = yieldKgAcre != null
+        ? 'අක්කරයකට කි.ග්‍රෑ. $yieldKgAcre'
+        : 'දත්ත නොමැත';
+    final expectedYieldTa =
+        yieldKgAcre != null ? 'ஏக்கருக்கு $yieldKgAcre கிலோ' : 'தரவு இல்லை';
+
+    final costEn =
+        costPerAcre != null ? 'Rs $costPerAcre / acre' : 'Data unavailable';
+    final costSi =
+        costPerAcre != null ? 'රු. $costPerAcre / අක්කරයකට' : 'දත්ත නොමැත';
+    final costTa =
+        costPerAcre != null ? 'ரூ. $costPerAcre / ஏக்கருக்கு' : 'தரவு இல்லை';
+
+    final double spiScoreValue =
+        spiRatio ??
+        (risk == MarketRisk.oversupply
+            ? 1.25
+            : risk == MarketRisk.shortage
+                ? 0.75
+                : 1.0);
+
+    final String riskTextEn;
+    final String riskTextSi;
+    final String riskTextTa;
+    if (isTargetFull) {
+      riskTextEn = 'District target reached (110%+) · Do not overplant';
+      riskTextSi = 'දිස්ත්‍රික් ඉලක්කය සම්පූර්ණයි · අමතර වගාවෙන් වළකින්න';
+      riskTextTa = 'மாவட்ட இலக்கு நிறைவடைந்தது · கூடுதல் நடவு தவிர்க்கவும்';
+    } else if (risk == MarketRisk.oversupply) {
+      riskTextEn = 'Watch supply · Risk of peak harvest congestion';
+      riskTextSi = 'සැපයුම ගැන විමසිලිමත් වන්න · අස්වනු තදබද අවදානමක්';
+      riskTextTa = 'வழங்கலைக் கவனிக்கவும் · அறுவடை விலை சரிவு அபாயம்';
+    } else if (risk == MarketRisk.shortage) {
+      riskTextEn = 'Prices likely firm at harvest · Deficit expected';
+      riskTextSi = 'අස්වනු සමයේ ඉහළ මිලක් · සැපයුම් හිඟයක්';
+      riskTextTa = 'அறுவடையில் அதிக விலை சாத்தியம் · பற்றாக்குறை';
+    } else if (spiBand == 'unknown') {
+      riskTextEn = 'Agronomic match · Supply pressure model unavailable';
+      riskTextSi = 'කෘෂිකාර්මිකව සුදුසුයි · සැපයුම් ආකෘතිය නොමැත';
+      riskTextTa = 'பயிர்ச்செய்கைக்கு உகந்தது · வழங்கல் தரவு இல்லை';
+    } else {
+      riskTextEn = 'Balanced supply · Stable harvest farmgate price';
+      riskTextSi = 'සමබර ජාතික සැපයුම · ස්ථාවර ගොවිපළ මිලක්';
+      riskTextTa = 'சமநிலையான வழங்கல் · நிலையான சந்தை விலை';
+    }
+
+    final plantWindowText = plantingWindow ?? 'Current season';
+    final harvestWindowText = harvestPeriod ?? 'In ${durationMonths ?? 3} months';
+
+    return CropItem(
+      id: rawCropId,
+      nameEn: displayEn,
+      nameSi: displaySi,
+      nameTa: displayTa,
+      scientificName:
+          sourceNote != null && sourceNote.isNotEmpty
+              ? sourceNote
+              : 'DOA Agronomic Profile',
+      imageUrl:
+          imageUrl != null && imageUrl.isNotEmpty
+              ? imageUrl
+              : 'https://images.unsplash.com/photo-1592417817098-8f3d6ef23a41?auto=format&fit=crop&w=800&q=80',
+      photoCredit: 'GoviSense',
+      profitMin: profitMin,
+      profitMax: profitMax,
+      profitFormattedEn: profitFormattedEn,
+      profitFormattedSi: profitFormattedSi,
+      profitFormattedTa: profitFormattedTa,
+      risk: risk,
+      spiScore: spiScoreValue,
+      riskTextEn: riskTextEn,
+      riskTextSi: riskTextSi,
+      riskTextTa: riskTextTa,
+      waterNeed: waterDrops,
+      plantWindowEn: plantWindowText,
+      plantWindowSi: plantWindowText,
+      plantWindowTa: plantWindowText,
+      harvestWindowEn: harvestWindowText,
+      harvestWindowSi: harvestWindowText,
+      harvestWindowTa: harvestWindowText,
+      maturityDays: (durationMonths ?? 3) * 30,
+      fitBadgeEn: '$fitScore% Fit · Agronomic Match',
+      fitBadgeSi: '$fitScore% ගැලපීම · කෘෂි උපදෙස්',
+      fitBadgeTa: '$fitScore% பொருத்தம் · விவசாய ஆலோசனை',
+      fieldTipEn: suitabilityTip,
+      fieldTipSi: suitabilityTip,
+      fieldTipTa: suitabilityTip,
+      expectedYieldEn: expectedYieldEn,
+      expectedYieldSi: expectedYieldSi,
+      expectedYieldTa: expectedYieldTa,
+      cultivationCostEn: costEn,
+      cultivationCostSi: costSi,
+      cultivationCostTa: costTa,
+    );
   }
 }

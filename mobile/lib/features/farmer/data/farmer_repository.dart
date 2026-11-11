@@ -118,14 +118,39 @@ class FarmerRepository extends ChangeNotifier {
 
   static ({String en, String si, String ta}) _cropNamesForId(String cropId) {
     final normalized = cropId.toLowerCase();
-    if (normalized.contains('onion')) {
-      return (en: 'Big Onion', si: 'ලොකු ලූනු', ta: 'பெரிய வெங்காயம்');
+    if (normalized == 'crop-bigonion' || normalized == 'big_onion') {
+      return (en: 'Big Onion', si: 'ලොකු ලූණු', ta: 'பெரிய வெங்காயம்');
     }
-    if (normalized.contains('chilli')) {
+    if (normalized == 'crop-chilli' ||
+        normalized == 'chilli' ||
+        normalized == 'chilli_green') {
       return (en: 'Green Chilli', si: 'අමු මිරිස්', ta: 'பச்சை மிளகாய்');
     }
-    if (normalized.contains('gram')) {
-      return (en: 'Green Gram', si: 'මුං ඇට', ta: 'பச்சைப் பயறு');
+    if (normalized == 'tomato') {
+      return (en: 'Tomato', si: 'තක්කාලි', ta: 'தக்காளி');
+    }
+    if (normalized == 'brinjal') {
+      return (en: 'Brinjal (Eggplant)', si: 'වම්බටු', ta: 'கத்தரிக்காய்');
+    }
+    if (normalized == 'bitter_gourd') {
+      return (en: 'Bitter Gourd', si: 'කරවිල', ta: 'பாகற்காய்');
+    }
+    if (normalized == 'snake_gourd') {
+      return (en: 'Snake Gourd', si: 'පතෝල', ta: 'புடலங்காய்');
+    }
+    if (normalized == 'long_bean') {
+      return (en: 'Long Bean', si: 'මෑකරල්', ta: 'பயத்தங்காய்');
+    }
+    if (normalized == 'cowpea') {
+      return (en: 'Cowpea', si: 'කව්පි', ta: 'கௌபீ');
+    }
+    if (normalized == 'sesame') {
+      return (en: 'Sesame', si: 'තල', ta: 'எள்');
+    }
+    if (normalized == 'mung_bean' ||
+        normalized == 'green_gram' ||
+        normalized == 'crop-greengram') {
+      return (en: 'Mung Bean (Green Gram)', si: 'මුං ඇට', ta: 'பாசிப்பயறு');
     }
     if (normalized.contains('maize')) {
       return (en: 'Maize', si: 'බඩ ඉරිඟු', ta: 'சோளம்');
