@@ -7,7 +7,7 @@ class FarmerProfile {
     required this.totalLandAcres,
     required this.primaryCrop,
     required this.lastSyncTime,
-    this.soilPh = 0,
+    this.soilPh = 6.5,
     this.isRainfed = false,
   });
 
