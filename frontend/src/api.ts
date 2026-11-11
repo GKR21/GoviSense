@@ -75,6 +75,13 @@ export interface CropForecastData {
   crop_name: string
   crop_name_si: string
   target_period: string
+  monthly_series?: Array<{
+    period: string
+    supply_mt: number
+    demand_mt: number
+    spi_ratio: number
+  }>
+  monthly_series_note?: string
   ai1_harvest_forecast: {
     point_forecast_mt: number
     lower_bound_10_mt: number
@@ -345,7 +352,7 @@ export async function fetchSourcesSummary() {
 
 export async function fetchPipelineRuns() {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/runs`)
+    const res = await fetch(apiUrl("/api/runs").toString(), { headers: getAuthHeaders() })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return await res.json()
   } catch (err) {
@@ -355,7 +362,7 @@ export async function fetchPipelineRuns() {
 
 export async function fetchAlerts() {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/alerts`)
+    const res = await fetch(apiUrl("/api/alerts").toString(), { headers: getAuthHeaders() })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return await res.json()
   } catch (err) {
@@ -365,7 +372,7 @@ export async function fetchAlerts() {
 
 export async function loginApi(payload: { username: string; password: string; role?: string }) {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    const res = await fetch(apiUrl("/api/auth/login").toString(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -616,17 +623,27 @@ export async function loginUser(
   role?: "Officer" | "Admin" | "Farmer"
 ): Promise<LoginResult> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    const res = await fetch(apiUrl("/api/auth/login").toString(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: email.trim(), password, role: role?.toLowerCase() }),
+      body: JSON.stringify({
+        username: email.trim(),
+        email: email.trim(),
+        password,
+        role: role?.toLowerCase(),
+      }),
     })
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}))
+      let errorMsg = "Invalid email or password. Please verify your credentials."
+      if (typeof errData.detail === "string") {
+        errorMsg = errData.detail
+      } else if (Array.isArray(errData.detail) && errData.detail.length > 0) {
+        errorMsg = errData.detail.map((e: any) => e.msg || e.detail).join("; ")
+      }
       return {
         success: false,
-        error:
-          errData.detail || "Invalid email or password. Please verify your credentials.",
+        error: errorMsg,
       }
     }
     const data = await res.json()
@@ -667,7 +684,7 @@ export async function registerUser(payload: {
   password: string
 }): Promise<LoginResult> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
+    const res = await fetch(apiUrl("/api/auth/register").toString(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -698,13 +715,13 @@ export async function registerUser(payload: {
 // ---------------------------------------------------------------------------
 
 export async function fetchHealth() {
-  const res = await fetch(`${API_BASE_URL}/api/health`, { headers: getAuthHeaders() })
+  const res = await fetch(apiUrl("/api/health").toString(), { headers: getAuthHeaders() })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return await res.json()
 }
 
 export async function fetchEvaluationScoreboard(cropId?: string) {
-  const url = new URL(`${API_BASE_URL}/api/evaluation/scoreboard`)
+  const url = apiUrl("/api/evaluation/scoreboard")
   if (cropId) url.searchParams.set("crop_id", cropId)
   const res = await fetch(url.toString(), { headers: getAuthHeaders() })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -712,7 +729,7 @@ export async function fetchEvaluationScoreboard(cropId?: string) {
 }
 
 export async function fetchPricesLatest() {
-  const res = await fetch(`${API_BASE_URL}/api/prices/latest`, { headers: getAuthHeaders() })
+  const res = await fetch(apiUrl("/api/prices/latest").toString(), { headers: getAuthHeaders() })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return await res.json()
 }
@@ -721,7 +738,7 @@ export async function acknowledgeAlertApi(
   alertId: string,
   payload?: { ask_officer?: boolean; officer_note?: string; user_id?: string },
 ) {
-  const res = await fetch(`${API_BASE_URL}/api/alerts/${encodeURIComponent(alertId)}/ack`, {
+  const res = await fetch(apiUrl(`/api/alerts/${encodeURIComponent(alertId)}/ack`).toString(), {
     method: "POST",
     headers: getAuthHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(payload || {}),
@@ -731,7 +748,7 @@ export async function acknowledgeAlertApi(
 }
 
 export async function askOfficerInquiryApi(alertId: string, question: string, farmerId?: string) {
-  const res = await fetch(`${API_BASE_URL}/api/alerts/${encodeURIComponent(alertId)}/ask-officer`, {
+  const res = await fetch(apiUrl(`/api/alerts/${encodeURIComponent(alertId)}/ask-officer`).toString(), {
     method: "POST",
     headers: getAuthHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ question, farmer_id: farmerId }),
@@ -741,7 +758,7 @@ export async function askOfficerInquiryApi(alertId: string, question: string, fa
 }
 
 export async function addOfficerNoteApi(alertId: string, officerNote: string) {
-  const res = await fetch(`${API_BASE_URL}/api/alerts/${encodeURIComponent(alertId)}/officer-note`, {
+  const res = await fetch(apiUrl(`/api/alerts/${encodeURIComponent(alertId)}/officer-note`).toString(), {
     method: "POST",
     headers: getAuthHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ officer_note: officerNote }),

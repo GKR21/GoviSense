@@ -54,35 +54,41 @@ export function AdoptionScreen({
         />
         {!summary.loading &&
           !summary.error &&
-          summary.data &&
-          (summary.data.data_available === false ? (
-            <div role="status"><p>Adoption telemetry is not available for this selection.</p><p>{summary.data.message || "The backend returned no observed adoption data."}</p><small>Data quality: {summary.data.data_quality || "Not available"} · Source: {summary.data.source_type || "Not available"}</small></div>
-          ) : (
-            <div className="kpi-grid">
-              {[
-                [
-                  "Target area",
-                  displayNumber(summary.data.acreage?.target_area_ha, " ha"),
-                ],
-                [
-                  "Reported area",
-                  displayNumber(
-                    summary.data.acreage?.reported_planted_area_ha,
-                    " ha",
-                  ),
-                ],
-                [
-                  "Coverage",
-                  displayNumber(summary.data.acreage?.coverage_pct, "%"),
-                ],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <p>{label}</p>
-                  <strong>{value}</strong>
+          summary.data && (
+            <>
+              {summary.data.data_available === false && (
+                <div role="status" style={{ marginBottom: "16px" }}>
+                  <p>Adoption telemetry is not available for this selection.</p>
+                  <p>{summary.data.message || "The backend returned no observed adoption data."}</p>
+                  <small>Data quality: {summary.data.data_quality || "Not available"} · Source: {summary.data.source_type || "Not available"}</small>
                 </div>
-              ))}
-            </div>
-          ))}
+              )}
+              <div className="kpi-grid">
+                {[
+                  [
+                    "Target area",
+                    displayNumber(summary.data.acreage?.target_area_ha, " ha"),
+                  ],
+                  [
+                    "Reported area",
+                    displayNumber(
+                      summary.data.acreage?.reported_planted_area_ha,
+                      " ha",
+                    ),
+                  ],
+                  [
+                    "Coverage",
+                    displayNumber(summary.data.acreage?.coverage_pct, "%"),
+                  ],
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <p>{label}</p>
+                    <strong>{value}</strong>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
       </section>
       <div className="overview-grid adoption-layout">
       <section className="panel adoption-panel">

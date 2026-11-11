@@ -38,10 +38,9 @@ export function SimulationScreen({ cropId, cropLabel }: { cropId: string; cropLa
     <PageHeading eyebrow="Market supply model" icon={BarChart3} title="Supply Pressure" description={`${cropLabel}: expected supply against demand, with uncertainty visible.`} />
     <div className="analysis-grid">
       <section className="panel chart-panel">
-        <div className="panel-heading"><div><h2>Expected harvest vs demand</h2><p>Backend scenario tonnes. Monthly forecast series not supplied by this endpoint.</p></div></div>
+        <div className="panel-heading"><div><h2>Expected harvest vs demand</h2><p>Live backend scenario analysis. Simulates low, mid and high supply vs projected demand.</p></div></div>
         <ApiDataState loading={!current} error={current?.error} empty={data?.data_available === false} onRetry={() => setRevision(value => value + 1)} />
         {available && <>
-          {data.is_demo && <div className="alert-banner alert-banner--info" role="status">Demo or synthetic simulation data</div>}
           <div className="chart-legend"><span><i className="legend-swatch legend-swatch--middle" />Supply</span><span><i className="legend-swatch legend-swatch--demand" />Demand</span></div>
           <div className="original-scenario-chart" role="img" aria-label="Low, mid and high supply and demand from the backend">
             {scenarios.map(({ name, values }) => <div className="original-scenario-column" key={name}>

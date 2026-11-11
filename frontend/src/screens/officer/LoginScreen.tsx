@@ -1,12 +1,14 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import {
   AlertCircle,
+  AlertTriangle,
   BarChart3,
   Check,
   CheckCircle2,
   LockKeyhole,
   LogIn,
   Mail,
+  MapPin,
   Eye,
   EyeOff,
   ShieldCheck,
@@ -14,6 +16,8 @@ import {
   Settings,
   Database,
   Shield,
+  User,
+  X,
 } from "lucide-react"
 import { Button } from "../../components/common"
 import { loginUser, registerUser, type AuthUser } from "../../api"
@@ -33,23 +37,59 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [toastNotification, setToastNotification] = useState<{ title: string; message: string } | null>(null)
+  const [hasPasswordError, setHasPasswordError] = useState(false)
+
+  useEffect(() => {
+    if (!toastNotification) return
+    const timer = setTimeout(() => {
+      setToastNotification(null)
+    }, 6000)
+    return () => clearTimeout(timer)
+  }, [toastNotification])
 
   const handleRoleChange = (selectedRole: "Officer" | "Admin") => {
     setRole(selectedRole)
     setErrorMessage(null)
+    setToastNotification(null)
+    setHasPasswordError(false)
+    if (selectedRole === "Admin" && mode === "signup") {
+      setMode("signin")
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMessage(null)
+    setToastNotification(null)
+    setHasPasswordError(false)
 
     if (!email.trim() || !password.trim() || (mode === "signup" && (!fullName.trim() || !confirmPassword.trim()))) {
-      setErrorMessage(mode === "signup" ? "Complete all required registration fields." : "Please enter your username and password.")
+      const msg = mode === "signup" ? "Complete all required registration fields." : "Please enter your username and password."
+      setErrorMessage(msg)
+      setToastNotification({ title: "Incomplete Fields", message: msg })
       return
     }
-    if (mode === "signup" && role === "Admin") { setErrorMessage("System Administrator accounts must be provisioned by an administrator."); return }
-    if (mode === "signup" && password !== confirmPassword) { setErrorMessage("Passwords do not match."); return }
-    if (mode === "signup" && password.length < 8) { setErrorMessage("Password must be at least 8 characters."); return }
+    if (mode === "signup" && role === "Admin") {
+      const msg = "System Administrator accounts cannot be created via public sign up. Accounts must be provisioned internally."
+      setErrorMessage(msg)
+      setToastNotification({ title: "Registration Restricted", message: msg })
+      return
+    }
+    if (mode === "signup" && password !== confirmPassword) {
+      const msg = "Passwords do not match."
+      setErrorMessage(msg)
+      setHasPasswordError(true)
+      setToastNotification({ title: "Password Mismatch", message: msg })
+      return
+    }
+    if (mode === "signup" && password.length < 8) {
+      const msg = "Password must be at least 8 characters."
+      setErrorMessage(msg)
+      setHasPasswordError(true)
+      setToastNotification({ title: "Password Too Short", message: msg })
+      return
+    }
 
     setIsLoading(true)
     try {
@@ -57,12 +97,26 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
         ? await registerUser({ full_name: fullName, role: "officer", district, username: email, password })
         : await loginUser(email, password, role)
       if (res.success && res.user) {
+        setHasPasswordError(false)
+        setToastNotification(null)
         onLogin(res.user.role, res.user)
       } else {
-        setErrorMessage(res.error || "Invalid credentials — please try again.")
+        const errorText = res.error || "Invalid credentials — please try again."
+        const isPasswordIssue = /password|credential|incorrect|invalid|unauthorized|401/i.test(errorText)
+        setHasPasswordError(isPasswordIssue)
+        setErrorMessage(errorText)
+        setToastNotification({
+          title: isPasswordIssue ? "Invalid Password / Credentials" : "Authentication Failed",
+          message: errorText,
+        })
       }
     } catch (err: any) {
-      setErrorMessage(err.message || "Failed to connect to authentication service.")
+      const errorText = err.message || "Failed to connect to authentication service."
+      setErrorMessage(errorText)
+      setToastNotification({
+        title: "Connection Error",
+        message: errorText,
+      })
     } finally {
       setIsLoading(false)
     }
@@ -70,6 +124,25 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
 
   return (
     <div className="login-preview">
+      {toastNotification && (
+        <div className="auth-toast" role="alert" aria-live="assertive">
+          <div className="auth-toast__icon">
+            <AlertTriangle size={20} />
+          </div>
+          <div className="auth-toast__body">
+            <strong>{toastNotification.title}</strong>
+            <span>{toastNotification.message}</span>
+          </div>
+          <button
+            type="button"
+            className="auth-toast__close"
+            onClick={() => setToastNotification(null)}
+            aria-label="Dismiss notification"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
       <div className="login-story">
         <div className="brand brand--login">
           <div className="brand__mark">
@@ -109,16 +182,25 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
         <h2>{mode === "signin" ? "Welcome back" : "Create your account"}</h2>
         <p>{mode === "signin" ? "Sign in to your GoviSense workspace." : "Register for your role-based GoviSense workspace."}</p>
 
-        <div className="auth-mode-toggle" role="tablist" aria-label="Authentication mode">
-          <button type="button" className={mode === "signin" ? "active" : ""} onClick={() => { setMode("signin"); setErrorMessage(null) }}>Sign In</button>
-          <button type="button" className={mode === "signup" ? "active" : ""} onClick={() => { setMode("signup"); setErrorMessage(null) }}>Sign Up / Register</button>
-        </div>
+        {role !== "Admin" ? (
+          <div className="auth-mode-toggle" role="tablist" aria-label="Authentication mode">
+            <button type="button" className={mode === "signin" ? "active" : ""} onClick={() => { setMode("signin"); setErrorMessage(null) }}>Sign In</button>
+            <button type="button" className={mode === "signup" ? "active" : ""} onClick={() => { setMode("signup"); setErrorMessage(null) }}>Sign Up / Register</button>
+          </div>
+        ) : (
+          <div className="admin-auth-notice">
+            <ShieldCheck size={16} />
+            <span>Administrator sign-in only. New administrator accounts cannot be created via public sign up.</span>
+          </div>
+        )}
 
         <div className="role-picker">
           {[
             ["Officer", "Agricultural Officer", "Planning & Policy", BarChart3],
             ["Admin", "Administrator", "Data Catalogue & Security", ShieldCheck],
-          ].map(([value, name, detail, Icon]) => (
+          ]
+            .filter(([value]) => mode !== "signup" || value !== "Admin")
+            .map(([value, name, detail, Icon]) => (
             <button
               className={role === value ? "active" : ""}
               type="button"
@@ -132,25 +214,64 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
         </div>
 
         {errorMessage && (
-          <div
-            className="alert-banner alert-banner--warning"
-            style={{
-              padding: "10px 14px",
-              marginBottom: "14px",
-              fontSize: "12px",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
-            <AlertCircle size={16} />
-            <span>{errorMessage}</span>
+          <div className="auth-notification" role="alert" aria-live="assertive">
+            <AlertCircle size={20} className="auth-notification__icon" />
+            <div className="auth-notification__content">
+              <strong>{hasPasswordError ? "Invalid Password or Credentials" : "Authentication Notice"}</strong>
+              <p>{errorMessage}</p>
+            </div>
+            <button
+              type="button"
+              className="auth-notification__close"
+              onClick={() => {
+                setErrorMessage(null)
+                setHasPasswordError(false)
+              }}
+              aria-label="Dismiss notification"
+            >
+              <X size={15} />
+            </button>
           </div>
         )}
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-          {mode === "signup" && <label className="login-field"><span>Full name</span><input type="text" required value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Your full name" /></label>}
-          {mode === "signup" && <label className="login-field"><span>District</span><select value={district} onChange={(e) => setDistrict(e.target.value)}><option>Anuradhapura</option><option>Polonnaruwa</option><option>Kurunegala</option><option>Matale</option><option>Hambantota</option><option>Jaffna</option></select></label>}
+          {mode === "signup" && (
+            <label className="login-field">
+              <span>Full name</span>
+              <div className="auth-input-shell">
+                <User size={16} aria-hidden="true" />
+                <input
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Your full name"
+                  autoComplete="name"
+                />
+              </div>
+            </label>
+          )}
+          {mode === "signup" && (
+            <label className="login-field">
+              <span>District</span>
+              <div className="auth-input-shell auth-select-shell">
+                <MapPin size={16} aria-hidden="true" />
+                <select
+                  value={district}
+                  onChange={(e) => setDistrict(e.target.value)}
+                  aria-label="Select district"
+                  className="district-select"
+                >
+                  <option value="Anuradhapura">Anuradhapura</option>
+                  <option value="Polonnaruwa">Polonnaruwa</option>
+                  <option value="Kurunegala">Kurunegala</option>
+                  <option value="Matale">Matale</option>
+                  <option value="Hambantota">Hambantota</option>
+                  <option value="Jaffna">Jaffna</option>
+                </select>
+              </div>
+            </label>
+          )}
           <label className="login-field">
             <span>Email / username</span>
             <div className="auth-input-shell">
@@ -159,7 +280,11 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                 type="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  if (errorMessage) setErrorMessage(null)
+                  if (hasPasswordError) setHasPasswordError(false)
+                }}
                 placeholder="name@agriculture.gov.lk"
                 autoComplete="email"
               />
@@ -168,18 +293,29 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
 
           <label className="login-field">
             <span>Password</span>
-            <div className="auth-input-shell auth-password-shell">
+            <div className={`auth-input-shell auth-password-shell ${hasPasswordError ? "auth-input-shell--error" : ""}`}>
               <LockKeyhole size={16} aria-hidden="true" />
               <input
                 type={showPassword ? "text" : "password"}
                 required
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  if (hasPasswordError) setHasPasswordError(false)
+                  if (errorMessage) setErrorMessage(null)
+                }}
                 placeholder={mode === "signup" ? "At least 8 characters" : "Enter password"}
                 autoComplete="current-password"
+                aria-invalid={hasPasswordError}
               />
               <button type="button" className="password-toggle" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((value) => !value)}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
             </div>
+            {hasPasswordError && (
+              <span className="auth-field-error-hint">
+                <AlertCircle size={12} />
+                <span>Incorrect password. Please verify your password.</span>
+              </span>
+            )}
           </label>
           {mode === "signup" && <label className="login-field"><span>Confirm password</span><input type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Re-enter password" /></label>}
 
@@ -192,9 +328,11 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
           </Button>
         </form>
 
-        <button type="button" className="auth-inline-toggle" onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setErrorMessage(null) }}>
-          {mode === "signin" ? "New to GoviSense? Create an account" : "Already have an account? Sign in"}
-        </button>
+        {role !== "Admin" && (
+          <button type="button" className="auth-inline-toggle" onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setErrorMessage(null) }}>
+            {mode === "signin" ? "New to GoviSense? Create an account" : "Already have an account? Sign in"}
+          </button>
+        )}
         <div className="auth-security-note">
           <small style={{ color: "var(--ink-muted)", fontSize: "11px", display: "flex", alignItems: "center", gap: "5px" }}>
             <ShieldCheck size={13} color="var(--primary)" />

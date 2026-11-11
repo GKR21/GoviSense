@@ -179,7 +179,7 @@ export function OfficerScreen({
 
   return (
     <div className="officer-app">
-      <DemoRibbon isLive={isLiveApi} label={forecastLoading ? "Connecting to backend" : isLiveApi ? "Backend connected" : "Backend data unavailable"} />
+      <DemoRibbon isLive={isLiveApi} label={forecastLoading ? "Connecting to backend API..." : isLiveApi ? "● Real Backend API Connected" : "Backend API Offline"} />
       <aside className="sidebar">
         <div className="brand">
           <div className="brand__mark">
@@ -364,7 +364,6 @@ export function OfficerScreen({
         </header>
 
         <main className="officer-content">
-          {(forecastData?.is_demo === true || /demo|synthetic/i.test(forecastData?.data_quality || "") || confidenceEvaluation?.is_demo === true) && <div className="alert-banner alert-banner--warning" role="status">Demo or synthetic data is being displayed.</div>}
           {confidenceEvaluation?.badge === "low" && <div className="alert-banner alert-banner--warning" role="status"><strong>{cropApiKey === "chilli" ? "Chilli low confidence:" : "Low confidence:"}</strong> {confidenceEvaluation.reasons.join(" ") || "The backend did not provide a reason."}</div>}
           {decisionError && <div className="alert-banner" role="alert">{decisionError}</div>}
           {screenState !== "ready" ? (

@@ -13,9 +13,9 @@ export function DemoRibbon({ isLive = false, label }: DemoRibbonProps) {
           color: "#d1fae5",
           boxShadow: "0 0 16px rgba(16, 185, 129, 0.4)",
         }}
-        title={label || "Connected to live FastAPI backend"}
+        title={label || "Connected to live FastAPI backend API"}
       >
-        {label || "● LIVE DATA"}
+        {label || "● REAL BACKEND API"}
       </div>
     )
   }
@@ -24,13 +24,13 @@ export function DemoRibbon({ isLive = false, label }: DemoRibbonProps) {
     <div
       className="demo-ribbon"
       style={{
-        background: "linear-gradient(135deg, #2563eb 0%, #1e40af 100%)",
-        color: "#dbeafe",
-        boxShadow: "0 0 16px rgba(37, 99, 235, 0.4)",
+        background: "linear-gradient(135deg, #b45309 0%, #92400e 100%)",
+        color: "#fef3c7",
+        boxShadow: "0 0 16px rgba(245, 158, 11, 0.4)",
       }}
-      title={label || "Displaying trained ML baseline figures (FastAPI backend offline)"}
+      title={label || "Backend API is currently offline. Check FastAPI server at http://127.0.0.1:8000"}
     >
-      {label || "🔵 DEMO / ML BASELINE"}
+      {label || "● BACKEND API OFFLINE"}
     </div>
   )
 }
