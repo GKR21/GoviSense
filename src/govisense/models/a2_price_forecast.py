@@ -54,11 +54,25 @@ def get_cbsl_retail_margin_stats(crop: str) -> Dict[str, Any]:
     """
     Computes dynamic retail/wholesale ratio statistics from monthly_prices_cbsl.csv
     over the trailing 12 months with empirical band (P10 to P90) and sample size n.
+
+    Credit transparency:
+      - method="12m_cbsl_median_ratio": n real CBSL Pettah market observations used.
+      - method="cbsl_static_median":    CSV absent; static CBSL published median applied.
+                                        n=0 to signal no live data was consumed.
+      - method="fallback":              CSV present but column parse failed; n=0.
+    Callers must treat n=0 results as synthetic and widen uncertainty accordingly.
     """
     csv_path = Path("data/processed/monthly_prices_cbsl.csv")
     if not csv_path.exists():
         fallback_ratio = CBSL_MEDIAN_RETAIL_RATIOS.get(crop, 1.22)
-        return {"median": fallback_ratio, "p10": round(fallback_ratio * 0.95, 3), "p90": round(fallback_ratio * 1.05, 3), "n": 12, "method": "cbsl_static_median"}
+        # C2 FIX: n=0 (not 12) — no live data points consumed; method label is explicit.
+        return {
+            "median": fallback_ratio,
+            "p10": round(fallback_ratio * 0.95, 3),
+            "p90": round(fallback_ratio * 1.05, 3),
+            "n": 0,
+            "method": "cbsl_static_median",
+        }
     try:
         df = pd.read_csv(csv_path)
         if crop in ("big_onion", "onion"):
@@ -72,14 +86,28 @@ def get_cbsl_retail_margin_stats(crop: str) -> Dict[str, Any]:
         last12 = ratios.iloc[-12:] if len(ratios) >= 12 else ratios
         if len(last12) == 0:
             fallback_ratio = CBSL_MEDIAN_RETAIL_RATIOS.get(crop, 1.22)
-            return {"median": fallback_ratio, "p10": round(fallback_ratio * 0.95, 3), "p90": round(fallback_ratio * 1.05, 3), "n": 0, "method": "fallback"}
+            # C2 FIX: n=0 — columns parsed but no valid ratio rows found.
+            return {
+                "median": fallback_ratio,
+                "p10": round(fallback_ratio * 0.95, 3),
+                "p90": round(fallback_ratio * 1.05, 3),
+                "n": 0,
+                "method": "fallback",
+            }
         med = float(last12.median())
         p10 = float(last12.quantile(0.10))
         p90 = float(last12.quantile(0.90))
         return {"median": round(med, 3), "p10": round(p10, 3), "p90": round(p90, 3), "n": len(last12), "method": "12m_cbsl_median_ratio"}
     except Exception:
         fallback_ratio = CBSL_MEDIAN_RETAIL_RATIOS.get(crop, 1.22)
-        return {"median": fallback_ratio, "p10": round(fallback_ratio * 0.95, 3), "p90": round(fallback_ratio * 1.05, 3), "n": 12, "method": "fallback"}
+        # C2 FIX: n=0 — exception during parse; static fallback applied.
+        return {
+            "median": fallback_ratio,
+            "p10": round(fallback_ratio * 0.95, 3),
+            "p90": round(fallback_ratio * 1.05, 3),
+            "n": 0,
+            "method": "fallback",
+        }
 
 def compute_modeled_retail_price(
     wholesale_price_rs_kg: float,

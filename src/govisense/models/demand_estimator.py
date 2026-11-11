@@ -22,15 +22,26 @@ from govisense.config import settings, HUB_SHARE as CONFIG_HUB_SHARE
 
 
 # Seasonal demand multipliers (month → factor).
-# April = Sinhala/Tamil New Year, December = Festive season.
+# M5 NOTE: These are expert-estimated calendar weights, NOT fitted to market data.
+# Source: HARTI Market Outlook seasonal index (qualitative); festival calendar
+#   (Sinhala/Tamil New Year=April, Christmas/New Year=December).
+# Confidence: LOW — should be replaced with a regression fit to CBSL monthly
+#   retail quantity index once ≥36 months of data are available.
+# Override path: set SEASONAL_FACTORS values directly or add a DB-driven update
+#   endpoint at /api/admin/seasonal-factors (planned for Phase 2).
 SEASONAL_FACTORS: Dict[int, float] = {
     1: 1.00, 2: 0.98, 3: 1.05, 4: 1.30, 5: 1.10, 6: 0.95,
     7: 0.96, 8: 1.02, 9: 1.00, 10: 1.05, 11: 1.08, 12: 1.25,
 }
 
 # National annual demand anchors (MT/year).
-# Big Onion: Commodity Board confirmed ~320,000 t/year (year to verify).
-# Chilli & others: DCS HIES per-capita consumption × national population.
+# M1 NOTE: Big Onion 320,000 MT — Commodity Board national requirement.
+# Source: Sri Lanka Commodity Board Annual Report (year TBC — "to verify" since pilot inception).
+# Confidence: MEDIUM — single-source, unconfirmed year. All SPI scores and LP bounds
+#   for Big Onion trace back to this constant; a ±10% error flips SPI label.
+# Override path: DB table `demand_anchors` (planned stub — see docs/assumptions.md).
+#   Until live feed is available, update NATIONAL_ANNUAL_DEMAND_MT["big_onion"] here
+#   after each Commodity Board Annual Report.
 NATIONAL_ANNUAL_DEMAND_MT: Dict[str, Optional[float]] = {
     "big_onion": 320_000.0,
     "chilli": 66_600.0,

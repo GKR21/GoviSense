@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mobile/core/config/app_config.dart';
@@ -13,12 +12,7 @@ void main() {
 
   test('default API URL is HTTPS and supports a build-time override', () async {
     await AppConfig.init();
-    const expected = String.fromEnvironment(
-      'API_BASE_URL',
-      defaultValue: kReleaseMode
-          ? AppConfig.deployedUrl
-          : AppConfig.localEmulatorUrl,
-    );
+    final expected = AppConfig.defaultUrl;
     expect(AppConfig.apiBaseUrl, AppConfig.validateBaseUrl(expected));
   });
 
@@ -63,12 +57,7 @@ void main() {
       'govisense_api_base_url': 'javascript:invalid',
     });
     await AppConfig.init();
-    const expected = String.fromEnvironment(
-      'API_BASE_URL',
-      defaultValue: kReleaseMode
-          ? AppConfig.deployedUrl
-          : AppConfig.localEmulatorUrl,
-    );
+    final expected = AppConfig.defaultUrl;
     expect(AppConfig.apiBaseUrl, AppConfig.validateBaseUrl(expected));
   });
 

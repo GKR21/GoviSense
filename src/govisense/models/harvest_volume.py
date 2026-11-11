@@ -78,8 +78,15 @@ def compute_transparent_accounting_supply(
     net_yield = max(yield_mt_ha, 0.1)
     net_loss = float(np.clip(loss_pct, 0.0, 0.50))
     raw_production = planted_area_ha * net_yield
+
+    # C3 FIX: sum only integer-keyed (month) weights — exclude the "default" string key,
+    # which previously inflated the denominator and silently deflated effective_supply.
+    # e.g. big_onion weights={8:0.40,9:0.65,10:0.88,default:0.08} → sum was 2.01 (wrong),
+    # now correctly 1.93 (months only).
+    numeric_weights = {k: v for k, v in window_weights.items() if isinstance(k, int)}
+    weight_sum = sum(numeric_weights.values()) if numeric_weights else 1.0
     effective_supply = raw_production * (1.0 - net_loss) * (
-        spread_factor / max(sum(window_weights.values()) if "window_weights" in locals() else 1.0, 0.5)
+        spread_factor / max(weight_sum, 0.5)
     )
 
     return {

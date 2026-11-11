@@ -150,7 +150,11 @@ class SupplyPressureEngine:
         net_retention = 1.0 - loss_pct
 
         # Effective available supply
-        effective_supply = (forecast_supply_mt * net_retention) + (import_volume_mt * 0.40)
+        # import_absorption_factor: fraction of imports reaching the hub as effective supply.
+        # Source: HARTI MRD 2022 Table 4.3 — now a named, configurable setting (C1 fix).
+        effective_supply = (forecast_supply_mt * net_retention) + (
+            import_volume_mt * settings.import_absorption_factor
+        )
         gap_mt = effective_supply - projected_demand
 
         # Primary ratio formula: S / D
@@ -326,12 +330,14 @@ class SupplyPressureEngine:
             thesis_confirmed = bool(corr_1m < -0.20 and overall_hit_rate > 65.0)
 
             # Correlation with local-vs-import price gap
+            # M3 FIX: return None when column is absent or correlation is NaN —
+            # never substitute the synthetic 0.68 placeholder as a measured value.
+            # Callers must check for None before rendering this metric.
             if "local_vs_import_gap" in clean_sub.columns:
-                corr_import_gap = clean_sub["local_vs_import_gap"].corr(clean_sub["wholesale_price_rs_kg"])
-                if pd.isna(corr_import_gap):
-                    corr_import_gap = 0.68
+                corr_import_gap_raw = clean_sub["local_vs_import_gap"].corr(clean_sub["wholesale_price_rs_kg"])
+                corr_import_gap = None if pd.isna(corr_import_gap_raw) else float(corr_import_gap_raw)
             else:
-                corr_import_gap = 0.68
+                corr_import_gap = None  # column absent — no measurement available
 
             # Confidence badge & thesis diagnostics
             if not thesis_confirmed:
@@ -354,7 +360,9 @@ class SupplyPressureEngine:
             results[crop_name] = {
                 "spi_vs_next_month_price_change_corr": round(float(corr_1m), 3),
                 "spi_vs_2month_price_change_corr": round(float(corr_2m), 3),
-                "import_gap_price_corr": round(float(corr_import_gap), 3),
+                # M3 FIX: None when no live data — never a synthetic 0.68 substitution.
+                "import_gap_price_corr": round(float(corr_import_gap), 3) if corr_import_gap is not None else None,
+                "import_gap_price_corr_source": "measured" if corr_import_gap is not None else "unavailable",
                 "glut_prediction_hit_rate_pct": round(float(glut_correct) * 100, 1),
                 "shortage_prediction_hit_rate_pct": round(float(short_correct) * 100, 1),
                 "overall_direction_hit_rate_pct": round(float(overall_hit_rate), 1),
