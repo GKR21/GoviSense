@@ -38,7 +38,7 @@
       "destination": "https://govisense-production.up.railway.app/api/:path*"
     },
     {
-      "source": "/((?!api/|assets/|.*\\..*).*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]
