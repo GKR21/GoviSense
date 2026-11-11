@@ -1,7 +1,7 @@
 // GoviSense PWA Service Worker
 // Enables offline field operation for Sri Lankan farmers with limited/intermittent connectivity.
 
-const CACHE_NAME = "govisense-pwa-v1";
+const CACHE_NAME = "govisense-pwa-v2";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
