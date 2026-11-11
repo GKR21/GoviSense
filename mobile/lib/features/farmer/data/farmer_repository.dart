@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/foundation.dart';
 
 import '../../auth/data/auth_repository.dart';
@@ -118,6 +116,24 @@ class FarmerRepository extends ChangeNotifier {
     return ok;
   }
 
+  static ({String en, String si, String ta}) _cropNamesForId(String cropId) {
+    final normalized = cropId.toLowerCase();
+    if (normalized.contains('onion')) {
+      return (en: 'Big Onion', si: 'ලොකු ලූනු', ta: 'பெரிய வெங்காயம்');
+    }
+    if (normalized.contains('chilli')) {
+      return (en: 'Green Chilli', si: 'අමු මිරිස්', ta: 'பச்சை மிளகாய்');
+    }
+    if (normalized.contains('gram')) {
+      return (en: 'Green Gram', si: 'මුං ඇට', ta: 'பச்சைப் பயறு');
+    }
+    if (normalized.contains('maize')) {
+      return (en: 'Maize', si: 'බඩ ඉරිඟු', ta: 'சோளம்');
+    }
+    final fallback = cropId.replaceFirst('crop-', '').replaceAll('_', ' ');
+    return (en: fallback, si: fallback, ta: fallback);
+  }
+
   /// Submits planting report.
   /// If submission to backend fails or is offline, the report is saved as "pending"
   /// for automatic background retry and the farmer is explicitly notified of offline status.
@@ -132,17 +148,10 @@ class FarmerRepository extends ChangeNotifier {
     String? saleChannel,
     bool consentGiven = true,
   }) async {
-    if (_crops.isEmpty) {
-      throw StateError(
-        'Cannot submit a planting report without live crop data',
-      );
-    }
-    final crop = _crops.firstWhere(
-      (c) => c.id == cropId,
-      orElse: () => _crops.first,
-    );
-    final rng = Random();
-    final hexCode = rng.nextInt(0xFFFFFF).toRadixString(16).padLeft(6, '0');
+    final matchedCrop = _crops.where((c) => c.id == cropId).firstOrNull;
+    final names = matchedCrop != null
+        ? (en: matchedCrop.nameEn, si: matchedCrop.nameSi, ta: matchedCrop.nameTa)
+        : _cropNamesForId(cropId);
     final localId =
         'LOCAL-${DateTime.now().microsecondsSinceEpoch}-${++_localReportSequence}';
 
@@ -150,17 +159,16 @@ class FarmerRepository extends ChangeNotifier {
     PlantingReport report = PlantingReport(
       id: localId,
       cropId: cropId,
-      cropNameEn: crop.nameEn,
-      cropNameSi: crop.nameSi,
-      cropNameTa: crop.nameTa,
+      cropNameEn: names.en,
+      cropNameSi: names.si,
+      cropNameTa: names.ta,
       district: _profile.district,
       areaAcres: areaAcres,
       plantingDate: plantingDate,
       irrigationType: irrigationType,
       seedSource: seedSource,
       timestamp: DateTime.now().toString().substring(0, 16),
-      receiptHash:
-          '0x$hexCode...${rng.nextInt(0xFFFF).toRadixString(16).toUpperCase()}',
+      receiptHash: '',
       status: 'pending',
       harvestOutcomeMt: harvestOutcomeMt,
       salePriceRsKg: salePriceRsKg,
@@ -195,9 +203,9 @@ class FarmerRepository extends ChangeNotifier {
         FarmerAlert(
           id: 'alert-${DateTime.now().millisecondsSinceEpoch}',
           type: AlertType.success,
-          titleEn: 'Planting Declaration Confirmed (${crop.nameEn})',
-          titleSi: 'වගා වාර්තාව තහවුරු විය (${crop.nameSi})',
-          titleTa: 'நடவு அறிக்கை உறுதிப்படுத்தப்பட்டது (${crop.nameTa})',
+          titleEn: 'Planting Declaration Confirmed (${names.en})',
+          titleSi: 'වගා වාර්තාව තහවුරු විය (${names.si})',
+          titleTa: 'நடவு அறிக்கை உறுதிப்படுத்தப்பட்டது (${names.ta})',
           messageEn:
               'Successfully submitted $areaAcres acres for ${report.season}. Receipt ID: ${report.id}. Telemetry synced with ${_profile.district} Agrarian Ledger.',
           messageSi:
@@ -218,9 +226,9 @@ class FarmerRepository extends ChangeNotifier {
         FarmerAlert(
           id: 'alert-pending-${DateTime.now().millisecondsSinceEpoch}',
           type: AlertType.market,
-          titleEn: 'Submission Pending Sync (${crop.nameEn})',
-          titleSi: 'වාර්තාව සමමුහුර්ත වීම පොරොත්තුයි (${crop.nameSi})',
-          titleTa: 'அறிக்கை ஒத்திசைவு நிலுவையில் உள்ளது (${crop.nameTa})',
+          titleEn: 'Submission Pending Sync (${names.en})',
+          titleSi: 'වාර්තාව සමමුහුර්ත වීම පොරොත්තුයි (${names.si})',
+          titleTa: 'அறிக்கை ஒத்திசைவு நிலுவையில் உள்ளது (${names.ta})',
           messageEn:
               'Unable to reach ${_profile.district} Agrarian Ledger. Report ${report.id} kept pending in this app session. Retry when connected; durable offline saving is not available yet.',
           messageSi:

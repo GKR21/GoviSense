@@ -144,44 +144,50 @@ class _FarmerPageState extends State<FarmerPage> {
               ),
             ),
             const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      AppTranslations.t(_language, 'appName'),
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 1,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryTint,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'Maha 2026',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primary,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          AppTranslations.t(_language, 'appName'),
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const Text(
-                  'Anuradhapura District',
-                  style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
-                ),
-              ],
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryTint,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'Maha 2026',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Text(
+                    'Anuradhapura District',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
