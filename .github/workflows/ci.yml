@@ -89,5 +89,11 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci || npm install
 
-      - name: TypeScript typecheck and build
+      - name: TypeScript typecheck
+        run: npm run typecheck
+
+      - name: Run frontend unit tests
+        run: npm test
+
+      - name: Build frontend production bundle
         run: npm run build
