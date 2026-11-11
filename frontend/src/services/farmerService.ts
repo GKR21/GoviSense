@@ -164,7 +164,7 @@ function mapApiCropToCropItem(raw: any, landAcres: number): CropItem {
 }
 
 export class FarmerService {
-  private profile: FarmerProfileData = { ...initialFarmerProfile }
+  private profile: FarmerProfileData = createFarmerProfile()
   private reports: PlantingReportData[] = []
   private alerts: AlertItem[] = []
   private identityRequest: Promise<ServerIdentity> | null = null
@@ -195,6 +195,7 @@ export class FarmerService {
   async getRecommendedCrops(district = this.profile.district, landSize = this.profile.totalLandAcres): Promise<CropItem[]> {
     try {
       const profile = await this.getProfile()
+      if (!profile.farmerId) return []
       const top3Res = await fetchFarmerTop3({
         farmer_id: profile.farmerId || undefined,
         district: district || profile.district || undefined,
@@ -256,13 +257,13 @@ export class FarmerService {
       const identity = await this.loadIdentity()
       const farmerId = identity.farmerId || ""
       if (farmerId !== this.profile.farmerId) {
-        this.profile = { ...initialFarmerProfile }
+        this.profile = createFarmerProfile()
         this.reports = []
         this.alerts = []
       }
       this.profile = { ...this.profile, farmerId, name: identity.name, district: identity.district || this.profile.district }
     } catch (error) {
-      this.profile = { ...initialFarmerProfile }
+      this.profile = createFarmerProfile()
       console.warn("Backend farmer identity is unavailable", error)
     }
     return { ...this.profile }

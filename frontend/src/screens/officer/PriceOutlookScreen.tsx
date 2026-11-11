@@ -21,6 +21,9 @@ export function PriceOutlookScreen({
   const cropId = cropApiId(crop)
   const { data, loading, error, refetch } = usePriceOutlook(cropId)
   const outlook = data?.crops?.[cropId]
+  const isChilli = cropId === "chilli"
+  const baselineServed = data?.baseline_served === true || /baseline/i.test(String(data?.served_model || ""))
+  const intervalCoverage = data?.interval_coverage_pct ?? data?.coverage_pct ?? outlook?.interval_coverage_pct
   return (
     <>
       <PageHeading
@@ -48,8 +51,17 @@ export function PriceOutlookScreen({
               <p>Target period: {outlook.target_period || "Not available"}</p>
             </div>
           </div>
-          <div className="table-scroll">
-            <table className="audit-table">
+          <div className="original-price-chart">
+            <div className="chart-legend"><span><i className="legend-swatch legend-swatch--band" />10th-90th percentile</span><span><i className="legend-swatch legend-swatch--middle" />Median</span></div>
+            <p className="original-empty">Returned price intervals for {outlook.target_period || "the available period"}; monthly price history is not supplied.</p>
+            {[{ label: "Farmgate", band: outlook.farmgate_price }, { label: "Retail", band: outlook.retail_price }].map(({ label, band }) => {
+              const valid = [band?.p10, band?.p50, band?.p90].every(value => typeof value === "number" && Number.isFinite(value)) && band.p90 >= band.p10
+              const position = valid && band.p90 > band.p10 ? Math.min(100, Math.max(0, (band.p50 - band.p10) / (band.p90 - band.p10) * 100)) : 50
+              return <div className="original-price-row" key={label}><strong>{label}</strong>{valid ? <div><div className="original-price-band"><i style={{ left: `${position}%` }} /></div><div className="original-price-labels"><span>{displayNumber(band.p10)}</span><strong>{displayNumber(band.p50)} Rs/kg</strong><span>{displayNumber(band.p90)}</span></div></div> : <p>Interval not available</p>}</div>
+            })}
+          </div>
+          <div className="data-table-wrap">
+            <table className="data-table">
               <thead>
                 <tr>
                   <th>Price (Rs/kg)</th>
@@ -77,14 +89,17 @@ export function PriceOutlookScreen({
             Fair floor:{" "}
             {displayNumber(outlook.fair_floor_price_rs_kg, " Rs/kg")}
           </p>
-          <p>
-            Model reported by backend:{" "}
-            {outlook.price_model_used || data.served_model || "Not available"}
-          </p>
+          <div className="kpi-grid kpi-grid--three">
+            <div><p>Model used</p><strong>{outlook.price_model_used || data.served_model || "Not available"}</strong></div>
+            <div><p>Baseline status</p><strong>{data?.baseline_served === true || data?.baseline_name ? (baselineServed ? "Baseline served" : "Model served") : "Not reported"}</strong></div>
+            <div><p>Interval coverage</p><strong>{typeof intervalCoverage === "number" && Number.isFinite(intervalCoverage) ? `${intervalCoverage}%` : "Not available"}</strong></div>
+          </div>
+          {!isChilli && outlook.direction && <p>Direction: {outlook.direction}</p>}
           <p>
             Data quality: {data.data_quality || "Not available"} | Data version:{" "}
             {data.data_version || "Not available"}
           </p>
+          <p>Data age: {typeof data.data_age_days === "number" ? `${data.data_age_days} days` : "Not available"}</p>
           {data.is_demo === true && <p role="status">Demo or synthetic data</p>}
         </section>
       )}

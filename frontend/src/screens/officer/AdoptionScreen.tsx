@@ -56,9 +56,7 @@ export function AdoptionScreen({
           !summary.error &&
           summary.data &&
           (summary.data.data_available === false ? (
-            <p role="status">
-              Adoption telemetry is not available for this selection.
-            </p>
+            <div role="status"><p>Adoption telemetry is not available for this selection.</p><p>{summary.data.message || "The backend returned no observed adoption data."}</p><small>Data quality: {summary.data.data_quality || "Not available"} · Source: {summary.data.source_type || "Not available"}</small></div>
           ) : (
             <div className="kpi-grid">
               {[
@@ -86,7 +84,8 @@ export function AdoptionScreen({
             </div>
           ))}
       </section>
-      <section className="panel large-data-panel">
+      <div className="overview-grid">
+      <section className="panel adoption-panel">
         <h2>Adoption simulation</h2>
         <p>
           These scenarios are simulated outputs, separate from observed
@@ -99,8 +98,8 @@ export function AdoptionScreen({
           onRetry={simulation.refetch}
         />
         {!simulation.loading && !simulation.error && scenarios.length > 0 && (
-          <div className="table-scroll">
-            <table className="audit-table">
+          <div className="data-table-wrap">
+            <table className="data-table">
               <thead>
                 <tr>
                   <th>Adoption</th>
@@ -128,8 +127,11 @@ export function AdoptionScreen({
             </table>
           </div>
         )}
+        {!simulation.loading && !simulation.error && scenarios.length > 0 && (
+          <p className="original-empty">Simulation source: backend · {simulation.data?.conclusion || "No conclusion returned."}</p>
+        )}
       </section>
-      <section className="panel large-data-panel">
+      <section className="panel attention-panel">
         <h2>Ground reports</h2>
         <ApiDataState
           loading={reports.loading}
@@ -138,11 +140,11 @@ export function AdoptionScreen({
           onRetry={reports.refetch}
         />
         {reports.data?.privacy_suppressed === true && (
-          <p>Reports withheld by the backend privacy policy.</p>
+          <p role="status">Reports withheld by the backend privacy policy ({reports.data.cohort_count ?? "unknown"} reports in this cohort).</p>
         )}
         {!reports.loading && !reports.error && groundReports.length > 0 && (
-          <div className="table-scroll">
-            <table className="audit-table">
+          <div className="data-table-wrap">
+            <table className="data-table">
               <thead>
                 <tr>
                   <th>Report</th>
@@ -153,7 +155,7 @@ export function AdoptionScreen({
                 </tr>
               </thead>
               <tbody>
-                {groundReports.map((report) => (
+                {groundReports.map((report: GroundReport) => (
                   <tr key={report.id}>
                     <td>{report.id}</td>
                     <td>{report.crop}</td>
@@ -167,6 +169,7 @@ export function AdoptionScreen({
           </div>
         )}
       </section>
+      </div>
     </>
   )
 }

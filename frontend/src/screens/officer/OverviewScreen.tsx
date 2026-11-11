@@ -1,7 +1,9 @@
-import { Home, RefreshCw } from "lucide-react"
-import { Button, PageHeading } from "../../components/common"
+import { Home, RefreshCw, BarChart3, Sprout, CircleDollarSign, ArrowUpCircle, ChevronRight, Database, Info } from "lucide-react"
+import { Button, PageHeading, KpiTile } from "../../components/common"
 import { displayNumber } from "../../components/common/ApiDataState"
 import type { CropForecastData } from "../../api"
+const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
 export function OverviewScreen({
   crop = "Big onion",
   district = "Anuradhapura",
@@ -55,35 +57,29 @@ export function OverviewScreen({
           </section>
         ))}
       </div>
-      <section className="panel large-data-panel">
-        <div className="panel-heading">
-          <div>
-            <h2>{apiCropData?.crop_name || crop}</h2>
-            <p>Data period: {apiCropData?.target_period || "Not available"}</p>
+      <div className="overview-grid">
+        <section className="panel heat-panel">
+          <div className="panel-heading"><div><h2>12-month risk outlook</h2><p>Only months supplied by the backend are coloured.</p></div></div>
+          <div className="heat-table">
+            <div className="heat-row heat-row--head"><span>Crop</span>{months.map(month => <span key={month}>{month}</span>)}</div>
+            <div className="heat-row"><strong>{crop}</strong>{months.map((month, index) => {
+              const period = apiCropData?.target_period || ""
+              const monthIndex = /^\d{4}-\d{2}(?:$|-)/.test(period) ? Number(period.slice(5, 7)) - 1 : -1
+              const label = pressure?.spi_label?.toLowerCase()
+              const risk = label === "glut" || label === "oversupply" ? "oversupply" : label === "shortage" ? "shortage" : label === "balanced" ? "balanced" : null
+              const available = monthIndex === index && risk
+              return <button type="button" key={month} className={`heat-cell heat-cell--${available || "unavailable"}`} aria-label={`${crop}, ${month}, ${available || "not available"}`} onClick={onOpenSupply}>{available ? <BarChart3 size={13} /> : <span aria-hidden="true">&mdash;</span>}</button>
+            })}</div>
           </div>
-        </div>
-        <p>
-          Supply pressure: {pressure?.spi_label || "Not available"} | Score:{" "}
-          {displayNumber(pressure?.spi_score)}
-        </p>
-        <p>{pressure?.action_summary || "No policy summary was returned."}</p>
-        <p>
-          Harvest interval: {displayNumber(harvest?.lower_bound_10_mt, " MT")} -{" "}
-          {displayNumber(harvest?.upper_bound_90_mt, " MT")}
-        </p>
-        <p>
-          Price interval: {displayNumber(price?.lower_bound_rs_kg, " Rs/kg")} -{" "}
-          {displayNumber(price?.upper_bound_rs_kg, " Rs/kg")}
-        </p>
-        <div className="heading-actions">
-          <Button icon={RefreshCw} onClick={onOpenSupply}>
-            View supply pressure
-          </Button>
-          <Button variant="secondary" onClick={onOpenGap}>
-            View gap timeline
-          </Button>
-        </div>
-      </section>
+          <p className="sr-summary">Data period: {apiCropData?.target_period || "Not available"}. A full monthly outlook has not been supplied.</p>
+        </section>
+        <section className="panel attention-panel">
+          <div className="panel-heading"><div><h2>Needs your attention</h2><p>Latest supplied policy summary.</p></div></div>
+          <button className="attention-item" type="button" onClick={onOpenGap}><span className="attention-item__icon"><Info size={18} /></span><span><strong>{pressure?.spi_label || "Not available"}</strong><small>{pressure?.action_summary || "No policy summary was returned."}</small></span><ChevronRight size={17} /></button>
+          <button className="attention-item" type="button" onClick={onOpenSupply}><span className="attention-item__icon"><BarChart3 size={18} /></span><span><strong>Inspect supply pressure</strong><small>Compare backend low, mid and high scenarios.</small></span><ChevronRight size={17} /></button>
+        </section>
+      </div>
+      <div className="data-footnote"><Database size={15} /><span>{apiCropData?.crop_name || crop} | Data period: {apiCropData?.target_period || "Not available"} | SPI: {displayNumber(pressure?.spi_score)}</span></div>
     </>
   )
 }

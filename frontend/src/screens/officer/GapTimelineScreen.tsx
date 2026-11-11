@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { FileClock, RefreshCw } from "lucide-react"
 import type { PolicyDecision } from "../../types"
 import { Button, PageHeading } from "../../components/common"
@@ -19,11 +19,20 @@ export function GapTimelineScreen({
 }: {
   crop?: string
   district?: string
-  onRecord: (decision: string, details?: Partial<PolicyDecision>) => void
+  onRecord: (decision: string, details?: Partial<PolicyDecision>) => Promise<void>
   forecastData?: LatestForecastsResponse | null
   isLiveApi?: boolean
 }) {
   const [leadWeeks, setLeadWeeks] = useState(7)
+  const [selectedOption, setSelectedOption] = useState<string | null>(null)
+  const [quantity, setQuantity] = useState("")
+  const [unit, setUnit] = useState("")
+  const [season, setSeason] = useState("")
+  const [rationale, setRationale] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const submittingRef = useRef(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  useEffect(() => { setSelectedOption(null); setSubmitError(null) }, [crop, district, leadWeeks])
   const cropId = cropApiId(crop)
   const { data, loading, error, refetch } = useApiQuery(
     () => fetchGapTimeline(cropId, undefined, leadWeeks),
@@ -44,7 +53,7 @@ export function GapTimelineScreen({
           </Button>
         }
       />
-      <label>
+      <label className="original-lead-control">
         Import lead time (weeks){" "}
         <input
           type="number"
@@ -66,7 +75,7 @@ export function GapTimelineScreen({
       />
       {!loading && !error && timeline && (
         <>
-          <div className="kpi-grid">
+          <div className="deadline-summary original-gap-summary">
             {[
               [
                 "Decision deadline",
@@ -76,29 +85,29 @@ export function GapTimelineScreen({
               ["Best gap", displayNumber(timeline.gap_best_mt, " MT")],
               ["Worst gap", displayNumber(timeline.gap_worst_mt, " MT")],
             ].map(([label, value]) => (
-              <section className="panel" style={{ padding: 20 }} key={label}>
+              <section key={label}>
                 <p>{label}</p>
                 <h2>{value}</h2>
               </section>
             ))}
           </div>
-          <section className="panel large-data-panel">
+          <section className="decision-options">
             <div className="panel-heading">
               <div>
                 <h2>
                   {timeline.recommended_action || "No recommended action"}
                 </h2>
                 <p>
-                  {displayNumber(timeline.days_remaining, " days remaining")} ?
+                  {displayNumber(timeline.days_remaining, " days remaining")} ·
                   Data period: {timeline.target_period || "Not available"}
                 </p>
               </div>
             </div>
-            {options.length === 0 ? (
+            <div className="option-grid">{options.length === 0 ? (
               <p>No options were returned.</p>
             ) : (
               options.map((option: any) => (
-                <div className="attention-item" key={option.id}>
+                <div className={`option-card ${selectedOption === option.id ? "option-card--selected" : ""}`} key={option.id}>
                   <div>
                     <strong>{option.label || option.id}</strong>
                     <p>
@@ -108,22 +117,49 @@ export function GapTimelineScreen({
                           ? "Not feasible"
                           : "Feasibility not available"}
                     </p>
+                    <small>
+                      Lead time: {displayNumber(option.lead_weeks ?? timeline.import_lead_weeks, " weeks")}
+                      {option.capacity_mt != null ? ` · Capacity: ${displayNumber(option.capacity_mt, " MT")}` : ""}
+                    </small>
                   </div>
                   <Button
                     variant="secondary"
                     disabled={option.feasible !== true}
-                    onClick={() =>
-                      onRecord(option.id, {
-                        leadTime: timeline.import_lead_weeks,
-                        notes: `${option.label || option.id}; deadline ${timeline.decision_deadline || "not available"}`,
-                      })
-                    }
+                    onClick={() => {
+                      setSelectedOption(option.id)
+                      setQuantity(""); setUnit(""); setSeason(""); setRationale(""); setSubmitError(null)
+                    }}
                   >
                     Record option
                   </Button>
                 </div>
               ))
             )}
+            </div>
+            {selectedOption && <form onSubmit={async (event) => {
+              event.preventDefault()
+              if (submittingRef.current) return
+              submittingRef.current = true
+              setSubmitting(true); setSubmitError(null)
+              try {
+                await onRecord(selectedOption, { quantity: Number(quantity), unit, season, notes: rationale, leadTime: timeline.import_lead_weeks })
+                setSelectedOption(null)
+              } catch (error) {
+                setSubmitError(error instanceof Error ? error.message : "Submission failed. Check history before retrying.")
+              } finally { submittingRef.current = false; setSubmitting(false) }
+            }} className="panel" style={{ padding: 20 }}>
+              <h3>Review decision: {selectedOption}</h3>
+              <p>Enter the actual decision values. Use zero only when the action has no quantity.</p>
+              <fieldset disabled={submitting} style={{ display: "grid", gap: 12 }}>
+                <label>Season <input aria-label="Decision season" required value={season} onChange={e => setSeason(e.target.value)} /></label>
+                <label>Quantity <input aria-label="Decision quantity" required type="number" min="0" step="any" value={quantity} onChange={e => setQuantity(e.target.value)} /></label>
+                <label>Unit <input aria-label="Decision unit" required value={unit} onChange={e => setUnit(e.target.value)} placeholder="e.g. MT, percent, or not applicable" /></label>
+                <label>Rationale <textarea aria-label="Decision rationale" required value={rationale} onChange={e => setRationale(e.target.value)} /></label>
+                <button type="submit">{submitting ? "Submitting..." : "Submit decision"}</button>
+                <button type="button" onClick={() => setSelectedOption(null)}>Cancel</button>
+              </fieldset>
+              {submitError && <p role="alert">{submitError}</p>}
+            </form>}
             <p>
               Data quality: {data.data_quality || "Not available"} | Run:{" "}
               {data.run_id || "Not available"}
