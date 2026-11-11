@@ -293,7 +293,10 @@ export async function simulateScenarioApi(payload: {
 
 export async function fetchGapTimeline(cropId?: string, season?: string, leadWeeks?: number) {
   const data = await readApi('/api/forecasts/gap-timeline', { crop_id: cropId, season, lead_weeks: leadWeeks })
-  if (!Array.isArray(data.timelines)) throw new Error('Invalid gap timeline response')
+  if (!Array.isArray(data.timelines) || data.timelines.some((timeline: any) =>
+    !timeline || typeof timeline.crop_id !== "string" || typeof timeline.decision_deadline !== "string" ||
+    typeof timeline.import_lead_weeks !== "number" || typeof timeline.days_remaining !== "number" ||
+    !Array.isArray(timeline.options))) throw new Error('Invalid gap timeline response')
   return data
 }
 

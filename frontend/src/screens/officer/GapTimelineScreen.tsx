@@ -98,7 +98,7 @@ export function GapTimelineScreen({
                   {timeline.recommended_action || "No recommended action"}
                 </h2>
                 <p>
-                  {displayNumber(timeline.days_remaining, " days remaining")} ?
+                  {displayNumber(timeline.days_remaining, " days remaining")} ·
                   Data period: {timeline.target_period || "Not available"}
                 </p>
               </div>
@@ -117,6 +117,10 @@ export function GapTimelineScreen({
                           ? "Not feasible"
                           : "Feasibility not available"}
                     </p>
+                    <small>
+                      Lead time: {displayNumber(option.lead_weeks ?? timeline.import_lead_weeks, " weeks")}
+                      {option.capacity_mt != null ? ` · Capacity: ${displayNumber(option.capacity_mt, " MT")}` : ""}
+                    </small>
                   </div>
                   <Button
                     variant="secondary"
