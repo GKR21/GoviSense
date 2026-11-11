@@ -63,7 +63,9 @@ class _FarmerPageState extends State<FarmerPage> {
     super.initState();
     _profileLandAcres = _repo.profile.totalLandAcres;
     _profileIsRainfed = _repo.profile.isRainfed;
-    _profileSoilPh = _repo.profile.soilPh;
+    _profileSoilPh = (_repo.profile.soilPh >= 5.0 && _repo.profile.soilPh <= 8.0)
+        ? _repo.profile.soilPh
+        : 6.5;
     _repo.addListener(_onRepoUpdated);
     _repo.checkBackendConnection();
     _repo.refreshRecommendations();
@@ -79,6 +81,11 @@ class _FarmerPageState extends State<FarmerPage> {
 
   void _onRepoUpdated() {
     if (mounted) {
+      if (_profileSoilPh < 5.0 || _profileSoilPh > 8.0) {
+        _profileSoilPh = (_repo.profile.soilPh >= 5.0 && _repo.profile.soilPh <= 8.0)
+            ? _repo.profile.soilPh
+            : 6.5;
+      }
       if (_repo.crops.isNotEmpty &&
           !_repo.crops.any((c) => c.id == _selectedCropId)) {
         _selectedCropId = _repo.crops.first.id;
@@ -576,6 +583,13 @@ class _FarmerPageState extends State<FarmerPage> {
                       Text(
                         _repo.decPriceSummary,
                         style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       const LocalizedText(
                         'Live wholesale & retail prices across Sri Lankan DECs',
                         style: TextStyle(
@@ -2464,7 +2478,7 @@ class _FarmerPageState extends State<FarmerPage> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: LocalizedText(
-                      '${_profileSoilPh.toStringAsFixed(1)} pH',
+                      '${_profileSoilPh.clamp(5.0, 8.0).toStringAsFixed(1)} pH',
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -2475,13 +2489,13 @@ class _FarmerPageState extends State<FarmerPage> {
                 ],
               ),
               Slider(
-                value: _profileSoilPh,
+                value: _profileSoilPh.clamp(5.0, 8.0),
                 min: 5.0,
                 max: 8.0,
                 divisions: 30,
                 activeColor: AppTheme.primary,
-                label: _profileSoilPh.toStringAsFixed(1),
-                onChanged: (val) => setState(() => _profileSoilPh = val),
+                label: _profileSoilPh.clamp(5.0, 8.0).toStringAsFixed(1),
+                onChanged: (val) => setState(() => _profileSoilPh = val.clamp(5.0, 8.0)),
               ),
               const SizedBox(height: 8),
               // Recalibrate Button
