@@ -4,115 +4,100 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_client.dart';
 import '../models/crop_item.dart';
+import '../models/farmer_alert.dart';
 import '../models/farmer_profile.dart';
-import '../models/planting_report.dart';
 import '../models/market_price_item.dart';
+import '../models/planting_report.dart';
 
 class FarmerApiService {
   FarmerApiService({ApiClient? apiClient}) : _client = apiClient ?? ApiClient();
 
   final ApiClient _client;
 
-  /// Check if the FastAPI backend is running and accessible
   Future<bool> checkHealth() async {
     try {
-      final res = await _client.get('/api/health');
-      return res.statusCode == 200;
+      final response = await _client.get('/api/health');
+      return response.statusCode == 200;
     } catch (_) {
       return false;
     }
   }
 
-  /// Fetches live Top-3 AI recommendations for the farmer's parcel from FastAPI
   Future<List<CropItem>?> getTop3Recommendations(FarmerProfile profile) async {
     try {
-      final queryParams = {
+      final query = <String, dynamic>{
         'farmer_id': profile.farmerId,
+        'district': profile.district,
         'season': 'Maha',
-        'land_ha': profile.landHectares.toStringAsFixed(2),
-        'current_month': '10',
-        'is_rainfed': profile.isRainfed.toString(),
-        'annual_rainfall_mm': profile.isRainfed ? '950.0' : '1100.0',
-        'avg_temp_c': '28.0',
-        'soil_ph': profile.soilPh.toStringAsFixed(1),
-        'zone': 'dry',
+        'current_month': DateTime.now().month,
+        'is_rainfed': profile.isRainfed,
       };
+      if (profile.landHectares > 0) {
+        query['land_ha'] = profile.landHectares;
+      }
+      if (profile.soilPh > 0) {
+        query['soil_ph'] = profile.soilPh;
+      }
 
       final response = await _client.get(
         '/api/farmer/top3',
-        queryParameters: queryParams,
+        queryParameters: query,
       );
+      if (response.statusCode != 200 || response.data == null) return null;
 
-      if (response.statusCode == 200 && response.data != null) {
-        final data = response.data is String
-            ? jsonDecode(response.data)
-            : response.data;
-        final list = data['top3'] as List<dynamic>?;
-        if (list != null && list.isNotEmpty) {
-          return list
-              .map((item) => _mapJsonToCropItem(item as Map<String, dynamic>))
-              .toList();
-        }
-      }
-    } catch (e) {
-      debugPrint('GoviSense API connection failed: $e');
-    }
-    return null;
-  }
-
-  /// Submits actual farmer planting decision to the Closed-Loop Feedback endpoint
-  Future<PlantingReceipt?> submitPlantingReport(PlantingReport report) async {
-    try {
-      final payload = report.toApiPayload();
-      final response = await _client.post(
-        '/api/feedback/planting-report',
-        data: payload,
-      );
-      if (response.statusCode != 200 && response.statusCode != 201) return null;
-      final data = response.data is String
-          ? jsonDecode(response.data)
-          : response.data;
-      return PlantingReceipt.fromJson(Map<String, dynamic>.from(data as Map));
-    } catch (_) {
-      // An HTTP 200 error body or malformed receipt is not acceptance.
+      final data = _asMap(response.data);
+      final rawItems = data['top3'];
+      if (rawItems is! List) return null;
+      return rawItems
+          .whereType<Map>()
+          .map((item) => _mapJsonToCropItem(Map<String, dynamic>.from(item)))
+          .toList();
+    } catch (error) {
+      debugPrint('GoviSense recommendations API failed: $error');
       return null;
     }
   }
 
-  /// Fetches live wholesale & retail market price bulletin from FastAPI backend (/api/market-prices)
-  /// Returns null when the live backend is unavailable.
-  Future<List<MarketPriceItem>?> getMarketPrices({String? category}) async {
+  Future<PlantingReceipt?> submitPlantingReport(PlantingReport report) async {
     try {
-      final Map<String, dynamic> query = {};
-      if (category != null && category.isNotEmpty && category != 'all') {
-        query['category'] = category;
-      }
-      final response = await _client.get(
-        '/api/market-prices',
-        queryParameters: query.isNotEmpty ? query : null,
+      final response = await _client.post(
+        '/api/feedback/planting-report',
+        data: report.toApiPayload(),
       );
-
-      if (response.statusCode == 200 && response.data != null) {
-        final data = response.data is String
-            ? jsonDecode(response.data)
-            : response.data;
-        final list = data['prices'] as List<dynamic>?;
-        if (list != null && list.isNotEmpty) {
-          return list
-              .map(
-                (item) =>
-                    MarketPriceItem.fromJson(item as Map<String, dynamic>),
-              )
-              .toList();
-        }
-      }
-    } catch (e) {
-      debugPrint('Market prices API connection failed: $e');
+      if (response.statusCode != 200 && response.statusCode != 201) return null;
+      return PlantingReceipt.fromJson(_asMap(response.data));
+    } catch (error) {
+      debugPrint('Planting report API failed: $error');
+      return null;
     }
-    return null;
   }
 
-  /// Acknowledges an alert on behalf of the farmer (/api/alerts/{id}/acknowledge)
+  Future<List<MarketPriceItem>?> getMarketPrices({String? category}) async {
+    try {
+      final query = category != null && category != 'all'
+          ? <String, dynamic>{'category': category}
+          : null;
+      final response = await _client.get(
+        '/api/market-prices',
+        queryParameters: query,
+      );
+      if (response.statusCode != 200 || response.data == null) return null;
+
+      final data = _asMap(response.data);
+      final rawItems = data['prices'];
+      if (rawItems is! List) return null;
+      return rawItems
+          .whereType<Map>()
+          .map(
+            (item) => MarketPriceItem.fromJson(Map<String, dynamic>.from(item)),
+          )
+          .toList();
+    } catch (error) {
+      debugPrint('Market prices API failed: $error');
+      return null;
+    }
+  }
+
   Future<bool> acknowledgeAlert(String alertId, String farmerId) async {
     try {
       final response = await _client.post(
@@ -120,13 +105,12 @@ class FarmerApiService {
         data: {'farmer_id': farmerId},
       );
       return response.statusCode == 200;
-    } catch (e) {
-      debugPrint('Acknowledge alert API request failed: $e');
+    } catch (error) {
+      debugPrint('Acknowledge alert API failed: $error');
       return false;
     }
   }
 
-  /// Sends farmer inquiry to the agricultural extension officer (/api/alerts/{id}/ask)
   Future<bool> askOfficer(
     String alertId,
     String farmerId,
@@ -138,50 +122,71 @@ class FarmerApiService {
         data: {'farmer_id': farmerId, 'question': question},
       );
       return response.statusCode == 200;
-    } catch (e) {
-      debugPrint('Ask officer API request failed: $e');
+    } catch (error) {
+      debugPrint('Ask officer API failed: $error');
       return false;
     }
   }
 
-  CropItem _mapJsonToCropItem(Map<String, dynamic> json) {
-    final rawCropId = (json['crop_id'] as String? ?? 'unknown').trim().toLowerCase();
-    final fitScore = (json['fit_score'] as num?)?.round() ?? 0;
-    final spiBand = (json['spi_band_at_harvest'] as String? ?? 'Unknown')
-        .toLowerCase();
-    final spiRatio = (json['spi_ratio_at_harvest'] as num?)?.toDouble();
-    final netProfit = json['expected_net_profit_per_acre'] as Map<String, dynamic>?;
-    final priceRange = json['profit_range_rs_kg'] as Map<String, dynamic>?;
-    final p10PerAcre = (netProfit?['p10_rs_per_acre'] as num?)?.round();
-    final p90PerAcre = (netProfit?['p90_rs_per_acre'] as num?)?.round();
-    final p10Kg = (priceRange?['p10_rs_kg'] as num?)?.toDouble();
-    final p90Kg = (priceRange?['p90_rs_kg'] as num?)?.toDouble();
-    final waterMm = (json['water_need_mm_season'] as num?)?.toInt() ?? 500;
-    final durationMonths = (json['duration_months'] as num?)?.round();
-    final yieldMtHa = (json['expected_yield_mt_ha'] as num?)?.toDouble();
-    final costPerAcre = (json['estimated_cost_per_acre_rs'] as num?)?.round();
-    final plantingWindow = json['planting_window'] as String?;
-    final harvestPeriod = json['harvest_period'] as String?;
-    final sourceNote = (json['source_note'] as String?)?.trim();
-    final imageUrl = (json['image_url'] as String?)?.trim();
-    final isTargetFull = json['is_target_full'] == true;
-    final reasons =
-        (json['suitability_reasons'] as List<dynamic>?)
-            ?.map((e) => e.toString())
-            .where((e) => e.trim().isNotEmpty)
-            .toList() ??
-        [];
+  Future<List<FarmerAlert>?> getAlerts() async {
+    try {
+      final response = await _client.get('/api/alerts');
+      if (response.statusCode != 200 || response.data == null) return null;
 
-    MarketRisk risk = MarketRisk.balanced;
-    if (spiBand.contains('shortage')) {
-      risk = MarketRisk.shortage;
-    } else if (spiBand.contains('glut') || spiBand.contains('oversupply')) {
-      risk = MarketRisk.oversupply;
+      final data = _asMap(response.data);
+      final rawItems = data['alerts'];
+      if (rawItems is! List) return null;
+      return rawItems.whereType<Map>().map((item) {
+        final map = Map<String, dynamic>.from(item);
+        final type = (map['type'] ?? '').toString().toLowerCase();
+        final alertType = type.contains('weather')
+            ? AlertType.weather
+            : type.contains('market') || type.contains('glut')
+            ? AlertType.market
+            : AlertType.officer;
+        final title = map['title']?.toString() ?? '';
+        final message = map['message']?.toString() ?? '';
+        return FarmerAlert(
+          id: map['id']?.toString() ?? '',
+          type: alertType,
+          titleEn: title,
+          titleSi: map['title_si']?.toString() ?? title,
+          titleTa: map['title_ta']?.toString() ?? title,
+          messageEn: message,
+          messageSi: map['message_si']?.toString() ?? message,
+          messageTa: map['message_ta']?.toString() ?? message,
+          timestamp: map['created_at']?.toString() ?? '',
+          isRead: map['is_read'] == true,
+          isAcknowledged: map['acknowledged'] == true,
+        );
+      }).toList();
+    } catch (error) {
+      debugPrint('Alerts API failed: $error');
+      return null;
+    }
+  }
+
+  CropItem _mapJsonToCropItem(Map<String, dynamic> json) {
+    final cropId = _string(json['crop_id']);
+    if (cropId.isEmpty) {
+      throw const FormatException('Recommendation has no crop id');
     }
 
-    int waterDrops = 2;
-    if (waterMm <= 400) waterDrops = 1;
-    if (waterMm >= 600) waterDrops = 3;
+    final priceRange = json['profit_range_rs_kg'] is Map
+        ? Map<String, dynamic>.from(json['profit_range_rs_kg'] as Map)
+        : const <String, dynamic>{};
+    final p10 = _number(priceRange['p10_rs_kg']);
+    final p90 = _number(priceRange['p90_rs_kg']);
+    final fitScore = _number(json['fit_score']);
+    final spiRatio = _number(json['spi_ratio_at_harvest']);
+    final waterMm = _number(json['water_need_mm_season']);
+    final durationDays = _number(json['growing_duration_days']);
+    final cropName = _string(json['crop_name'], fallback: cropId);
+    final riskText = _string(json['spi_band_at_harvest']);
+    final reason = (json['suitability_reasons'] as List?)
+        ?.map((item) => item.toString())
+        .join(' ');
+    final expectedYield = _number(json['expected_yield_mt_ha']);
 
     final suitabilityTip = reasons.isNotEmpty
         ? reasons.take(2).join(' · ')
