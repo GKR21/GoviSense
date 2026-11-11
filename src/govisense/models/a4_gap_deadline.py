@@ -99,8 +99,15 @@ def compute_gap_and_deadline(
 
     cap = storage_capacity_mt if storage_capacity_mt is not None else getattr(settings, "onion_storage_capacity_mt", 15000.0)
 
+    # M4 FIX: Read policy gap thresholds from CropConfig (crop-specific, not a shared magic number).
+    # Defaults: surplus_store_threshold_mt=150 MT, shortage_import_threshold_mt=200 MT
+    # Source: Proposal Section 6; calibrated to pilot hub monthly volumes (config.py CropConfig).
+    crop_cfg = settings.crops.get(crop)
+    surplus_threshold = crop_cfg.surplus_store_threshold_mt if crop_cfg else 150.0
+    shortage_threshold = crop_cfg.shortage_import_threshold_mt if crop_cfg else 200.0
+
     # Policy option classification
-    if mid_gap < -150.0:
+    if mid_gap < -surplus_threshold:
         # Clear surplus
         if abs(mid_gap) <= cap:
             policy_option = "STORE"
@@ -108,7 +115,7 @@ def compute_gap_and_deadline(
         else:
             policy_option = "DELAY"
             action_summary = "Storage capacity exhausted: Defer imports and distribute surplus to regional hubs."
-    elif mid_gap > 200.0:
+    elif mid_gap > shortage_threshold:
         # Significant shortage
         if days_until_deadline <= 14:
             policy_option = "IMPORT_NOW"

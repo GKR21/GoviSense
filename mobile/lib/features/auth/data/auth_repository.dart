@@ -75,7 +75,7 @@ class AuthRepository extends ChangeNotifier {
     required String district,
     String? officerCode,
   }) async {
-    final response = await _dio.post<Map<String, dynamic>>(
+    final response = await _client.post<Map<String, dynamic>>(
       '/api/auth/register',
       data: {
         'username': username.trim(),
