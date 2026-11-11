@@ -35,7 +35,14 @@ class CropDetailPage extends StatelessWidget {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.network(crop.imageUrl, fit: BoxFit.cover),
+                  Image.network(
+                    crop.imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const ColoredBox(
+                      color: AppTheme.primaryTint,
+                      child: Icon(Icons.image_not_supported_outlined),
+                    ),
+                  ),
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(

@@ -11,23 +11,14 @@ import {
   fetchAlerts,
   submitPlantingReportApi,
   submitHarvestReportApi,
-  API_BASE_URL,
   fetchServerIdentity,
   type ServerIdentity,
 } from "../api"
 
-function createFarmerProfile(): FarmerProfileData {
-  return {
-    farmerId: "",
-    name: "",
-    district: "",
-    division: "",
-    totalLandAcres: 0,
-    primaryCropInterest: "",
-    pseudonymousConsent: false,
-    dataVersion: "",
-    lastSyncTime: "",
-  }
+// Identity is populated only from an authenticated backend response.
+export const initialFarmerProfile: FarmerProfileData = {
+  farmerId: "", name: "", district: "", division: "", totalLandAcres: 0,
+  primaryCropInterest: "", pseudonymousConsent: false, dataVersion: "", lastSyncTime: "",
 }
 
 const CROP_IMAGE_MAP: Record<string, { image: string; photoCredit: string; scientificName: string }> = {
@@ -201,26 +192,21 @@ export class FarmerService {
     })
   }
 
-  async getRecommendedCrops(district = "", landSize?: number): Promise<CropItem[]> {
-    const requestedLand = landSize ?? this.profile.totalLandAcres
-    if (requestedLand <= 0) return []
+  async getRecommendedCrops(district = this.profile.district, landSize = this.profile.totalLandAcres): Promise<CropItem[]> {
     try {
       const profile = await this.getProfile()
       if (!profile.farmerId) return []
       const top3Res = await fetchFarmerTop3({
-        farmer_id: this.profile.farmerId,
-        district: district || profile.district,
-        land_ha: requestedLand * 0.404686,
-
+        farmer_id: profile.farmerId || undefined,
+        district: district || profile.district || undefined,
+        land_ha: landSize > 0 ? landSize * 0.404686 : undefined,
       })
-
-      if (top3Res && Array.isArray(top3Res.top3) && top3Res.top3.length > 0) {
-        return top3Res.top3.map((c: any) => mapApiCropToCropItem(c, requestedLand))
+      if (top3Res && Array.isArray(top3Res.top3)) {
+        return top3Res.top3.filter((crop: any) => typeof crop?.crop_id === "string" && crop.crop_id.trim()).map((crop: any) => mapApiCropToCropItem(crop, landSize))
       }
     } catch (err) {
       console.warn("Could not load backend crop recommendations", err)
     }
-
     return []
   }
 
@@ -310,28 +296,26 @@ export class FarmerService {
     const rawCropId = reportData.cropId.replace(/^crop-/, "")
     if (!rawCropId) throw new Error("Select a crop returned by the backend.")
     const areaHa = Number((reportData.areaAcres * 0.404686).toFixed(2))
-
     const response = await submitPlantingReportApi({
-      crop_id: rawCropId, season: "Maha 2025/2026", planned_area_ha: areaHa,
-      actual_area_ha: areaHa, consent_given: profile.pseudonymousConsent,
-      pseudonymous_id: profile.farmerId, planting_date: reportData.plantingDate,
-      district: profile.district, irrigation_type: reportData.irrigationType,
-      notes: reportData.seedSource,
+      crop_id: rawCropId,
+      season: "Maha 2025/2026",
+      planned_area_ha: areaHa,
+      actual_area_ha: areaHa,
+      consent_given: this.profile.pseudonymousConsent,
+      pseudonymous_id: profile.farmerId,
+      planting_date: reportData.plantingDate,
+      district: profile.district,
+      irrigation_type: reportData.irrigationType.toLowerCase().replace(/ /g, "_").replace("-", "_"),
+      notes: `Seed source: ${reportData.seedSource}`,
     })
-
-    const cropNameEn = rawCropId === "big_onion" ? "Big Onion" : rawCropId === "chilli" ? "Chilli" : rawCropId.replace(/_/g, " ")
-
+    const cropName = rawCropId.replace(/_/g, " ")
     const report: PlantingReportData = {
       id: response.report_id,
       receiptHash: response.receipt_hash,
       status: "verified",
-      cropId: reportData.cropId,
-      cropName: {
-        en: cropNameEn,
-        si: rawCropId.includes("onion") ? "ලොකු ලූනු" : rawCropId.includes("chilli") ? "අමු මිරිස්" : "මුං ඇට",
-        ta: rawCropId.includes("onion") ? "பெரிய வெங்காயம்" : rawCropId.includes("chilli") ? "பச்சை மிளகாய்" : "பச்சைப் பயறு",
-      },
-      district: this.profile.district,
+      cropId: rawCropId,
+      cropName: { en: cropName, si: cropName, ta: cropName },
+      district: profile.district,
       areaAcres: reportData.areaAcres,
       plantingDate: reportData.plantingDate,
       irrigationType: reportData.irrigationType,
@@ -366,7 +350,7 @@ export class FarmerService {
         quantity_stored_kg: harvestData.quantityStoredKg || 0,
         sale_price_rs_kg: harvestData.salePriceRsKg,
         sale_channel: harvestData.saleChannel,
-        pseudonymous_id: this.profile.farmerId,
+        pseudonymous_id: profile.farmerId,
       })
       if (res && res.harvest_id) {
         return { success: true, harvestId: res.harvest_id }

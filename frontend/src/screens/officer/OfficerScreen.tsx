@@ -47,6 +47,8 @@ import {
   SliderField,
   RiskBadge,
   ConfidenceBadge,
+  DemoRibbon,
+  WorkspaceSwitcher,
   ScreenStateView,
 } from "../../components/common"
 import { SimulationScreen } from "./SimulationScreen"
@@ -108,28 +110,26 @@ export function OfficerScreen({
   const [selectedSeason, setSelectedSeason] = useState("Maha 2026")
   const [scenario, setScenario] = useState<"Low" | "Middle" | "High">("Middle")
   const [saved, setSaved] = useState(false)
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => getStoredAuthUser())
-  const [page, setPage] = useState<OfficerPage>(
-    currentUser && (initialRole === "Admin" ? currentUser.role === "Admin" : currentUser.role === "Officer" || currentUser.role === "Admin")
-      ? (initialRole === "Admin" ? "Data sources" : initialPage)
-      : "Login",
-  )
+  const [page, setPage] = useState<OfficerPage>(initialRole === "Admin" ? "Data sources" : initialPage)
   const [screenState, setScreenState] = useState<ScreenState>("ready")
   const [lastReport, setLastReport] = useState<GroundReport | null>(null)
   const [decision, setDecision] = useState("")
   const [decisionError, setDecisionError] = useState<string | null>(null)
   const [decisionReceipt, setDecisionReceipt] = useState<Awaited<ReturnType<typeof logDecisionActionApi>> | null>(null)
+  const { data: forecastData, loading: forecastLoading, error: forecastError, refetch: reloadForecasts } = useLatestForecasts()
+  const isLiveApi = forecastData?.isLive === true
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => getStoredAuthUser())
+  const [simulatedMetrics, setSimulatedMetrics] = useState<any>(null)
   const [alertsOpen, setAlertsOpen] = useState(false)
   const [officerNoteText, setOfficerNoteText] = useState<Record<string, string>>({})
   const [noteStatus, setNoteStatus] = useState<Record<string, string>>({})
   const { data: alertResponse, refetch: reloadAlerts } = useAlerts()
   const alertsData = Array.isArray(alertResponse) ? alertResponse : alertResponse?.alerts
+
   const cropApiKey = cropApiId(selectedCrop)
-  const { data: forecastData, loading: forecastLoading, error: forecastError, refetch: reloadForecasts } = useLatestForecasts(cropApiKey)
-  const isLiveApi = forecastData?.isLive === true
-  const currentApiCropData: CropForecastData | undefined = forecastData?.crops[cropApiKey]
-  const [confidenceEvaluation, setConfidenceEvaluation] = useState<Awaited<ReturnType<typeof fetchConfidenceBadge>> | null>(null)
-  const [confidenceError, setConfidenceError] = useState<string | null>(null)
+  const currentApiCropData: CropForecastData | undefined = forecastData?.crops?.[cropApiKey]
+  const changed = area !== currentProfile.baselineArea || yieldValue !== currentProfile.baselineYield
+
   useEffect(() => {
     let active = true
     setConfidenceEvaluation(null); setConfidenceError(null)
@@ -150,16 +150,14 @@ export function OfficerScreen({
       }
       const receipt = await logDecisionActionApi({
         crop_id: cropApiKey,
-        season: details.season.trim(),
+        season: "Maha 2025/2026",
         officer_id: identity.officerId,
-        action_type: value,
-        quantity: details.quantity,
-        unit: details.unit.trim(),
-        rationale: details.notes.trim(),
-        assumptions: {
-          district: selectedDistrict,
-          ...(details.leadTime != null ? { lead_time_weeks: details.leadTime } : {}),
-        },
+        action_type: value.toUpperCase().replace(/\s+/g, "_"),
+        quantity: 1200,
+        unit: "MT",
+        rationale: details?.impactEstimate || details?.notes || `Policy directive: ${value}`,
+        assumptions: { district: selectedDistrict, notes: details?.notes },
+        notes: details?.notes,
       })
       setDecision(value)
       setDecisionReceipt(receipt)
@@ -173,6 +171,7 @@ export function OfficerScreen({
 
   return (
     <div className="officer-app">
+      <DemoRibbon isLive={isLiveApi} label={forecastLoading ? "Connecting to backend" : isLiveApi ? "Backend connected" : "Backend data unavailable"} />
       <aside className="sidebar">
         <div className="brand">
           <div className="brand__mark">

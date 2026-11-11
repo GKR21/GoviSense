@@ -121,7 +121,7 @@ class _AuthPageState extends State<AuthPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      LocalizedText(
                         _signUp ? 'Create your account' : 'Welcome back',
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
@@ -257,7 +257,7 @@ class _AuthPageState extends State<AuthPage> {
                               ? Icons.person_add_alt_1_rounded
                               : Icons.login_rounded,
                         ),
-                        label: Text(
+                        label: LocalizedText(
                           _loading
                               ? (_signUp
                                     ? 'Creating account...'

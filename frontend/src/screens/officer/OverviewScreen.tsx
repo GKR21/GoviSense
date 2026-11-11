@@ -49,9 +49,13 @@ export function OverviewScreen({
           </Button>
         }
       />
-
       <div className="kpi-grid">
-        {cards.map(([label, value], index) => <KpiTile key={label} label={label} value={value} meta={apiCropData?.target_period || "Period not available"} icon={[Sprout, BarChart3, ArrowUpCircle, CircleDollarSign][index]} />)}
+        {cards.map(([label, value]) => (
+          <section className="panel" style={{ padding: 20 }} key={label}>
+            <p>{label}</p>
+            <h2>{value}</h2>
+          </section>
+        ))}
       </div>
       <div className="overview-grid">
         <section className="panel heat-panel">

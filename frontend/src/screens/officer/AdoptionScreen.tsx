@@ -25,9 +25,12 @@ export function AdoptionScreen({
   const simulation = useAdoptionSimulation(cropId)
   const reports = useGroundReports(cropId)
   const scenarios = simulation.data?.scenarios || []
-  const groundReports = reports.data?.ground_reports || []
-  const refresh = () => { summary.refetch(); simulation.refetch(); reports.refetch() }
-
+  const groundReports: GroundReport[] = reports.data?.ground_reports || []
+  const refresh = () => {
+    summary.refetch()
+    simulation.refetch()
+    reports.refetch()
+  }
   return (
     <>
       <PageHeading

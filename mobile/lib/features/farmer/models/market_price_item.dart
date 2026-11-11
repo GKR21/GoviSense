@@ -56,22 +56,36 @@ class MarketPriceItem {
   }
 
   factory MarketPriceItem.fromJson(Map<String, dynamic> json) {
+    final crop = json['crop'] ?? json['crop_name'];
+    final market = json['market'] ?? json['market_center'];
+    final wholesale = json['wholesale_price_rs_kg'] ?? json['wholesale_val'];
+    final retail = json['retail_price_rs_kg'] ?? json['retail_val'];
     return MarketPriceItem(
-      cropEn: json['crop_en'] as String? ?? json['crop_name'] as String? ?? '',
-      cropSi: json['crop_si'] as String? ?? json['crop_name'] as String? ?? '',
-      cropTa: json['crop_ta'] as String? ?? json['crop_name'] as String? ?? '',
-      category: (json['category'] as String? ?? 'vegetable').toLowerCase(),
-      wholesalePrice: json['wholesale_price'] as String? ?? 'Rs ${(json['wholesale_val'] ?? 0)} / kg',
-      retailPrice: json['retail_price'] as String? ?? 'Rs ${(json['retail_val'] ?? 0)} / kg',
-      economicCenterEn: json['economic_center_en'] as String? ?? json['market_center'] as String? ?? '',
-      economicCenterSi: json['economic_center_si'] as String? ?? json['market_center'] as String? ?? '',
-      economicCenterTa: json['economic_center_ta'] as String? ?? json['market_center'] as String? ?? '',
-      trendPct: json['trend_pct'] as String? ?? '±0% (Stable)',
+      cropEn: json['crop_en'] as String? ?? crop?.toString() ?? '',
+      cropSi: json['crop_si'] as String? ?? crop?.toString() ?? '',
+      cropTa: json['crop_ta'] as String? ?? crop?.toString() ?? '',
+      category: (json['category'] as String? ?? '').toLowerCase(),
+      wholesalePrice: _formatPrice(wholesale),
+      retailPrice: _formatPrice(retail),
+      economicCenterEn:
+          json['economic_center_en'] as String? ?? market?.toString() ?? '',
+      economicCenterSi:
+          json['economic_center_si'] as String? ?? market?.toString() ?? '',
+      economicCenterTa:
+          json['economic_center_ta'] as String? ?? market?.toString() ?? '',
+      trendPct: json['trend_pct'] as String? ?? '',
       isUp: json['is_up'] as bool? ?? false,
-      isStable: json['is_stable'] as bool? ?? true,
-      source: json['source'] as String? ?? 'CBSL/HARTI',
-      priceDate: json['price_date'] as String? ?? '',
+      isStable: json['is_stable'] as bool? ?? false,
+      source:
+          json['source'] as String? ?? json['data_quality'] as String? ?? '',
+      priceDate:
+          json['price_date'] as String? ?? json['date']?.toString() ?? '',
     );
+  }
+
+  static String _formatPrice(dynamic value) {
+    if (value is num) return 'Rs ${value.toStringAsFixed(2)} / kg';
+    return value?.toString() ?? '';
   }
 
   Map<String, dynamic> toJson() {
@@ -93,4 +107,3 @@ class MarketPriceItem {
     };
   }
 }
-

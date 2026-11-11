@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/foundation.dart';
 
 import '../../auth/data/auth_repository.dart';
@@ -7,6 +5,7 @@ import '../models/crop_item.dart';
 import '../models/planting_report.dart';
 import '../models/farmer_alert.dart';
 import '../models/farmer_profile.dart';
+import '../models/market_price_item.dart';
 import '../services/farmer_api_service.dart';
 
 class FarmerRepository extends ChangeNotifier {
@@ -24,6 +23,7 @@ class FarmerRepository extends ChangeNotifier {
   late List<CropItem> _crops;
   late List<PlantingReport> _reports;
   late List<FarmerAlert> _alerts;
+  late List<MarketPriceItem> _marketPrices;
   late FarmerProfile _profile;
 
   bool _isLoadingApi = false;
@@ -32,6 +32,7 @@ class FarmerRepository extends ChangeNotifier {
   List<CropItem> get crops => List.unmodifiable(_crops);
   List<PlantingReport> get reports => List.unmodifiable(_reports);
   List<FarmerAlert> get alerts => List.unmodifiable(_alerts);
+  List<MarketPriceItem> get marketPrices => List.unmodifiable(_marketPrices);
   FarmerProfile get profile => _profile;
   bool get isLoadingApi => _isLoadingApi;
   bool get isLiveConnected => _isLiveConnected;
@@ -40,6 +41,19 @@ class FarmerRepository extends ChangeNotifier {
       _reports.where((r) => r.status == 'pending').toList();
 
   int get unreadAlertsCount => _alerts.where((a) => !a.isRead).length;
+
+  String get decPriceSummary {
+    if (_marketPrices.isNotEmpty) {
+      final p1 = _marketPrices[0];
+      final part1 = '${p1.economicCenterEn}: ${p1.cropEn} ${p1.wholesalePrice}';
+      if (_marketPrices.length > 1) {
+        final p2 = _marketPrices[1];
+        return '$part1 · ${p2.cropEn} ${p2.wholesalePrice}';
+      }
+      return part1;
+    }
+    return 'Live market prices unavailable';
+  }
 
   void _initData() {
     final user = AuthRepository.instance;
@@ -56,10 +70,68 @@ class FarmerRepository extends ChangeNotifier {
       farmerId: user.username ?? '',
       name: user.name ?? '',
       district: user.district ?? '',
+      totalLandAcres: 0,
     );
     _crops = <CropItem>[];
     _reports = <PlantingReport>[];
     _alerts = <FarmerAlert>[];
+    _marketPrices = <MarketPriceItem>[];
+  }
+
+  /// Synchronize authenticated user profile and trigger live telemetry refresh
+  void syncWithAuthUser({
+    required String username,
+    String? fullName,
+    String? district,
+    String? pseudonymousId,
+    double? totalLandAcres,
+  }) {
+    final effName = (fullName != null && fullName.isNotEmpty)
+        ? fullName
+        : (username.isNotEmpty ? username : _profile.name);
+    final effDist = (district != null && district.isNotEmpty)
+        ? district
+        : _profile.district;
+    _profile = _profile.copyWith(
+      farmerId: pseudonymousId ?? _profile.farmerId,
+      name: effName,
+      district: effDist,
+      division: _profile.division,
+      totalLandAcres: totalLandAcres ?? _profile.totalLandAcres,
+      lastSyncTime: 'Just now',
+    );
+    notifyListeners();
+    refreshRecommendations();
+    refreshAlerts();
+    refreshMarketPrices();
+  }
+
+  /// Reset to clean guest state on logout
+  void resetToGuest() {
+    _initData();
+    notifyListeners();
+  }
+
+  /// Refreshes market prices from live API
+  Future<void> refreshMarketPrices() async {
+    try {
+      final prices = await _apiService.getMarketPrices();
+      if (prices != null && prices.isNotEmpty) {
+        _marketPrices = prices;
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  /// Refreshes alerts from live API
+  Future<void> refreshAlerts() async {
+    try {
+      final liveAlerts = await _apiService.getAlerts();
+      if (liveAlerts != null && liveAlerts.isNotEmpty) {
+        _alerts = liveAlerts;
+        notifyListeners();
+      }
+    } catch (_) {}
   }
 
   /// Updates farmer profile parcel conditions and recalibrates recommendations
@@ -118,6 +190,49 @@ class FarmerRepository extends ChangeNotifier {
     return ok;
   }
 
+  static ({String en, String si, String ta}) _cropNamesForId(String cropId) {
+    final normalized = cropId.toLowerCase();
+    if (normalized == 'crop-bigonion' || normalized == 'big_onion') {
+      return (en: 'Big Onion', si: 'ලොකු ලූණු', ta: 'பெரிய வெங்காயம்');
+    }
+    if (normalized == 'crop-chilli' ||
+        normalized == 'chilli' ||
+        normalized == 'chilli_green') {
+      return (en: 'Green Chilli', si: 'අමු මිරිස්', ta: 'பச்சை மிளகாய்');
+    }
+    if (normalized == 'tomato') {
+      return (en: 'Tomato', si: 'තක්කාලි', ta: 'தக்காளி');
+    }
+    if (normalized == 'brinjal') {
+      return (en: 'Brinjal (Eggplant)', si: 'වම්බටු', ta: 'கத்தரிக்காய்');
+    }
+    if (normalized == 'bitter_gourd') {
+      return (en: 'Bitter Gourd', si: 'කරවිල', ta: 'பாகற்காய்');
+    }
+    if (normalized == 'snake_gourd') {
+      return (en: 'Snake Gourd', si: 'පතෝල', ta: 'புடலங்காய்');
+    }
+    if (normalized == 'long_bean') {
+      return (en: 'Long Bean', si: 'මෑකරල්', ta: 'பயத்தங்காய்');
+    }
+    if (normalized == 'cowpea') {
+      return (en: 'Cowpea', si: 'කව්පි', ta: 'கௌபீ');
+    }
+    if (normalized == 'sesame') {
+      return (en: 'Sesame', si: 'තල', ta: 'எள்');
+    }
+    if (normalized == 'mung_bean' ||
+        normalized == 'green_gram' ||
+        normalized == 'crop-greengram') {
+      return (en: 'Mung Bean (Green Gram)', si: 'මුං ඇට', ta: 'பாசிப்பயறு');
+    }
+    if (normalized.contains('maize')) {
+      return (en: 'Maize', si: 'බඩ ඉරිඟු', ta: 'சோளம்');
+    }
+    final fallback = cropId.replaceFirst('crop-', '').replaceAll('_', ' ');
+    return (en: fallback, si: fallback, ta: fallback);
+  }
+
   /// Submits planting report.
   /// If submission to backend fails or is offline, the report is saved as "pending"
   /// for automatic background retry and the farmer is explicitly notified of offline status.
@@ -132,17 +247,10 @@ class FarmerRepository extends ChangeNotifier {
     String? saleChannel,
     bool consentGiven = true,
   }) async {
-    if (_crops.isEmpty) {
-      throw StateError(
-        'Cannot submit a planting report without live crop data',
-      );
-    }
-    final crop = _crops.firstWhere(
-      (c) => c.id == cropId,
-      orElse: () => _crops.first,
-    );
-    final rng = Random();
-    final hexCode = rng.nextInt(0xFFFFFF).toRadixString(16).padLeft(6, '0');
+    final matchedCrop = _crops.where((c) => c.id == cropId).firstOrNull;
+    final names = matchedCrop != null
+        ? (en: matchedCrop.nameEn, si: matchedCrop.nameSi, ta: matchedCrop.nameTa)
+        : _cropNamesForId(cropId);
     final localId =
         'LOCAL-${DateTime.now().microsecondsSinceEpoch}-${++_localReportSequence}';
 
@@ -150,17 +258,16 @@ class FarmerRepository extends ChangeNotifier {
     PlantingReport report = PlantingReport(
       id: localId,
       cropId: cropId,
-      cropNameEn: crop.nameEn,
-      cropNameSi: crop.nameSi,
-      cropNameTa: crop.nameTa,
+      cropNameEn: names.en,
+      cropNameSi: names.si,
+      cropNameTa: names.ta,
       district: _profile.district,
       areaAcres: areaAcres,
       plantingDate: plantingDate,
       irrigationType: irrigationType,
       seedSource: seedSource,
       timestamp: DateTime.now().toString().substring(0, 16),
-      receiptHash:
-          '0x$hexCode...${rng.nextInt(0xFFFF).toRadixString(16).toUpperCase()}',
+      receiptHash: '',
       status: 'pending',
       harvestOutcomeMt: harvestOutcomeMt,
       salePriceRsKg: salePriceRsKg,
@@ -195,9 +302,9 @@ class FarmerRepository extends ChangeNotifier {
         FarmerAlert(
           id: 'alert-${DateTime.now().millisecondsSinceEpoch}',
           type: AlertType.success,
-          titleEn: 'Planting Declaration Confirmed (${crop.nameEn})',
-          titleSi: 'වගා වාර්තාව තහවුරු විය (${crop.nameSi})',
-          titleTa: 'நடவு அறிக்கை உறுதிப்படுத்தப்பட்டது (${crop.nameTa})',
+          titleEn: 'Planting Declaration Confirmed (${names.en})',
+          titleSi: 'වගා වාර්තාව තහවුරු විය (${names.si})',
+          titleTa: 'நடவு அறிக்கை உறுதிப்படுத்தப்பட்டது (${names.ta})',
           messageEn:
               'Successfully submitted $areaAcres acres for ${report.season}. Receipt ID: ${report.id}. Telemetry synced with ${_profile.district} Agrarian Ledger.',
           messageSi:
@@ -218,9 +325,9 @@ class FarmerRepository extends ChangeNotifier {
         FarmerAlert(
           id: 'alert-pending-${DateTime.now().millisecondsSinceEpoch}',
           type: AlertType.market,
-          titleEn: 'Submission Pending Sync (${crop.nameEn})',
-          titleSi: 'වාර්තාව සමමුහුර්ත වීම පොරොත්තුයි (${crop.nameSi})',
-          titleTa: 'அறிக்கை ஒத்திசைவு நிலுவையில் உள்ளது (${crop.nameTa})',
+          titleEn: 'Submission Pending Sync (${names.en})',
+          titleSi: 'වාර්තාව සමමුහුර්ත වීම පොරොත්තුයි (${names.si})',
+          titleTa: 'அறிக்கை ஒத்திசைவு நிலுவையில் உள்ளது (${names.ta})',
           messageEn:
               'Unable to reach ${_profile.district} Agrarian Ledger. Report ${report.id} kept pending in this app session. Retry when connected; durable offline saving is not available yet.',
           messageSi:

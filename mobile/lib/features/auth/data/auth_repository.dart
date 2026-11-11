@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../farmer/data/farmer_repository.dart';
 
 class AuthRepository extends ChangeNotifier {
   AuthRepository({Dio? dio, FlutterSecureStorage? storage})
@@ -37,11 +38,13 @@ class AuthRepository extends ChangeNotifier {
   String? _username;
   String? _name;
   String? _district;
+  String? _pseudonymousId;
   String? get accessToken => _accessToken;
   String? get role => _role;
   String? get username => _username;
   String? get name => _name;
   String? get district => _district;
+  String? get pseudonymousId => _pseudonymousId;
   bool initialized = false;
   Timer? _timer;
   bool get authenticated => accessToken != null && role != null;
@@ -129,12 +132,29 @@ class AuthRepository extends ChangeNotifier {
     }
     _accessToken = token;
     _role = verifiedRole;
-    _username = claims['sub']?.toString();
-    final claimName = claims['name']?.toString();
-    _name = (claimName == null || claimName.isEmpty)
-        ? claims['sub']?.toString()
-        : claimName;
-    _district = claims['district']?.toString();
+    _username = profile['username']?.toString() ?? claims['sub']?.toString();
+    final profileName =
+        profile['full_name']?.toString() ?? profile['name']?.toString();
+    _name = (profileName != null && profileName.isNotEmpty)
+        ? profileName
+        : (_username ?? 'Farmer');
+    _district =
+        profile['district']?.toString() ??
+        claims['district']?.toString() ??
+        'Anuradhapura';
+    _pseudonymousId =
+        profile['pseudonymous_id']?.toString() ??
+        claims['pseudonymous_id']?.toString();
+
+    if (verifiedRole == 'farmer') {
+      FarmerRepository.instance.syncWithAuthUser(
+        username: _username ?? '',
+        fullName: _name,
+        district: _district,
+        pseudonymousId: _pseudonymousId,
+      );
+    }
+
     _timer?.cancel();
     _timer = Timer(remaining, () {
       unawaited(logout());
@@ -148,6 +168,8 @@ class AuthRepository extends ChangeNotifier {
     _username = null;
     _name = null;
     _district = null;
+    _pseudonymousId = null;
+    FarmerRepository.instance.resetToGuest();
     notifyListeners();
     await _storage.delete(key: 'access_token');
   }

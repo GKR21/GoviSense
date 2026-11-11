@@ -44,6 +44,21 @@ from govisense.provenance import compute_data_version, compute_model_version, ge
 logger = logging.getLogger("govisense.api.farmer")
 router = APIRouter(prefix="", tags=["Farmer Advisor"])
 
+_CROP_TAMIL_NAMES: Dict[str, str] = {
+    "big_onion": "பெரிய வெங்காயம்",
+    "chilli_green": "பச்சை மிளகாய்",
+    "chilli": "பச்சை மிளகாய்",
+    "tomato": "தக்காளி",
+    "brinjal": "கத்தரிக்காய்",
+    "bitter_gourd": "பாகற்காய்",
+    "snake_gourd": "புடலங்காய்",
+    "long_bean": "பயத்தங்காய்",
+    "cowpea": "கௌபீ",
+    "sesame": "எள்",
+    "mung_bean": "பாசிப்பயறு",
+    "green_gram": "பாசிப்பயறு",
+}
+
 suitability_scorer = SuitabilityScorer()
 demand_estimator = DemandEstimator()
 spi_engine = SupplyPressureEngine()
@@ -285,13 +300,18 @@ def farmer_top3_recommendations(
 
         exp_yield = round(rec_ha * yield_mid, 2)
         floor_price = settings.crops[crop_id].min_fair_farmgate_price if crop_id in settings.crops else 120.0
+        cost_ha = req.cost_per_ha_rs if req else None
+        cost_acre = round(cost_ha * 0.404686) if cost_ha is not None else None
 
         top3_results.append({
             "rank": len(top3_results) + 1,
             "crop_id": crop_id,
             "crop_name": scored_crop.crop_name,
+            "crop_name_si": req.crop_name_si if req else scored_crop.crop_name,
+            "crop_name_ta": _CROP_TAMIL_NAMES.get(crop_id, scored_crop.crop_name),
             "fit_score": fit_score,
             "confidence_badge": confidence_badge,
+            "suitability_reasons": scored_crop.reasons,
             "supply_forecast_mt": a1_forecast_supply_mt,
             "supply_data_quality": supply_quality,
             "profit_range_rs_kg": profit_range,
@@ -308,6 +328,9 @@ def farmer_top3_recommendations(
             "spi_band_at_harvest": spi_band,
             "spi_ratio_at_harvest": spi_ratio,
             "growing_duration_days": (req.duration_months * 30) if req else 90,
+            "cost_per_ha_rs": cost_ha,
+            "estimated_cost_per_acre_rs": cost_acre,
+            "source_note": req.source_note if req else None,
             "primary_fertilizer": "NPK + Compost",
             "allocated_ha": rec_ha,
             "allocated_area_ha": rec_ha,
