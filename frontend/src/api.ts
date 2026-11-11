@@ -333,8 +333,9 @@ export async function fetchGroundReports(cropId?: string, district?: string) {
 
 export async function fetchDataCatalogue() {
   const data = await readApi('/api/catalogue', {})
-  if (!Array.isArray(data) || data.some((item: any) => !item || typeof item.dataset_id !== "string" || typeof item.title !== "string")) throw new Error('Invalid catalogue response')
-  return data
+  const entries = Array.isArray(data) ? data : data.datasets
+  if (!Array.isArray(entries) || entries.some((item: any) => !item || typeof item.dataset_id !== "string" || typeof item.title !== "string")) throw new Error('Invalid catalogue response')
+  return entries
 }
 
 export async function fetchSourcesSummary() {
@@ -850,4 +851,3 @@ export function usePricesLatest() {
 export function useFarmerTop3(params: Parameters<typeof fetchFarmerTop3>[0]) {
   return useApiQuery(() => fetchFarmerTop3(params), [JSON.stringify(params)])
 }
-
