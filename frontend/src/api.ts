@@ -309,7 +309,7 @@ export async function fetchPriceOutlook(cropId?: string) {
 
 export async function fetchAdoptionSummary(cropId?: string, season?: string) {
   const data = await readApi('/api/adoption/summary', { crop_id: cropId, season })
-
+  if (typeof data.data_available !== "boolean") throw new Error('Invalid adoption summary response')
   return data
 }
 
