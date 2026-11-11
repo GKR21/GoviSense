@@ -121,6 +121,7 @@ export function OfficerScreen({
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => getStoredAuthUser())
   const [simulatedMetrics, setSimulatedMetrics] = useState<any>(null)
   const [alertsOpen, setAlertsOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
   const [officerNoteText, setOfficerNoteText] = useState<Record<string, string>>({})
   const [noteStatus, setNoteStatus] = useState<Record<string, string>>({})
   const { data: alertResponse, refetch: reloadAlerts } = useAlerts()
@@ -182,7 +183,7 @@ export function OfficerScreen({
       <aside className="sidebar">
         <div className="brand">
           <div className="brand__mark">
-            <Sprout size={23} />
+            <img src="/govisense-logo.png" alt="GoviSense logo" />
           </div>
           <div>
             <strong>GoviSense</strong>
@@ -219,15 +220,8 @@ export function OfficerScreen({
             <Settings size={18} />
             <span>Settings</span>
           </button>
-          <button
-            className="profile-card"
-            type="button"
-            onClick={() => {
-              clearAuthSession()
-              setPage("Login")
-            }}
-            title="Click to Switch User or Sign Out"
-          >
+          <div className="profile-menu-wrap">
+          <button className="profile-card" type="button" onClick={() => setProfileOpen((open) => !open)} title="Open profile menu">
             <span className="avatar">
               {currentUser
                 ? currentUser.name
@@ -248,6 +242,11 @@ export function OfficerScreen({
             </span>
             <MoreHorizontal size={17} />
           </button>
+          {profileOpen && <div className="profile-menu" role="menu">
+            <div className="profile-menu__identity"><strong>{currentUser?.name || "Authenticated user"}</strong><small>{currentUser?.email || ""}</small><small>{currentUser?.role || currentRole}</small></div>
+            <button type="button" role="menuitem" onClick={() => { clearAuthSession(); window.location.reload() }}>Sign out</button>
+          </div>}
+          </div>
         </div>
       </aside>
 

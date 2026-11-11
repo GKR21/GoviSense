@@ -112,6 +112,7 @@
 }
 
 .brand > div:last-child { display: flex; flex-direction: column; gap: 2px; }
+.brand__mark img { width: 30px; height: 30px; object-fit: cover; border-radius: 9px; display: block; }
 .brand strong { color: var(--ink); font-size: 16px; font-weight: 800; letter-spacing: -0.03em; }
 .brand span { color: var(--ink-muted); font-size: 10px; font-weight: 500; }
 
@@ -211,6 +212,12 @@
 }
 
 .profile-card:hover { border-color: rgba(16,185,129,0.3); }
+.profile-menu-wrap { position: relative; }
+.profile-menu { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 30; width: 220px; padding: 10px; border: 1px solid var(--glass-border); border-radius: 12px; background: #101c25; box-shadow: 0 16px 35px #0008; }
+.profile-menu__identity { display: grid; gap: 3px; padding: 6px 8px 10px; border-bottom: 1px solid var(--glass-border); }
+.profile-menu__identity strong { color: var(--ink); font-size: 12px; }
+.profile-menu__identity small { color: var(--ink-muted); font-size: 10px; overflow-wrap: anywhere; }
+.profile-menu > button { width: 100%; margin-top: 8px; padding: 9px 8px; border: 0; border-radius: 8px; background: #ef444418; color: #fca5a5; text-align: left; font-weight: 700; cursor: pointer; }
 
 .avatar, .top-avatar {
   display: grid;
