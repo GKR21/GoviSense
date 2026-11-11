@@ -576,6 +576,13 @@ class _FarmerPageState extends State<FarmerPage> {
                       Text(
                         _repo.decPriceSummary,
                         style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       const LocalizedText(
                         'Live wholesale & retail prices across Sri Lankan DECs',
                         style: TextStyle(
