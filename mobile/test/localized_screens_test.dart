@@ -10,6 +10,8 @@ import 'package:mobile/core/localization/app_locale.dart';
 import 'package:mobile/core/localization/app_translations.dart';
 import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/features/farmer/data/farmer_repository.dart';
+import 'package:mobile/features/farmer/models/crop_item.dart';
+import 'package:mobile/features/farmer/models/farmer_profile.dart';
 import 'package:mobile/features/farmer/services/farmer_api_service.dart';
 import 'package:mobile/features/farmer/presentation/farmer_page.dart';
 import 'package:mobile/features/officer/data/officer_repository.dart';
@@ -24,6 +26,52 @@ class DisconnectedFarmerApi extends FarmerApiService {
   @override
   Future<List<MarketPriceItem>?> getMarketPrices({String? category}) async =>
       null;
+}
+
+class LocalizedFixtureFarmerApi extends DisconnectedFarmerApi {
+  @override
+  Future<List<CropItem>?> getTop3Recommendations(FarmerProfile profile) async =>
+      const [
+        CropItem(
+          id: 'crop-bigonion',
+          nameEn: 'Big Onion',
+          nameSi: 'ලොකු ලූනු',
+          nameTa: 'பெரிய வெங்காயம்',
+          scientificName: 'Allium cepa',
+          imageUrl: 'https://example.invalid/onion.jpg',
+          photoCredit: 'Test',
+          profitMin: 120000,
+          profitMax: 160000,
+          profitFormattedEn: 'Rs 120,000 – 160,000',
+          profitFormattedSi: 'රු. 120,000 – 160,000',
+          profitFormattedTa: 'ரூ. 120,000 – 160,000',
+          risk: MarketRisk.balanced,
+          spiScore: 1.0,
+          riskTextEn: 'Balanced supply · Stable harvest farmgate price',
+          riskTextSi: 'සමබර ජාතික සැපයුම · ස්ථාවර ගොවිපළ මිලක්',
+          riskTextTa: 'சமநிலையான வழங்கல் · நிலையான சந்தை விலை',
+          waterNeed: 2,
+          plantWindowEn: 'Oct 15 – Nov 20',
+          plantWindowSi: 'ඔක් 15 – නොවැ 20',
+          plantWindowTa: 'அக் 15 – நவ 20',
+          harvestWindowEn: 'Feb – Mar 2026',
+          harvestWindowSi: 'පෙබ – මාර්තු 2026',
+          harvestWindowTa: 'பிப் – மார் 2026',
+          maturityDays: 90,
+          fitBadgeEn: 'Optimal Maha Match',
+          fitBadgeSi: 'විශිෂ්ටතම මහ තේරීම',
+          fitBadgeTa: 'சிறந்த மகா தேர்வு',
+          fieldTipEn: 'Ensure raised beds with good drainage.',
+          fieldTipSi: 'හොඳින් ජලය බැස යන පාත්ති සකසන්න.',
+          fieldTipTa: 'நல்ல வடிகால் வசதியுள்ள பாத்திகளை அமைக்கவும்.',
+          expectedYieldEn: '2,500 kg / acre',
+          expectedYieldSi: 'අක්කරයකට කි.ග්‍රෑ. 2,500',
+          expectedYieldTa: 'ஏக்கருக்கு 2,500 கிலோ',
+          cultivationCostEn: 'Rs 65,000 / acre',
+          cultivationCostSi: 'රු. 65,000 / අක්කරයකට',
+          cultivationCostTa: 'ரூ. 65,000 / ஏக்கருக்கு',
+        ),
+      ];
 }
 
 Future<void> inspectScroll(WidgetTester tester, String label) async {
@@ -66,8 +114,9 @@ void main() {
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    final repository = FarmerRepository(apiService: DisconnectedFarmerApi());
+    final repository = FarmerRepository(apiService: LocalizedFixtureFarmerApi());
     addTearDown(repository.dispose);
+    await repository.refreshRecommendations();
     await tester.pumpWidget(
       localizedHarness(FarmerPage(repository: repository)),
     );
@@ -176,8 +225,9 @@ void main() {
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      final repository = FarmerRepository(apiService: DisconnectedFarmerApi());
+      final repository = FarmerRepository(apiService: LocalizedFixtureFarmerApi());
       addTearDown(repository.dispose);
+      await repository.refreshRecommendations();
       final pages = <Widget>[
         CropDetailPage(
           crop: repository.crops.first,

@@ -66,6 +66,7 @@ class _FarmerPageState extends State<FarmerPage> {
     _profileSoilPh = _repo.profile.soilPh;
     _repo.addListener(_onRepoUpdated);
     _repo.checkBackendConnection();
+    _repo.refreshRecommendations();
   }
 
   @override
@@ -78,6 +79,10 @@ class _FarmerPageState extends State<FarmerPage> {
 
   void _onRepoUpdated() {
     if (mounted) {
+      if (_repo.crops.isNotEmpty &&
+          !_repo.crops.any((c) => c.id == _selectedCropId)) {
+        _selectedCropId = _repo.crops.first.id;
+      }
       final current = _latestSubmittedReport;
       if (current != null) {
         _latestSubmittedReport = _repo.reports.firstWhere(
@@ -158,25 +163,25 @@ class _FarmerPageState extends State<FarmerPage> {
                           AppTranslations.t(_language, 'appName'),
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 15,
+                            fontSize: 16,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 5),
+                      const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
+                          horizontal: 6,
                           vertical: 1,
                         ),
                         decoration: BoxDecoration(
                           color: AppTheme.primaryTint,
-                          borderRadius: BorderRadius.circular(5),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        child: const Text(
+                        child: Text(
                           'Maha 2026',
                           style: TextStyle(
-                            fontSize: 8.5,
+                            fontSize: 9,
                             fontWeight: FontWeight.bold,
                             color: AppTheme.primary,
                           ),
@@ -184,13 +189,10 @@ class _FarmerPageState extends State<FarmerPage> {
                       ),
                     ],
                   ),
-                  Text(
-                    '${_repo.profile.district.isNotEmpty ? _repo.profile.district : 'Anuradhapura'} District',
+                  const Text(
+                    'Anuradhapura District',
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      color: AppTheme.neutral600,
-                    ),
+                    style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
                   ),
                 ],
               ),
@@ -574,6 +576,9 @@ class _FarmerPageState extends State<FarmerPage> {
                       Text(
                         _repo.decPriceSummary,
                         style: const TextStyle(
+                      const LocalizedText(
+                        'Live wholesale & retail prices across Sri Lankan DECs',
+                        style: TextStyle(
                           fontSize: 11,
                           color: AppTheme.neutral600,
                         ),

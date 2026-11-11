@@ -188,77 +188,145 @@ class FarmerApiService {
         .join(' ');
     final expectedYield = _number(json['expected_yield_mt_ha']);
 
-    return CropItem(
-      id: 'crop-$cropId',
-      nameEn: cropName,
-      nameSi: cropName,
-      nameTa: cropName,
-      scientificName: _string(json['scientific_name']),
-      imageUrl: _string(json['image_url']),
-      photoCredit: _string(json['photo_credit']),
-      profitMin: p10.round(),
-      profitMax: p90.round(),
-      profitFormattedEn: _formatRange(p10, p90, 'Rs/kg'),
-      profitFormattedSi: _formatRange(p10, p90, 'Rs/kg'),
-      profitFormattedTa: _formatRange(p10, p90, 'Rs/kg'),
-      risk: _marketRisk(riskText),
-      spiScore: spiRatio,
-      riskTextEn: riskText,
-      riskTextSi: riskText,
-      riskTextTa: riskText,
-      waterNeed: _waterDrops(waterMm),
-      plantWindowEn: _string(json['planting_window']),
-      plantWindowSi: _string(json['planting_window']),
-      plantWindowTa: _string(json['planting_window']),
-      harvestWindowEn: _string(json['harvest_period']),
-      harvestWindowSi: _string(json['harvest_period']),
-      harvestWindowTa: _string(json['harvest_period']),
-      maturityDays: durationDays.round(),
-      fitBadgeEn: '${fitScore.round()}% Fit',
-      fitBadgeSi: '${fitScore.round()}% Fit',
-      fitBadgeTa: '${fitScore.round()}% Fit',
-      fieldTipEn: reason ?? '',
-      fieldTipSi: reason ?? '',
-      fieldTipTa: reason ?? '',
-      expectedYieldEn: expectedYield > 0 ? '$expectedYield mt/ha' : '',
-      expectedYieldSi: expectedYield > 0 ? '$expectedYield mt/ha' : '',
-      expectedYieldTa: expectedYield > 0 ? '$expectedYield mt/ha' : '',
-      cultivationCostEn: '',
-      cultivationCostSi: '',
-      cultivationCostTa: '',
-    );
-  }
+    final suitabilityTip = reasons.isNotEmpty
+        ? reasons.take(2).join(' · ')
+        : 'Agronomic score $fitScore% for your parcel conditions';
 
-  static Map<String, dynamic> _asMap(dynamic value) {
-    final decoded = value is String ? jsonDecode(value) : value;
-    if (decoded is! Map) throw const FormatException('Invalid API response');
-    return Map<String, dynamic>.from(decoded);
-  }
+    final displayEn =
+        (json['crop_name'] as String?)?.trim().isNotEmpty == true
+            ? (json['crop_name'] as String).trim()
+            : rawCropId.replaceAll('_', ' ');
+    final displaySi =
+        (json['crop_name_si'] as String?)?.trim().isNotEmpty == true
+            ? (json['crop_name_si'] as String).trim()
+            : displayEn;
+    final displayTa =
+        (json['crop_name_ta'] as String?)?.trim().isNotEmpty == true
+            ? (json['crop_name_ta'] as String).trim()
+            : displayEn;
 
-  static String _string(dynamic value, {String fallback = ''}) =>
-      value?.toString() ?? fallback;
-
-  static double _number(dynamic value) =>
-      value is num && value.isFinite ? value.toDouble() : 0;
-
-  static String _formatRange(double min, double max, String unit) {
-    if (min == 0 && max == 0) return '';
-    return 'Rs ${min.toStringAsFixed(0)} – ${max.toStringAsFixed(0)} / $unit';
-  }
-
-  static int _waterDrops(double waterMm) {
-    if (waterMm <= 0) return 0;
-    if (waterMm <= 400) return 1;
-    if (waterMm >= 600) return 3;
-    return 2;
-  }
-
-  static MarketRisk _marketRisk(String value) {
-    final normalized = value.toLowerCase();
-    if (normalized.contains('shortage')) return MarketRisk.shortage;
-    if (normalized.contains('glut') || normalized.contains('oversupply')) {
-      return MarketRisk.oversupply;
+    final int profitMin;
+    final int profitMax;
+    final String profitFormattedEn;
+    final String profitFormattedSi;
+    final String profitFormattedTa;
+    if (p10PerAcre != null && p90PerAcre != null) {
+      profitMin = p10PerAcre;
+      profitMax = p90PerAcre;
+      profitFormattedEn = 'Rs $profitMin – $profitMax';
+      profitFormattedSi = 'රු. $profitMin – $profitMax';
+      profitFormattedTa = 'ரூ. $profitMin – $profitMax';
+    } else if (p10Kg != null && p90Kg != null) {
+      final kgPerAcre = ((yieldMtHa ?? 15.0) * 404.686).round();
+      profitMin = (p10Kg * kgPerAcre).round();
+      profitMax = (p90Kg * kgPerAcre).round();
+      profitFormattedEn = 'Rs $profitMin – $profitMax';
+      profitFormattedSi = 'රු. $profitMin – $profitMax';
+      profitFormattedTa = 'ரூ. $profitMin – $profitMax';
+    } else {
+      profitMin = 0;
+      profitMax = 0;
+      profitFormattedEn = 'Price forecast unavailable';
+      profitFormattedSi = 'මිල පුරෝකථනය නොමැත';
+      profitFormattedTa = 'விலை முன்னறிவிப்பு இல்லை';
     }
-    return MarketRisk.balanced;
+
+    final yieldKgAcre = yieldMtHa != null ? (yieldMtHa * 404.686).round() : null;
+    final expectedYieldEn =
+        yieldKgAcre != null ? '$yieldKgAcre kg / acre' : 'Data unavailable';
+    final expectedYieldSi = yieldKgAcre != null
+        ? 'අක්කරයකට කි.ග්‍රෑ. $yieldKgAcre'
+        : 'දත්ත නොමැත';
+    final expectedYieldTa =
+        yieldKgAcre != null ? 'ஏக்கருக்கு $yieldKgAcre கிலோ' : 'தரவு இல்லை';
+
+    final costEn =
+        costPerAcre != null ? 'Rs $costPerAcre / acre' : 'Data unavailable';
+    final costSi =
+        costPerAcre != null ? 'රු. $costPerAcre / අක්කරයකට' : 'දත්ත නොමැත';
+    final costTa =
+        costPerAcre != null ? 'ரூ. $costPerAcre / ஏக்கருக்கு' : 'தரவு இல்லை';
+
+    final double spiScoreValue =
+        spiRatio ??
+        (risk == MarketRisk.oversupply
+            ? 1.25
+            : risk == MarketRisk.shortage
+                ? 0.75
+                : 1.0);
+
+    final String riskTextEn;
+    final String riskTextSi;
+    final String riskTextTa;
+    if (isTargetFull) {
+      riskTextEn = 'District target reached (110%+) · Do not overplant';
+      riskTextSi = 'දිස්ත්‍රික් ඉලක්කය සම්පූර්ණයි · අමතර වගාවෙන් වළකින්න';
+      riskTextTa = 'மாவட்ட இலக்கு நிறைவடைந்தது · கூடுதல் நடவு தவிர்க்கவும்';
+    } else if (risk == MarketRisk.oversupply) {
+      riskTextEn = 'Watch supply · Risk of peak harvest congestion';
+      riskTextSi = 'සැපයුම ගැන විමසිලිමත් වන්න · අස්වනු තදබද අවදානමක්';
+      riskTextTa = 'வழங்கலைக் கவனிக்கவும் · அறுவடை விலை சரிவு அபாயம்';
+    } else if (risk == MarketRisk.shortage) {
+      riskTextEn = 'Prices likely firm at harvest · Deficit expected';
+      riskTextSi = 'අස්වනු සමයේ ඉහළ මිලක් · සැපයුම් හිඟයක්';
+      riskTextTa = 'அறுவடையில் அதிக விலை சாத்தியம் · பற்றாக்குறை';
+    } else if (spiBand == 'unknown') {
+      riskTextEn = 'Agronomic match · Supply pressure model unavailable';
+      riskTextSi = 'කෘෂිකාර්මිකව සුදුසුයි · සැපයුම් ආකෘතිය නොමැත';
+      riskTextTa = 'பயிர்ச்செய்கைக்கு உகந்தது · வழங்கல் தரவு இல்லை';
+    } else {
+      riskTextEn = 'Balanced supply · Stable harvest farmgate price';
+      riskTextSi = 'සමබර ජාතික සැපයුම · ස්ථාවර ගොවිපළ මිලක්';
+      riskTextTa = 'சமநிலையான வழங்கல் · நிலையான சந்தை விலை';
+    }
+
+    final plantWindowText = plantingWindow ?? 'Current season';
+    final harvestWindowText = harvestPeriod ?? 'In ${durationMonths ?? 3} months';
+
+    return CropItem(
+      id: rawCropId,
+      nameEn: displayEn,
+      nameSi: displaySi,
+      nameTa: displayTa,
+      scientificName:
+          sourceNote != null && sourceNote.isNotEmpty
+              ? sourceNote
+              : 'DOA Agronomic Profile',
+      imageUrl:
+          imageUrl != null && imageUrl.isNotEmpty
+              ? imageUrl
+              : 'https://images.unsplash.com/photo-1592417817098-8f3d6ef23a41?auto=format&fit=crop&w=800&q=80',
+      photoCredit: 'GoviSense',
+      profitMin: profitMin,
+      profitMax: profitMax,
+      profitFormattedEn: profitFormattedEn,
+      profitFormattedSi: profitFormattedSi,
+      profitFormattedTa: profitFormattedTa,
+      risk: risk,
+      spiScore: spiScoreValue,
+      riskTextEn: riskTextEn,
+      riskTextSi: riskTextSi,
+      riskTextTa: riskTextTa,
+      waterNeed: waterDrops,
+      plantWindowEn: plantWindowText,
+      plantWindowSi: plantWindowText,
+      plantWindowTa: plantWindowText,
+      harvestWindowEn: harvestWindowText,
+      harvestWindowSi: harvestWindowText,
+      harvestWindowTa: harvestWindowText,
+      maturityDays: (durationMonths ?? 3) * 30,
+      fitBadgeEn: '$fitScore% Fit · Agronomic Match',
+      fitBadgeSi: '$fitScore% ගැලපීම · කෘෂි උපදෙස්',
+      fitBadgeTa: '$fitScore% பொருத்தம் · விவசாய ஆலோசனை',
+      fieldTipEn: suitabilityTip,
+      fieldTipSi: suitabilityTip,
+      fieldTipTa: suitabilityTip,
+      expectedYieldEn: expectedYieldEn,
+      expectedYieldSi: expectedYieldSi,
+      expectedYieldTa: expectedYieldTa,
+      cultivationCostEn: costEn,
+      cultivationCostSi: costSi,
+      cultivationCostTa: costTa,
+    );
   }
 }

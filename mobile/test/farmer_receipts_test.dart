@@ -228,4 +228,57 @@ void main() {
     expect(find.byType(QrImageView), findsNothing);
     expect(find.text('Not verified'), findsOneWidget);
   });
+
+  test(
+    'top3 recommendations preserve distinct crops returned by suitability API',
+    () async {
+      body = {
+        'top3': [
+          {
+            'crop_id': 'brinjal',
+            'crop_name': 'Brinjal (Eggplant)',
+            'crop_name_si': 'වම්බටු',
+            'crop_name_ta': 'கத்தரிக்காய்',
+            'fit_score': 100.0,
+            'water_need_mm_season': 500,
+            'duration_months': 4,
+            'expected_yield_mt_ha': 22.0,
+            'estimated_cost_per_acre_rs': 32375,
+            'planting_window': 'Month 9–11',
+            'harvest_period': 'Month 2 (approx)',
+            'spi_band_at_harvest': 'Unknown',
+            'suitability_reasons': ['Water score: 100/100', 'Temp score: 100/100'],
+          },
+          {
+            'crop_id': 'tomato',
+            'crop_name': 'Tomato',
+            'crop_name_si': 'තක්කාලි',
+            'crop_name_ta': 'தக்காளி',
+            'fit_score': 94.3,
+            'water_need_mm_season': 600,
+            'duration_months': 3,
+            'expected_yield_mt_ha': 35.0,
+            'estimated_cost_per_acre_rs': 101172,
+            'planting_window': 'Month 9–11',
+            'harvest_period': 'Month 1 (approx)',
+            'spi_band_at_harvest': 'Unknown',
+            'suitability_reasons': ['Temp score: 100/100'],
+          },
+        ],
+      };
+      final crops = await service.getTop3Recommendations(repository.profile);
+      expect(crops, isNotNull);
+      expect(crops!.map((c) => c.id).toList(), ['brinjal', 'tomato']);
+      expect(
+        crops.map((c) => c.nameEn).toList(),
+        ['Brinjal (Eggplant)', 'Tomato'],
+      );
+      expect(crops.map((c) => c.nameSi).toList(), ['වම්බටු', 'තක්කාලි']);
+      expect(crops[0].cultivationCostEn, 'Rs 32375 / acre');
+      expect(crops[1].cultivationCostEn, 'Rs 101172 / acre');
+      expect(crops[0].fieldTipEn, contains('Water score: 100/100'));
+      expect(crops[0].fitBadgeEn, startsWith('100% Fit'));
+      expect(crops[1].fitBadgeEn, startsWith('94% Fit'));
+    },
+  );
 }
