@@ -9,6 +9,25 @@ import '../models/farmer_profile.dart';
 import '../models/market_price_item.dart';
 import '../models/planting_report.dart';
 
+const _cropImageUrls = <String, String>{
+  'big_onion': 'https://images.unsplash.com/photo-1600807644626-fb3c8c8ba40d?auto=format&fit=crop&w=800&q=80',
+  'chilli': 'https://images.unsplash.com/photo-1546860255-95536c19724e?auto=format&fit=crop&w=800&q=80',
+  'chilli_green': 'https://images.unsplash.com/photo-1546860255-95536c19724e?auto=format&fit=crop&w=800&q=80',
+  'green_gram': 'https://images.unsplash.com/photo-1719846923269-6fdf75444cb8?auto=format&fit=crop&w=800&q=80',
+  'mung_bean': 'https://images.unsplash.com/photo-1719846923269-6fdf75444cb8?auto=format&fit=crop&w=800&q=80',
+  'maize': 'https://images.unsplash.com/photo-1551754655-cd27e38d2076?auto=format&fit=crop&w=800&q=80',
+  'brinjal': 'https://images.unsplash.com/photo-1659261200833-ec8761558af7?auto=format&fit=crop&w=800&q=80',
+  'tomato': 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?auto=format&fit=crop&w=800&q=80',
+  'bitter_gourd': 'https://images.unsplash.com/photo-1726745991973-78ba39a28a37?auto=format&fit=crop&w=800&q=80',
+  'snake_gourd': 'https://images.unsplash.com/photo-1627988499399-e7d0cb5b4d5a?auto=format&fit=crop&w=800&q=80',
+  'long_bean': 'https://images.unsplash.com/photo-1567306295427-94503f8300d7?auto=format&fit=crop&w=800&q=80',
+  'cowpea': 'https://images.unsplash.com/photo-1567306295427-94503f8300d7?auto=format&fit=crop&w=800&q=80',
+  'sesame': 'https://images.unsplash.com/photo-1612257999756-db4b7beebe41?auto=format&fit=crop&w=800&q=80',
+};
+
+const _defaultCropImageUrl =
+    'https://images.unsplash.com/photo-1592417817098-8f3d6ef23a41?auto=format&fit=crop&w=800&q=80';
+
 class FarmerApiService {
   FarmerApiService({ApiClient? apiClient}) : _client = apiClient ?? ApiClient();
 
@@ -181,7 +200,7 @@ class FarmerApiService {
       nameSi: json['crop_name_si']?.toString() ?? name,
       nameTa: json['crop_name_ta']?.toString() ?? name,
       scientificName: json['scientific_name']?.toString() ?? '',
-      imageUrl: json['image_url']?.toString() ?? '',
+      imageUrl: _cropImageUrl(json, id),
       photoCredit: json['photo_credit']?.toString() ?? '',
       profitMin: p10.round(),
       profitMax: p90.round(),
@@ -220,6 +239,12 @@ class FarmerApiService {
       cultivationCostSi: '',
       cultivationCostTa: '',
     );
+  }
+
+  String _cropImageUrl(Map<String, dynamic> json, String cropId) {
+    final serverUrl = json['image_url']?.toString().trim() ?? '';
+    if (serverUrl.isNotEmpty) return serverUrl;
+    return _cropImageUrls[cropId.toLowerCase()] ?? _defaultCropImageUrl;
   }
 
   static Map<String, dynamic> _asMap(dynamic value) {
