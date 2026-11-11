@@ -108,11 +108,9 @@ export function OfficerScreen({
   const [saved, setSaved] = useState(false)
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => getStoredAuthUser())
   const [page, setPage] = useState<OfficerPage>(
-    initialRole === "Admin"
-      ? "Data sources"
-      : currentUser
-        ? initialPage
-        : "Login",
+    currentUser && (initialRole === "Admin" ? currentUser.role === "Admin" : currentUser.role === "Officer" || currentUser.role === "Admin")
+      ? (initialRole === "Admin" ? "Data sources" : initialPage)
+      : "Login",
   )
   const [screenState, setScreenState] = useState<ScreenState>("ready")
   const [lastReport, setLastReport] = useState<GroundReport | null>(null)

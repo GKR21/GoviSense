@@ -609,7 +609,7 @@ export async function loginUser(
     const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, role }),
+      body: JSON.stringify({ username: email.trim(), password, role: role?.toLowerCase() }),
     })
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}))
@@ -620,11 +620,25 @@ export async function loginUser(
       }
     }
     const data = await res.json()
-    saveAuthSession(data.access_token, data.user)
+    const token = typeof data.access_token === "string" ? data.access_token : ""
+    const rawUser = data.user
+    const returnedRole = typeof rawUser?.role === "string" ? rawUser.role.toLowerCase() : ""
+    if (!token || !rawUser || !["officer", "admin", "farmer"].includes(returnedRole)) {
+      return { success: false, error: "Authentication response was incomplete." }
+    }
+    const user: AuthUser = {
+      email: String(rawUser.email || email).trim(),
+      role: returnedRole === "admin" ? "Admin" : returnedRole === "farmer" ? "Farmer" : "Officer",
+      name: String(rawUser.name || "Authenticated user"),
+      designation: String(rawUser.designation || "Authenticated user"),
+      district: String(rawUser.district || "Not available"),
+      officer_id: String(rawUser.officer_id || ""),
+    }
+    saveAuthSession(token, user)
     return {
       success: true,
-      token: data.access_token,
-      user: data.user,
+      token,
+      user,
     }
   } catch (err) {
     // If backend cannot be reached, validate credentials with authorized baseline
