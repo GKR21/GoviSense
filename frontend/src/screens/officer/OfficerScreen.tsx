@@ -220,13 +220,11 @@ export function OfficerScreen({
                     .join("")
                     .slice(0, 2)
                     .toUpperCase()
-                : currentRole === "Admin"
-                  ? "KP"
-                  : "DN"}
+                : "?"}
             </span>
             <span>
               <strong>
-                {currentUser?.name || (currentRole === "Admin" ? "K. Perera" : "D. Nimal")}
+                {currentUser?.name || "Sign in"}
               </strong>
               <small>
                 {currentUser?.designation || (currentRole === "Admin" ? "System Administrator" : "Planning Officer")}
@@ -318,7 +316,7 @@ export function OfficerScreen({
                 <option value="error">Error</option>
               </select>
             </label>
-            <ConfidenceBadge level="High" />
+            <span className="original-confidence">Confidence: {currentApiCropData?.ai2_price_forecast?.confidence ?? "Not available"}</span>
             <div style={{ position: "relative", display: "inline-flex" }}>
               <IconButton icon={Bell} label="Notifications" onClick={() => setAlertsOpen(true)} />
               {alertsData && alertsData.length > 0 && (
@@ -345,8 +343,8 @@ export function OfficerScreen({
                 </span>
               )}
             </div>
-            <span className="top-avatar" title={currentRole === "Admin" ? "K. Perera (Admin)" : "D. Nimal (Officer)"}>
-              {currentRole === "Admin" ? "KP" : "DN"}
+            <span className="top-avatar" title={currentUser?.name || "Not signed in"}>
+              {currentUser?.name?.split(" ").map(name => name[0]).join("").slice(0, 2).toUpperCase() || "?"}
             </span>
           </div>
         </header>

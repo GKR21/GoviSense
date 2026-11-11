@@ -48,8 +48,17 @@ export function PriceOutlookScreen({
               <p>Target period: {outlook.target_period || "Not available"}</p>
             </div>
           </div>
-          <div className="table-scroll">
-            <table className="audit-table">
+          <div className="original-price-chart">
+            <div className="chart-legend"><span><i className="legend-swatch legend-swatch--band" />10th-90th percentile</span><span><i className="legend-swatch legend-swatch--middle" />Median</span></div>
+            <p className="original-empty">Returned price intervals for {outlook.target_period || "the available period"}; monthly price history is not supplied.</p>
+            {[{ label: "Farmgate", band: outlook.farmgate_price }, { label: "Retail", band: outlook.retail_price }].map(({ label, band }) => {
+              const valid = [band?.p10, band?.p50, band?.p90].every(value => typeof value === "number" && Number.isFinite(value)) && band.p90 >= band.p10
+              const position = valid && band.p90 > band.p10 ? Math.min(100, Math.max(0, (band.p50 - band.p10) / (band.p90 - band.p10) * 100)) : 50
+              return <div className="original-price-row" key={label}><strong>{label}</strong>{valid ? <div><div className="original-price-band"><i style={{ left: `${position}%` }} /></div><div className="original-price-labels"><span>{displayNumber(band.p10)}</span><strong>{displayNumber(band.p50)} Rs/kg</strong><span>{displayNumber(band.p90)}</span></div></div> : <p>Interval not available</p>}</div>
+            })}
+          </div>
+          <div className="data-table-wrap">
+            <table className="data-table">
               <thead>
                 <tr>
                   <th>Price (Rs/kg)</th>

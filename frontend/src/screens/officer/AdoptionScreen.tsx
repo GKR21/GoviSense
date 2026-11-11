@@ -20,93 +20,13 @@ export function AdoptionScreen({
   forecastData?: LatestForecastsResponse | null
   isLiveApi?: boolean
 }) {
-  const [simAdoption, setSimAdoption] = useState<0 | 30 | 60>(30)
-  const [simData, setSimData] = useState<AdoptionSimulationResponse | null>(null)
-  const [simLoading, setSimLoading] = useState(false)
-
-  const cropKey = crop.toLowerCase().includes("chilli") ? "chilli" : "big_onion"
-  const { data: adoptData, loading: adoptLoading } = useAdoptionSummary(cropKey)
-  const { data: grData } = useGroundReports(cropKey)
-
-  // Fetch multi-agent adoption simulation from Item 9 endpoint
-  useEffect(() => {
-    let mounted = true
-    setSimLoading(true)
-    fetchAdoptionSimulation(cropKey)
-      .then((res) => {
-        if (!mounted) return
-        setSimData(res)
-        setSimLoading(false)
-      })
-      .catch(() => {
-        if (!mounted) return
-        setSimData(null)
-        setSimLoading(false)
-      })
-    return () => {
-      mounted = false
-    }
-  }, [cropKey])
-
-  // Real database acreage, adherence, and predicted vs actual from backend
-  const targetAreaHa = adoptData?.acreage?.target_area_ha ?? 0
-  const reportedPlantedHa = adoptData?.acreage?.reported_planted_area_ha ?? 0
-  const coveragePct = adoptData?.acreage?.coverage_pct ?? 0
-  const adherence = adoptData?.recommendation_adherence
-  const predVsAct = adoptData?.predicted_vs_actual
-
-  // Ground reports from API or fallback props
-  const liveReports: GroundReport[] =
-    grData?.ground_reports && grData.ground_reports.length > 0
-      ? grData.ground_reports
-      : groundReports
-  const isPrivacySuppressed = grData?.privacy_suppressed ?? false
-
-  // Selected scenario from the live API response
-  const activeScenario = simData?.scenarios.find((s) => s.adoption_rate_pct === simAdoption)
-
-  if (simLoading || !simData || !activeScenario) {
-    return (
-      <PageHeading
-        eyebrow="Ground truth monitoring"
-        icon={Users}
-        title="Adoption Tracker & Simulation"
-        description={simLoading ? "Loading live adoption data…" : "Live adoption data is unavailable."}
-      />
-    )
-  }
-
-  const spiTone =
-    activeScenario.spi_label === "Glut"
-      ? ("danger" as const)
-      : activeScenario.spi_label === "Balanced"
-      ? ("success" as const)
-      : ("warning" as const)
-
-  const actionText =
-    activeScenario.adoption_rate_pct === 0
-      ? "Glut Alert: Freeze July/August import permits immediately. Activate buffer warehouse purchases to absorb local bumper surplus."
-      : activeScenario.adoption_rate_pct === 30
-      ? "Moderate vigilance: Narrow import issuance window. Monitor weekly harvesting and planting declarations across regional agrarian centers."
-      : "Optimal balance: Proceed with planned scheduled imports during pre-harvest deficit only. Domestic supply meets demand at equilibrium."
-
-  // Extract recommended target from AI 4 optimizer or baseline
-  const plantRec = forecastData?.ai4_optimization?.recommendations?.find(
-    (r) => r.action_type === "PLANT_EXPANSION" && r.crop.toLowerCase().includes(crop.toLowerCase()),
-  )
-
-  const cropRows = [
-    {
-      name: "Big onion",
-      targetHa: plantRec && cropKey === "big_onion" ? Math.round(plantRec.quantity) : 0,
-      reportedHa: cropKey === "big_onion" ? reportedPlantedHa : 0,
-    },
-    {
-      name: "Chilli",
-      targetHa: plantRec && cropKey === "chilli" ? Math.round(plantRec.quantity) : 0,
-      reportedHa: cropKey === "chilli" ? reportedPlantedHa : 0,
-    },
-  ]
+  const cropId = cropApiId(crop)
+  const summary = useAdoptionSummary(cropId)
+  const simulation = useAdoptionSimulation(cropId)
+  const reports = useGroundReports(cropId)
+  const scenarios = simulation.data?.scenarios || []
+  const groundReports = reports.data?.ground_reports || []
+  const refresh = () => { summary.refetch(); simulation.refetch(); reports.refetch() }
 
   return (
     <>
@@ -163,7 +83,8 @@ export function AdoptionScreen({
             </div>
           ))}
       </section>
-      <section className="panel large-data-panel">
+      <div className="overview-grid">
+      <section className="panel adoption-panel">
         <h2>Adoption simulation</h2>
         <p>
           These scenarios are simulated outputs, separate from observed
@@ -176,8 +97,8 @@ export function AdoptionScreen({
           onRetry={simulation.refetch}
         />
         {!simulation.loading && !simulation.error && scenarios.length > 0 && (
-          <div className="table-scroll">
-            <table className="audit-table">
+          <div className="data-table-wrap">
+            <table className="data-table">
               <thead>
                 <tr>
                   <th>Adoption</th>
@@ -206,7 +127,7 @@ export function AdoptionScreen({
           </div>
         )}
       </section>
-      <section className="panel large-data-panel">
+      <section className="panel attention-panel">
         <h2>Ground reports</h2>
         <ApiDataState
           loading={reports.loading}
@@ -218,8 +139,8 @@ export function AdoptionScreen({
           <p>Reports withheld by the backend privacy policy.</p>
         )}
         {!reports.loading && !reports.error && groundReports.length > 0 && (
-          <div className="table-scroll">
-            <table className="audit-table">
+          <div className="data-table-wrap">
+            <table className="data-table">
               <thead>
                 <tr>
                   <th>Report</th>
@@ -230,7 +151,7 @@ export function AdoptionScreen({
                 </tr>
               </thead>
               <tbody>
-                {groundReports.map((report) => (
+                {groundReports.map((report: GroundReport) => (
                   <tr key={report.id}>
                     <td>{report.id}</td>
                     <td>{report.crop}</td>
@@ -244,6 +165,7 @@ export function AdoptionScreen({
           </div>
         )}
       </section>
+      </div>
     </>
   )
 }

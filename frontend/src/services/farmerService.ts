@@ -12,15 +12,15 @@ import {
   submitPlantingReportApi,
   submitHarvestReportApi,
   API_BASE_URL,
-  getStoredAuthUser,
+  fetchServerIdentity,
+  type ServerIdentity,
 } from "../api"
 
 function createFarmerProfile(): FarmerProfileData {
-  const user = getStoredAuthUser()
   return {
-    farmerId: user?.officer_id || user?.email || "",
-    name: user?.name || "",
-    district: user?.district || "",
+    farmerId: "",
+    name: "",
+    district: "",
     division: "",
     totalLandAcres: 0,
     primaryCropInterest: "",
@@ -173,7 +173,7 @@ function mapApiCropToCropItem(raw: any, landAcres: number): CropItem {
 }
 
 export class FarmerService {
-  private profile: FarmerProfileData = { ...initialFarmerProfile }
+  private profile: FarmerProfileData = createFarmerProfile()
   private reports: PlantingReportData[] = []
   private alerts: AlertItem[] = []
   private identityRequest: Promise<ServerIdentity> | null = null
@@ -203,18 +203,19 @@ export class FarmerService {
 
   async getRecommendedCrops(district = "", landSize?: number): Promise<CropItem[]> {
     const requestedLand = landSize ?? this.profile.totalLandAcres
-    if (requestedLand <= 0 || !this.profile.farmerId) return []
+    if (requestedLand <= 0) return []
     try {
       const profile = await this.getProfile()
+      if (!profile.farmerId) return []
       const top3Res = await fetchFarmerTop3({
         farmer_id: this.profile.farmerId,
-        season: "Maha",
+        district: district || profile.district,
         land_ha: requestedLand * 0.404686,
-        is_rainfed: false,
+
       })
 
       if (top3Res && Array.isArray(top3Res.top3) && top3Res.top3.length > 0) {
-        return top3Res.top3.map((c) => mapApiCropToCropItem(c, requestedLand))
+        return top3Res.top3.map((c: any) => mapApiCropToCropItem(c, requestedLand))
       }
     } catch (err) {
       console.warn("Could not load backend crop recommendations", err)
@@ -270,13 +271,13 @@ export class FarmerService {
       const identity = await this.loadIdentity()
       const farmerId = identity.farmerId || ""
       if (farmerId !== this.profile.farmerId) {
-        this.profile = { ...initialFarmerProfile }
+        this.profile = createFarmerProfile()
         this.reports = []
         this.alerts = []
       }
       this.profile = { ...this.profile, farmerId, name: identity.name, district: identity.district || this.profile.district }
     } catch (error) {
-      this.profile = { ...initialFarmerProfile }
+      this.profile = createFarmerProfile()
       console.warn("Backend farmer identity is unavailable", error)
     }
     return { ...this.profile }
@@ -310,32 +311,20 @@ export class FarmerService {
     if (!rawCropId) throw new Error("Select a crop returned by the backend.")
     const areaHa = Number((reportData.areaAcres * 0.404686).toFixed(2))
 
-    let reportId = `REP-${Date.now()}`
-    let isOffline = false
-
-    try {
-      const res = await submitPlantingReportApi({
-        crop_id: rawCropId,
-        season: "Maha 2025/2026",
-        planned_area_ha: areaHa,
-        actual_area_ha: areaHa,
-        consent_given: true,
-        pseudonymous_id: this.profile.farmerId,
-      })
-
-      if (res && res.report_id) {
-        reportId = res.report_id
-      } else if (res && res.status === "ACCEPTED_OFFLINE") {
-        isOffline = true
-      }
-    } catch {
-      isOffline = true
-    }
+    const response = await submitPlantingReportApi({
+      crop_id: rawCropId, season: "Maha 2025/2026", planned_area_ha: areaHa,
+      actual_area_ha: areaHa, consent_given: profile.pseudonymousConsent,
+      pseudonymous_id: profile.farmerId, planting_date: reportData.plantingDate,
+      district: profile.district, irrigation_type: reportData.irrigationType,
+      notes: reportData.seedSource,
+    })
 
     const cropNameEn = rawCropId === "big_onion" ? "Big Onion" : rawCropId === "chilli" ? "Chilli" : rawCropId.replace(/_/g, " ")
 
-    const newReport: PlantingReportData = {
-      id: reportId,
+    const report: PlantingReportData = {
+      id: response.report_id,
+      receiptHash: response.receipt_hash,
+      status: "verified",
       cropId: reportData.cropId,
       cropName: {
         en: cropNameEn,

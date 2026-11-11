@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { spawn } from "node:child_process"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { join } from "node:path"
 import { createServer } from "node:net"
@@ -90,6 +90,9 @@ async function evaluate(expression) {
 }
 
 function installMockApi() {
+  // This dashboard fixture represents an authenticated officer; unauthenticated users see Login.
+  localStorage.setItem("govisense_auth_token", "browser-fixture-token")
+  localStorage.setItem("govisense_auth_user", JSON.stringify({ role: "Officer", name: "Fixture Officer", email: "officer@example.test", district: "Matale" }))
   window.__mode = "online"
   window.__requests = []
   window.__slowPrice = false
@@ -129,6 +132,12 @@ function installMockApi() {
     window.__requests.push(url.pathname + url.search)
     if (window.__mode === "offline")
       return new Response("offline", { status: 503 })
+    if (url.pathname === "/api/simulate") {
+      const input = JSON.parse(options.body)
+      const area = input.custom_planted_extent_ha ?? 1234
+      const yieldValue = input.custom_yield_mt_ha ?? 4
+      return Response.json({ crop: input.crop, area_ha: area, yield_mt_ha: yieldValue, scenarios: { low: { supply_mt: 300, demand_mt: 600, gap_mt: -300, spi_ratio: 0.5, spi_label: "Shortage" }, mid: { supply_mt: 600, demand_mt: 600, gap_mt: 0, spi_ratio: 1, spi_label: "Balanced" }, high: { supply_mt: 900, demand_mt: 600, gap_mt: 300, spi_ratio: 1.5, spi_label: "Glut" } }, run_id: "SIMULATION-FIXTURE" })
+    }
     if (url.pathname === "/api/auth/me") return Response.json(window.__identity)
     if (url.pathname === "/api/history/log-action") {
       window.__writes.push(JSON.parse(options.body))
@@ -418,6 +427,32 @@ try {
   assert.ok((await main()).includes("a".repeat(64)))
   assert.deepEqual(errors, [], "no uncaught browser exceptions after writes")
   console.log("PASS: missing IDs and failed/malformed writes never show success; valid server IDs and hash are displayed unchanged")
+  await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false })
+  await evaluate("document.querySelector('.context-controls .select-control').click()")
+  await until(() => evaluate("document.querySelectorAll('.select-dropdown-menu button').length > 0"), "visual test crop dropdown")
+  await evaluate("Array.from(document.querySelectorAll('.select-dropdown-menu button')).find(button => button.textContent.trim() === 'Big onion').click()")
+  await navigate("Overview", "12-month risk outlook")
+  assert.equal(await evaluate("getComputedStyle(document.querySelector('.sidebar')).backgroundColor"), "rgb(255, 255, 255)")
+  assert.equal(await evaluate("getComputedStyle(document.querySelector('.officer-app')).getPropertyValue('--primary').trim()"), "#1b7f4b")
+  assert.equal(await evaluate("document.querySelectorAll('.heat-cell').length"), 12)
+  assert.equal(await evaluate("document.querySelectorAll('.kpi-tile').length"), 4)
+  await evaluate("document.querySelector('.toast button')?.click()")
+  await delay(500)
+  const screenshot = await send("Page.captureScreenshot", { format: "png" })
+  writeFileSync(join(cache, "dashboard-original-desktop.png"), Buffer.from(screenshot.data, "base64"))
+  for (const [page, expected, file] of [["Supply pressure", "SIMULATION-FIXTURE", "supply"], ["Price outlook", "123", "price"], ["Gap & import timeline", "2026-12-30", "gap"], ["Adoption tracker", "Adoption telemetry is not available", "adoption"], ["Decision history", "SERVER-DECISION-ONE", "history"], ["Data sources", "Backend catalogue dataset", "sources"]]) {
+    await navigate(page, expected)
+    await delay(200)
+    const capture = await send("Page.captureScreenshot", { format: "png" })
+    writeFileSync(join(cache, `dashboard-original-${file}.png`), Buffer.from(capture.data, "base64"))
+  }
+  await navigate("Overview", "12-month risk outlook")
+  await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
+  await delay(200)
+  const narrow = await send("Page.captureScreenshot", { format: "png" })
+  writeFileSync(join(cache, "dashboard-original-narrow.png"), Buffer.from(narrow.data, "base64"))
+  console.log("PASS: original light dashboard palette, KPI layout and risk grid; desktop/narrow screenshots saved")
+
 } catch (error) {
   if (socket?.readyState === WebSocket.OPEN) {
     console.error(

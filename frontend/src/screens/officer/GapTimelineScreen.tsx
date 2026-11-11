@@ -53,7 +53,7 @@ export function GapTimelineScreen({
           </Button>
         }
       />
-      <label>
+      <label className="original-lead-control">
         Import lead time (weeks){" "}
         <input
           type="number"
@@ -75,7 +75,7 @@ export function GapTimelineScreen({
       />
       {!loading && !error && timeline && (
         <>
-          <div className="kpi-grid">
+          <div className="deadline-summary original-gap-summary">
             {[
               [
                 "Decision deadline",
@@ -85,13 +85,13 @@ export function GapTimelineScreen({
               ["Best gap", displayNumber(timeline.gap_best_mt, " MT")],
               ["Worst gap", displayNumber(timeline.gap_worst_mt, " MT")],
             ].map(([label, value]) => (
-              <section className="panel" style={{ padding: 20 }} key={label}>
+              <section key={label}>
                 <p>{label}</p>
                 <h2>{value}</h2>
               </section>
             ))}
           </div>
-          <section className="panel large-data-panel">
+          <section className="decision-options">
             <div className="panel-heading">
               <div>
                 <h2>
@@ -103,11 +103,11 @@ export function GapTimelineScreen({
                 </p>
               </div>
             </div>
-            {options.length === 0 ? (
+            <div className="option-grid">{options.length === 0 ? (
               <p>No options were returned.</p>
             ) : (
               options.map((option: any) => (
-                <div className="attention-item" key={option.id}>
+                <div className={`option-card ${selectedOption === option.id ? "option-card--selected" : ""}`} key={option.id}>
                   <div>
                     <strong>{option.label || option.id}</strong>
                     <p>
@@ -131,6 +131,7 @@ export function GapTimelineScreen({
                 </div>
               ))
             )}
+            </div>
             {selectedOption && <form onSubmit={async (event) => {
               event.preventDefault()
               if (submittingRef.current) return

@@ -30,8 +30,8 @@ export function DataSourcesScreen(_props: DataSourcesScreenProps) {
       />
       {!loading && !error && sources.length > 0 && (
         <section className="panel large-data-panel">
-          <div className="table-scroll">
-            <table className="audit-table">
+          <div className="data-table-wrap">
+            <table className="data-table">
               <thead>
                 <tr>
                   <th>Dataset</th>
