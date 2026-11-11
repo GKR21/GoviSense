@@ -8,6 +8,7 @@ import '../../../core/localization/app_translations.dart';
 import '../models/crop_item.dart';
 import 'widgets/mini_gauge_widget.dart';
 import 'widgets/water_drops_widget.dart';
+import 'widgets/crop_image.dart';
 
 class CropDetailPage extends StatelessWidget {
   const CropDetailPage({
@@ -35,14 +36,7 @@ class CropDetailPage extends StatelessWidget {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.network(
-                    crop.imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const ColoredBox(
-                      color: AppTheme.primaryTint,
-                      child: Icon(Icons.image_not_supported_outlined),
-                    ),
-                  ),
+                  CropImage(url: crop.imageUrl, fit: BoxFit.cover),
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(

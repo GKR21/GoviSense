@@ -15,6 +15,7 @@ import 'widgets/mini_gauge_widget.dart';
 import 'widgets/water_drops_widget.dart';
 import 'widgets/why_advice_bottom_sheet.dart';
 import 'widgets/digital_farmer_card_widget.dart';
+import 'widgets/crop_image.dart';
 import 'crop_detail_page.dart';
 import 'market_prices_page.dart';
 import '../../../shared/widgets/premium_confirm_dialog.dart';
@@ -63,7 +64,8 @@ class _FarmerPageState extends State<FarmerPage> {
     super.initState();
     _profileLandAcres = _repo.profile.totalLandAcres;
     _profileIsRainfed = _repo.profile.isRainfed;
-    _profileSoilPh = (_repo.profile.soilPh >= 5.0 && _repo.profile.soilPh <= 8.0)
+    _profileSoilPh =
+        (_repo.profile.soilPh >= 5.0 && _repo.profile.soilPh <= 8.0)
         ? _repo.profile.soilPh
         : 6.5;
     _repo.addListener(_onRepoUpdated);
@@ -82,7 +84,8 @@ class _FarmerPageState extends State<FarmerPage> {
   void _onRepoUpdated() {
     if (mounted) {
       if (_profileSoilPh < 5.0 || _profileSoilPh > 8.0) {
-        _profileSoilPh = (_repo.profile.soilPh >= 5.0 && _repo.profile.soilPh <= 8.0)
+        _profileSoilPh =
+            (_repo.profile.soilPh >= 5.0 && _repo.profile.soilPh <= 8.0)
             ? _repo.profile.soilPh
             : 6.5;
       }
@@ -823,15 +826,11 @@ class _FarmerPageState extends State<FarmerPage> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                crop.imageUrl,
+              child: CropImage(
+                url: crop.imageUrl,
                 height: 56,
                 width: 56,
                 fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => const ColoredBox(
-                  color: AppTheme.primaryTint,
-                  child: Icon(Icons.image_not_supported_outlined),
-                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -1018,15 +1017,11 @@ class _FarmerPageState extends State<FarmerPage> {
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(21),
                 ),
-                child: Image.network(
-                  crop.imageUrl,
+                child: CropImage(
+                  url: crop.imageUrl,
                   height: 140,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => const ColoredBox(
-                    color: AppTheme.primaryTint,
-                    child: Icon(Icons.image_not_supported_outlined),
-                  ),
                 ),
               ),
               Positioned(
@@ -1316,8 +1311,8 @@ class _FarmerPageState extends State<FarmerPage> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        c.imageUrl,
+                      child: CropImage(
+                        url: c.imageUrl,
                         height: 48,
                         width: 48,
                         fit: BoxFit.cover,
@@ -2495,7 +2490,8 @@ class _FarmerPageState extends State<FarmerPage> {
                 divisions: 30,
                 activeColor: AppTheme.primary,
                 label: _profileSoilPh.clamp(5.0, 8.0).toStringAsFixed(1),
-                onChanged: (val) => setState(() => _profileSoilPh = val.clamp(5.0, 8.0)),
+                onChanged: (val) =>
+                    setState(() => _profileSoilPh = val.clamp(5.0, 8.0)),
               ),
               const SizedBox(height: 8),
               // Recalibrate Button
