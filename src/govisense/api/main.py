@@ -5,8 +5,18 @@ AI 3 (Supply Pressure Index), and AI 4 (Gap-Filling Optimization).
 Also provides WP2 endpoints: /api/farmer/top3 (farmer crop recommendation).
 """
 
+import os
+
+# Containers report the host's core count, so OpenMP/BLAS (LightGBM, numpy,
+# statsmodels) spawn dozens of threads on a fraction of a CPU and training
+# crawls (40+ minutes on Railway). Must be set before those libraries load.
+for _var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
+    os.environ.setdefault(_var, "1")
+
 from contextlib import asynccontextmanager
 import logging
+import threading
+import time
 
 from fastapi import FastAPI, Query, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -147,47 +157,73 @@ a1_models: Dict[str, HarvestVolumeForecaster] = {}
 a2_models: Dict[str, PriceForecaster] = {}
 
 
+_train_lock = threading.Lock()
+
+
 def _ensure_models_loaded():
-    global cached_df
-    if cached_df is None or not a1_models:
+    if cached_df is None or len(a1_models) < 2 or len(a2_models) < 2:
         load_and_train()
 
 
-def load_and_train():
-    global cached_df, a1_models, a2_models
+def load_and_train(init_database: bool = True):
+    """Train A1/A2 models. Thread-safe: concurrent callers wait for one run."""
+    global cached_df
+    with _train_lock:
+        if init_database:
+            try:
+                init_db()
+            except Exception as e:
+                logger.warning(f"Database initialization failed: {e}")
+
+        started = time.monotonic()
+        df = engineer_features(load_monthly_dataset())
+        new_a1: Dict[str, HarvestVolumeForecaster] = {}
+        new_a2: Dict[str, PriceForecaster] = {}
+        for crop in ["big_onion", "chilli"]:
+            # AI 1
+            a1 = HarvestVolumeForecaster(crop=crop)
+            a1.train(df)
+            new_a1[crop] = a1
+
+            # AI 2
+            cutoff = df["date"].max() - pd.DateOffset(months=6)
+            a2 = PriceForecaster(crop=crop)
+            a2.train_and_select(df[df["date"] <= cutoff], df[df["date"] > cutoff])
+            new_a2[crop] = a2
+
+        # Publish only complete results; update in place so references stay valid.
+        cached_df = df
+        a1_models.update(new_a1)
+        a2_models.update(new_a2)
+        logger.info("Models trained in %.1fs", time.monotonic() - started)
+
+
+def _startup_tasks() -> None:
+    """DB setup, seeding and model training, run off the request path."""
     try:
         init_db()
-    except Exception:
-        pass
-
-    raw = load_monthly_dataset()
-    cached_df = engineer_features(raw)
-    
-    for crop in ["big_onion", "chilli"]:
-        # AI 1
-        a1 = HarvestVolumeForecaster(crop=crop)
-        a1.train(cached_df)
-        a1_models[crop] = a1
-        
-        # AI 2
-        cutoff = cached_df["date"].max() - pd.DateOffset(months=6)
-        train_s = cached_df[cached_df["date"] <= cutoff]
-        val_s = cached_df[cached_df["date"] > cutoff]
-        a2 = PriceForecaster(crop=crop)
-        a2.train_and_select(train_s, val_s)
-        a2_models[crop] = a2
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """FastAPI application lifespan: load models, initialize DB, seed users and alerts."""
-    load_and_train()
-    ensure_seed_users()
+    except Exception as e:
+        logger.warning(f"Database initialization failed: {e}")
+    try:
+        ensure_seed_users()
+    except Exception as e:
+        logger.warning(f"Failed to seed users during startup: {e}")
     try:
         from govisense.api.routes.alerts import seed_alerts_from_templates
         seed_alerts_from_templates()
     except Exception as e:
         logger.warning(f"Failed to seed alert templates during startup: {e}")
+    try:
+        load_and_train(init_database=False)
+    except Exception:
+        logger.exception("Background model training failed")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start serving immediately; DB seeding and model training run in the
+    background so auth endpoints are reachable right after a deploy."""
+    threading.Thread(target=_startup_tasks, name="govisense-startup", daemon=True).start()
     yield
 
 
