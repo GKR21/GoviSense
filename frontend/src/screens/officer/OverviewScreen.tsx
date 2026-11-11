@@ -49,7 +49,7 @@ export function OverviewScreen({
           </Button>
         }
       />
-      <div className="kpi-grid">
+      <div className="kpi-grid overview-kpi-grid">
         {cards.map(([label, value]) => (
           <section className="panel" style={{ padding: 20 }} key={label}>
             <p>{label}</p>

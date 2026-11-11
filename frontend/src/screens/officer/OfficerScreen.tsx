@@ -126,6 +126,13 @@ export function OfficerScreen({
   const { data: alertResponse, refetch: reloadAlerts } = useAlerts()
   const alertsData = Array.isArray(alertResponse) ? alertResponse : alertResponse?.alerts
 
+  // Simulation / confidence state
+  const [area, setArea] = useState(0)
+  const [yieldValue, setYieldValue] = useState(0)
+  const [currentProfile, setCurrentProfile] = useState({ baselineArea: 0, baselineYield: 0 })
+  const [confidenceEvaluation, setConfidenceEvaluation] = useState<Awaited<ReturnType<typeof fetchConfidenceBadge>> | null>(null)
+  const [confidenceError, setConfidenceError] = useState<string | null>(null)
+
   const cropApiKey = cropApiId(selectedCrop)
   const currentApiCropData: CropForecastData | undefined = forecastData?.crops?.[cropApiKey]
   const changed = area !== currentProfile.baselineArea || yieldValue !== currentProfile.baselineYield

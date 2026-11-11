@@ -6,7 +6,7 @@
   "scripts": {
     "test": "node --test tests/*.test.mjs",
     "test:browser": "node tests/officer-dashboard.browser.mjs",
-    "dev": "vite",
+    "dev": "vite --host localhost",
     "build": "vite build",
     "preview": "vite preview",
     "format": "oxfmt"

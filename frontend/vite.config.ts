@@ -11,9 +11,9 @@ export default defineConfig({
     },
   },
   server: {
-    host: "0.0.0.0",
-    port: Number(process.env.PORT || 8443),
-    strictPort: true,
+    host: "127.0.0.1",
+    port: Number(process.env.PORT || 3000),
+    strictPort: false,
     proxy: {
       "/api": {
         target: process.env.GOVISENSE_BACKEND_URL || "https://govisense-production.up.railway.app",
@@ -22,9 +22,9 @@ export default defineConfig({
     },
   },
   preview: {
-    host: "0.0.0.0",
-    port: Number(process.env.PORT || 8443),
-    strictPort: true,
+    host: "127.0.0.1",
+    port: Number(process.env.PORT || 3000),
+    strictPort: false,
     proxy: {
       "/api": {
         target: process.env.GOVISENSE_BACKEND_URL || "https://govisense-production.up.railway.app",
