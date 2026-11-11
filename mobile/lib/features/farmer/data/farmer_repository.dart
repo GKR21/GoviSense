@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/foundation.dart';
 
 import '../../auth/data/auth_repository.dart';
@@ -7,6 +5,7 @@ import '../models/crop_item.dart';
 import '../models/planting_report.dart';
 import '../models/farmer_alert.dart';
 import '../models/farmer_profile.dart';
+import '../models/market_price_item.dart';
 import '../services/farmer_api_service.dart';
 
 class FarmerRepository extends ChangeNotifier {
@@ -24,6 +23,7 @@ class FarmerRepository extends ChangeNotifier {
   late List<CropItem> _crops;
   late List<PlantingReport> _reports;
   late List<FarmerAlert> _alerts;
+  late List<MarketPriceItem> _marketPrices;
   late FarmerProfile _profile;
 
   bool _isLoadingApi = false;
@@ -32,6 +32,7 @@ class FarmerRepository extends ChangeNotifier {
   List<CropItem> get crops => List.unmodifiable(_crops);
   List<PlantingReport> get reports => List.unmodifiable(_reports);
   List<FarmerAlert> get alerts => List.unmodifiable(_alerts);
+  List<MarketPriceItem> get marketPrices => List.unmodifiable(_marketPrices);
   FarmerProfile get profile => _profile;
   bool get isLoadingApi => _isLoadingApi;
   bool get isLiveConnected => _isLiveConnected;
@@ -40,6 +41,19 @@ class FarmerRepository extends ChangeNotifier {
       _reports.where((r) => r.status == 'pending').toList();
 
   int get unreadAlertsCount => _alerts.where((a) => !a.isRead).length;
+
+  String get decPriceSummary {
+    if (_marketPrices.isNotEmpty) {
+      final p1 = _marketPrices[0];
+      final part1 = '${p1.economicCenterEn}: ${p1.cropEn} ${p1.wholesalePrice}';
+      if (_marketPrices.length > 1) {
+        final p2 = _marketPrices[1];
+        return '$part1 · ${p2.cropEn} ${p2.wholesalePrice}';
+      }
+      return part1;
+    }
+    return 'Live market prices unavailable';
+  }
 
   void _initData() {
     final user = AuthRepository.instance;
@@ -56,10 +70,68 @@ class FarmerRepository extends ChangeNotifier {
       farmerId: user.username ?? '',
       name: user.name ?? '',
       district: user.district ?? '',
+      totalLandAcres: 0,
     );
     _crops = <CropItem>[];
     _reports = <PlantingReport>[];
     _alerts = <FarmerAlert>[];
+    _marketPrices = <MarketPriceItem>[];
+  }
+
+  /// Synchronize authenticated user profile and trigger live telemetry refresh
+  void syncWithAuthUser({
+    required String username,
+    String? fullName,
+    String? district,
+    String? pseudonymousId,
+    double? totalLandAcres,
+  }) {
+    final effName = (fullName != null && fullName.isNotEmpty)
+        ? fullName
+        : (username.isNotEmpty ? username : _profile.name);
+    final effDist = (district != null && district.isNotEmpty)
+        ? district
+        : _profile.district;
+    _profile = _profile.copyWith(
+      farmerId: pseudonymousId ?? _profile.farmerId,
+      name: effName,
+      district: effDist,
+      division: _profile.division,
+      totalLandAcres: totalLandAcres ?? _profile.totalLandAcres,
+      lastSyncTime: 'Just now',
+    );
+    notifyListeners();
+    refreshRecommendations();
+    refreshAlerts();
+    refreshMarketPrices();
+  }
+
+  /// Reset to clean guest state on logout
+  void resetToGuest() {
+    _initData();
+    notifyListeners();
+  }
+
+  /// Refreshes market prices from live API
+  Future<void> refreshMarketPrices() async {
+    try {
+      final prices = await _apiService.getMarketPrices();
+      if (prices != null && prices.isNotEmpty) {
+        _marketPrices = prices;
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  /// Refreshes alerts from live API
+  Future<void> refreshAlerts() async {
+    try {
+      final liveAlerts = await _apiService.getAlerts();
+      if (liveAlerts != null && liveAlerts.isNotEmpty) {
+        _alerts = liveAlerts;
+        notifyListeners();
+      }
+    } catch (_) {}
   }
 
   /// Updates farmer profile parcel conditions and recalibrates recommendations
@@ -141,8 +213,6 @@ class FarmerRepository extends ChangeNotifier {
       (c) => c.id == cropId,
       orElse: () => _crops.first,
     );
-    final rng = Random();
-    final hexCode = rng.nextInt(0xFFFFFF).toRadixString(16).padLeft(6, '0');
     final localId =
         'LOCAL-${DateTime.now().microsecondsSinceEpoch}-${++_localReportSequence}';
 
@@ -159,8 +229,7 @@ class FarmerRepository extends ChangeNotifier {
       irrigationType: irrigationType,
       seedSource: seedSource,
       timestamp: DateTime.now().toString().substring(0, 16),
-      receiptHash:
-          '0x$hexCode...${rng.nextInt(0xFFFF).toRadixString(16).toUpperCase()}',
+      receiptHash: '',
       status: 'pending',
       harvestOutcomeMt: harvestOutcomeMt,
       salePriceRsKg: salePriceRsKg,

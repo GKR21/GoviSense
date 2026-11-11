@@ -98,7 +98,7 @@ class AppTranslations {
       'navAlerts': 'Alerts',
       'navProfile': 'Profile',
       // Home
-      'greeting': 'Ayubowan, Sunil',
+      'greeting': 'Ayubowan',
       'greetingSub': 'Ready for Maha 2026 planting decisions',
       'decisionWindow': 'OPTIMAL DECISION WINDOW',
       'daysLeft': '11 Days Left to Decide',
@@ -191,7 +191,7 @@ class AppTranslations {
       'navAlerts': 'දැනුම්දීම්',
       'navProfile': 'ගිණුම',
       // Home
-      'greeting': 'ආයුබෝවන්, සුනිල්',
+      'greeting': 'ආයුබෝවන්',
       'greetingSub': '2026 මහ කන්නයේ බෝග තීරණයට සූදානම් වන්න',
       'decisionWindow': 'තීරණාත්මක කාල සීමාව',
       'daysLeft': 'තීරණය ගැනීමට තව දින 11යි',
@@ -287,7 +287,7 @@ class AppTranslations {
       'navAlerts': 'அறிவிப்புகள்',
       'navProfile': 'விவரக்குறிப்பு',
       // Home
-      'greeting': 'வணக்கம், சுனில்',
+      'greeting': 'வணக்கம்',
       'greetingSub': '2026 மகா பருவ பயிர் முடிவுகளுக்குத் தயாராகுங்கள்',
       'decisionWindow': 'முக்கியமான கால அவகாசம்',
       'daysLeft': 'முடிவெடுக்க இன்னும் 11 நாட்கள்',

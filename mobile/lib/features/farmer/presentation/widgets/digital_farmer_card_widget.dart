@@ -137,7 +137,9 @@ class DigitalFarmerCardWidget extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   LocalizedText(
-                    profile.farmerId,
+                    profile.farmerId.isNotEmpty
+                        ? profile.farmerId
+                        : 'LK-AP-FARMER',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 22,
@@ -148,7 +150,9 @@ class DigitalFarmerCardWidget extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   LocalizedText(
-                    profile.name,
+                    profile.name.isNotEmpty
+                        ? profile.name
+                        : 'Registered Farmer',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 14,
@@ -214,7 +218,7 @@ class DigitalFarmerCardWidget extends StatelessWidget {
                       style: TextStyle(color: Colors.white70, fontSize: 9),
                     ),
                     LocalizedText(
-                      '${profile.totalLandAcres} Ac (${profile.isRainfed ? "Rainfed" : "Irrigated"})',
+                      '${profile.totalLandAcres > 0 ? profile.totalLandAcres : "Not provided"} Ac (${profile.isRainfed ? "Rainfed" : "Irrigated"})',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 11,
@@ -231,7 +235,9 @@ class DigitalFarmerCardWidget extends StatelessWidget {
                       style: TextStyle(color: Colors.white70, fontSize: 9),
                     ),
                     LocalizedText(
-                      '${profile.soilPh.toStringAsFixed(1)} pH',
+                      profile.soilPh > 0
+                          ? '${profile.soilPh.toStringAsFixed(1)} pH'
+                          : 'Not provided',
                       style: const TextStyle(
                         color: AppTheme.accent,
                         fontSize: 11,

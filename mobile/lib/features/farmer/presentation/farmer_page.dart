@@ -130,6 +130,7 @@ class _FarmerPageState extends State<FarmerPage> {
     return Scaffold(
       appBar: AppBar(
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: const EdgeInsets.all(6),
@@ -144,44 +145,55 @@ class _FarmerPageState extends State<FarmerPage> {
               ),
             ),
             const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      AppTranslations.t(_language, 'appName'),
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 1,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryTint,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'Maha 2026',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primary,
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          AppTranslations.t(_language, 'appName'),
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
+                      const SizedBox(width: 5),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryTint,
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: const Text(
+                          'Maha 2026',
+                          style: TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    '${_repo.profile.district.isNotEmpty ? _repo.profile.district : 'Anuradhapura'} District',
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      color: AppTheme.neutral600,
                     ),
-                  ],
-                ),
-                const Text(
-                  'Anuradhapura District',
-                  style: TextStyle(fontSize: 11, color: AppTheme.neutral600),
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -357,15 +369,32 @@ class _FarmerPageState extends State<FarmerPage> {
                 ],
               ),
               const SizedBox(height: 10),
-              Text(
-                _repo.profile.name.isEmpty
-                    ? AppTranslations.t(_language, 'greeting')
-                    : 'Ayubowan, ${_repo.profile.name.replaceAll(RegExp(r'@.*$'), '')}!',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+              Builder(
+                builder: (context) {
+                  final greetingPrefix = AppTranslations.t(
+                    _language,
+                    'greeting',
+                  );
+                  final rawName = _repo.profile.name.isNotEmpty
+                      ? _repo.profile.name
+                      : (AuthRepository.instance.name ??
+                            AuthRepository.instance.username ??
+                            '');
+                  final cleanName = rawName.isNotEmpty
+                      ? rawName.replaceAll(RegExp(r'@.*$'), '')
+                      : '';
+                  final greetingText = cleanName.isNotEmpty
+                      ? '$greetingPrefix, $cleanName'
+                      : greetingPrefix;
+                  return Text(
+                    greetingText,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 2),
               LocalizedText(
@@ -433,21 +462,45 @@ class _FarmerPageState extends State<FarmerPage> {
                         ),
                       ),
                       const SizedBox(height: 2),
-                      LocalizedText(
-                        AppTranslations.t(_language, 'weatherAlertTitle'),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.ink,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      LocalizedText(
-                        AppTranslations.t(_language, 'weatherAlertDesc'),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppTheme.neutral600,
-                        ),
+                      Builder(
+                        builder: (context) {
+                          final alert = _repo.alerts.isNotEmpty
+                              ? _repo.alerts.first
+                              : null;
+                          final title = alert != null
+                              ? alert.localizedTitle(_language)
+                              : AppTranslations.t(
+                                  _language,
+                                  'weatherAlertTitle',
+                                );
+                          final desc = alert != null
+                              ? alert.localizedMessage(_language)
+                              : AppTranslations.t(
+                                  _language,
+                                  'weatherAlertDesc',
+                                );
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.ink,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                desc,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.neutral600,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -518,9 +571,9 @@ class _FarmerPageState extends State<FarmerPage> {
                         ],
                       ),
                       const SizedBox(height: 2),
-                      const LocalizedText(
-                        'Dambulla DEC: Big Onion Rs. 320–365 · Chilli Rs. 240–280',
-                        style: TextStyle(
+                      Text(
+                        _repo.decPriceSummary,
+                        style: const TextStyle(
                           fontSize: 11,
                           color: AppTheme.neutral600,
                         ),
@@ -587,14 +640,32 @@ class _FarmerPageState extends State<FarmerPage> {
                     color: AppTheme.ink,
                   ),
                 ),
-                Text(
-                  _repo.profile.totalLandAcres > 0
-                      ? 'Calculated for ${_repo.profile.totalLandAcres} acres in ${_repo.profile.district}'
-                      : 'Live recommendations for your farm',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppTheme.neutral600,
-                  ),
+                Builder(
+                  builder: (context) {
+                    final acres = _repo.profile.totalLandAcres;
+                    final dist = _repo.profile.district;
+                    if (acres <= 0 || dist.isEmpty) {
+                      return const LocalizedText(
+                        'Farmer profile data is not available yet.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.neutral600,
+                        ),
+                      );
+                    }
+                    final text = _language == AppLanguage.si
+                        ? '$dist දිස්ත්‍රික්කයේ අක්කර $acres සඳහා ගණනය කර ඇත'
+                        : _language == AppLanguage.ta
+                        ? '$dist-ல் $acres ஏக்கருக்கு கணக்கிடப்பட்டது'
+                        : 'Calculated for $acres acres in $dist';
+                    return Text(
+                      text,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.neutral600,
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -738,6 +809,10 @@ class _FarmerPageState extends State<FarmerPage> {
                 height: 56,
                 width: 56,
                 fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const ColoredBox(
+                  color: AppTheme.primaryTint,
+                  child: Icon(Icons.image_not_supported_outlined),
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -929,6 +1004,10 @@ class _FarmerPageState extends State<FarmerPage> {
                   height: 140,
                   width: double.infinity,
                   fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => const ColoredBox(
+                    color: AppTheme.primaryTint,
+                    child: Icon(Icons.image_not_supported_outlined),
+                  ),
                 ),
               ),
               Positioned(
@@ -2473,13 +2552,25 @@ class _FarmerPageState extends State<FarmerPage> {
                 ),
               ),
               const SizedBox(height: 6),
-              LocalizedText(
-                'Signed in as ${profile.name} (${profile.farmerId})',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: AppTheme.neutral600,
-                ),
+              Builder(
+                builder: (context) {
+                  final displayName = profile.name.isNotEmpty
+                      ? profile.name
+                      : (AuthRepository.instance.name ??
+                            AuthRepository.instance.username ??
+                            'Farmer');
+                  final displayId = profile.farmerId.isNotEmpty
+                      ? profile.farmerId
+                      : (AuthRepository.instance.username ?? 'LK-AP-FARMER');
+                  return Text(
+                    'Signed in as $displayName ($displayId)',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.neutral600,
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 16),
               Material(
@@ -2565,7 +2656,8 @@ class _FarmerPageState extends State<FarmerPage> {
       context,
       title: title,
       message: message,
-      accountInfo: '${_repo.profile.name} · ${_repo.profile.farmerId}',
+      accountInfo:
+          '${_repo.profile.name.isNotEmpty ? _repo.profile.name : (AuthRepository.instance.name ?? AuthRepository.instance.username ?? 'Farmer')} · ${_repo.profile.farmerId.isNotEmpty ? _repo.profile.farmerId : (AuthRepository.instance.username ?? 'LK-AP-FARMER')}',
       roleBadge: 'Farmer',
       confirmText: confirmText,
       cancelText: cancelText,
@@ -2575,5 +2667,4 @@ class _FarmerPageState extends State<FarmerPage> {
       },
     );
   }
-
 }

@@ -22,7 +22,7 @@ class PlantingReport {
     this.salePriceRsKg,
     this.saleChannel,
     this.consentGiven = true,
-    this.pseudonymousId = 'LK-NC-0842',
+    this.pseudonymousId = '',
     this.season = 'Maha 2026',
     this.notes,
   }) : clientId = clientId ?? id;

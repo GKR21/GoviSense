@@ -80,6 +80,7 @@ class UserProfile(BaseModel):
     full_name: Optional[str] = None
     phone_number: Optional[str] = None
     district: Optional[str] = "Anuradhapura"
+    pseudonymous_id: Optional[str] = None
     is_active: bool = True
     created_at: Optional[str] = None
 
@@ -338,6 +339,7 @@ async def login(
         "id": user.id or 1,
         "name": user.full_name or user.username.split("@")[0],
         "district": user.district or "Anuradhapura",
+        "pseudonymous_id": user.pseudonymous_id,
     }
 
     access_token = create_access_token(claims)
@@ -352,6 +354,7 @@ async def login(
         district=user.district,
         is_active=user.is_active,
         created_at=user.created_at.isoformat() if user.created_at else None,
+        pseudonymous_id=user.pseudonymous_id,
     )
 
     return TokenPair(
@@ -412,6 +415,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenPa
     claims = {
         "sub": user.username, "role": user.role, "user_id": user.user_id, "id": user.id or 1,
         "name": user.full_name or user.username, "district": user.district or payload.district,
+        "pseudonymous_id": user.pseudonymous_id,
     }
     return TokenPair(
         access_token=create_access_token(claims),
@@ -421,7 +425,8 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenPa
         user=UserProfile(id=user.id or 1, username=user.username, role=user.role,
                          full_name=user.full_name, phone_number=user.phone_number,
                          district=user.district, is_active=True,
-                         created_at=user.created_at.isoformat() if user.created_at else None),
+                         created_at=user.created_at.isoformat() if user.created_at else None,
+                         pseudonymous_id=user.pseudonymous_id),
     )
 
 
@@ -534,4 +539,3 @@ def get_me(current_user: User = Depends(get_current_user)) -> UserProfile:
         is_active=current_user.is_active,
         created_at=current_user.created_at.isoformat() if current_user.created_at else None,
     )
-
