@@ -47,7 +47,6 @@ import {
   SliderField,
   RiskBadge,
   ConfidenceBadge,
-  WorkspaceSwitcher,
   ScreenStateView,
 } from "../../components/common"
 import { SimulationScreen } from "./SimulationScreen"
@@ -312,7 +311,6 @@ export function OfficerScreen({
             </div>
           </div>
           <div className="topbar-actions">
-            <WorkspaceSwitcher view={view} setView={setView} compact={true} />
             <label className="state-preview">
               <span>Preview state</span>
               <select

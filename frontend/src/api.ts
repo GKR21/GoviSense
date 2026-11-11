@@ -649,6 +649,40 @@ export async function loginUser(
   }
 }
 
+export async function registerUser(payload: {
+  full_name: string
+  role: "officer" | "farmer"
+  district: string
+  username: string
+  password: string
+}): Promise<LoginResult> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) return { success: false, error: data.detail || `Registration failed (HTTP ${res.status}).` }
+    const token = typeof data.access_token === "string" ? data.access_token : ""
+    const rawUser = data.user
+    const returnedRole = typeof rawUser?.role === "string" ? rawUser.role.toLowerCase() : payload.role
+    if (!token || !rawUser || !["officer", "farmer"].includes(returnedRole)) return { success: false, error: "Registration response was incomplete." }
+    const user: AuthUser = {
+      email: String(rawUser.username || payload.username),
+      role: returnedRole === "farmer" ? "Farmer" : "Officer",
+      name: String(rawUser.full_name || payload.full_name),
+      designation: returnedRole === "farmer" ? "Registered Farmer" : "Agricultural Extension Officer",
+      district: String(rawUser.district || payload.district),
+      officer_id: "",
+    }
+    saveAuthSession(token, user)
+    return { success: true, token, user }
+  } catch {
+    return { success: false, error: "Registration failed. Check your connection and try again." }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Typed Endpoints & Mutation Methods
 // ---------------------------------------------------------------------------

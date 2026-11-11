@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react"
 import type { View } from "../../types"
-import { WorkspaceSwitcher } from "../../components/common/WorkspaceSwitcher"
 import type {
   Language,
   FarmerPage,
@@ -114,7 +113,6 @@ export function FarmerScreen({
     <div className="min-h-screen bg-stone-100/90 py-6 px-3 flex flex-col items-center justify-start font-sans antialiased text-stone-900">
       {setView && (
         <div style={{ marginBottom: 20 }}>
-          <WorkspaceSwitcher view={view} setView={setView} />
         </div>
       )}
       {/* Visual Frame Wrapper (Responsive: mobile width container on desktop, full-width on mobile) */}
