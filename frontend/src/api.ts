@@ -303,6 +303,7 @@ export async function fetchGapTimeline(cropId?: string, season?: string, leadWee
 export async function fetchPriceOutlook(cropId?: string) {
   const data = await readApi('/api/forecasts/price-outlook', { crop_id: cropId })
   if (!data.crops || typeof data.crops !== 'object' || Array.isArray(data.crops)) throw new Error('Invalid price outlook response')
+  if (cropId && data.crops[cropId] !== undefined && typeof data.crops[cropId] !== 'object') throw new Error('Invalid price forecast for this crop')
   return data
 }
 

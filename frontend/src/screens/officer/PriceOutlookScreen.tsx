@@ -21,6 +21,9 @@ export function PriceOutlookScreen({
   const cropId = cropApiId(crop)
   const { data, loading, error, refetch } = usePriceOutlook(cropId)
   const outlook = data?.crops?.[cropId]
+  const isChilli = cropId === "chilli"
+  const baselineServed = data?.baseline_served === true || /baseline/i.test(String(data?.served_model || ""))
+  const intervalCoverage = data?.interval_coverage_pct ?? data?.coverage_pct ?? outlook?.interval_coverage_pct
   return (
     <>
       <PageHeading
@@ -86,14 +89,17 @@ export function PriceOutlookScreen({
             Fair floor:{" "}
             {displayNumber(outlook.fair_floor_price_rs_kg, " Rs/kg")}
           </p>
-          <p>
-            Model reported by backend:{" "}
-            {outlook.price_model_used || data.served_model || "Not available"}
-          </p>
+          <div className="kpi-grid kpi-grid--three">
+            <div><p>Model used</p><strong>{outlook.price_model_used || data.served_model || "Not available"}</strong></div>
+            <div><p>Baseline status</p><strong>{data?.baseline_served === true || data?.baseline_name ? (baselineServed ? "Baseline served" : "Model served") : "Not reported"}</strong></div>
+            <div><p>Interval coverage</p><strong>{typeof intervalCoverage === "number" && Number.isFinite(intervalCoverage) ? `${intervalCoverage}%` : "Not available"}</strong></div>
+          </div>
+          {!isChilli && outlook.direction && <p>Direction: {outlook.direction}</p>}
           <p>
             Data quality: {data.data_quality || "Not available"} | Data version:{" "}
             {data.data_version || "Not available"}
           </p>
+          <p>Data age: {typeof data.data_age_days === "number" ? `${data.data_age_days} days` : "Not available"}</p>
           {data.is_demo === true && <p role="status">Demo or synthetic data</p>}
         </section>
       )}
