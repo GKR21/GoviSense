@@ -1362,12 +1362,13 @@ class _FarmerPageState extends State<FarmerPage> {
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [0.5, 1.0, 1.5, 2.0, 3.0].map((acres) {
-              final isSelected = _reportedAreaAcres == acres;
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 3),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [0.5, 1.0, 1.5, 2.0, 3.0].map((acres) {
+                final isSelected = _reportedAreaAcres == acres;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
                   child: ChoiceChip(
                     label: LocalizedText('$acres ac'),
                     selected: isSelected,
@@ -1380,9 +1381,9 @@ class _FarmerPageState extends State<FarmerPage> {
                       fontSize: 11,
                     ),
                   ),
-                ),
-              );
-            }).toList(),
+                );
+              }).toList(),
+            ),
           ),
           const SizedBox(height: 18),
           const LocalizedText(
@@ -2353,12 +2354,13 @@ class _FarmerPageState extends State<FarmerPage> {
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 6),
-              Row(
-                children: [0.5, 1.0, 1.5, 2.0, 3.0].map((acres) {
-                  final isSelected = _profileLandAcres == acres;
-                  return Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [0.5, 1.0, 1.5, 2.0, 3.0].map((acres) {
+                    final isSelected = _profileLandAcres == acres;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
                       child: ChoiceChip(
                         label: LocalizedText('$acres'),
                         selected: isSelected,
@@ -2371,9 +2373,9 @@ class _FarmerPageState extends State<FarmerPage> {
                           fontSize: 11,
                         ),
                       ),
-                    ),
-                  );
-                }).toList(),
+                    );
+                  }).toList(),
+                ),
               ),
               const SizedBox(height: 14),
               // Irrigation Toggle
