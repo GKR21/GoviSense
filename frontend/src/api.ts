@@ -321,7 +321,7 @@ export async function fetchGroundReports(cropId?: string, district?: string) {
 
 export async function fetchDataCatalogue() {
   const data = await readApi('/api/catalogue', {})
-  if (!Array.isArray(data)) throw new Error('Invalid catalogue response')
+  if (!Array.isArray(data) || data.some((item: any) => !item || typeof item.dataset_id !== "string" || typeof item.title !== "string")) throw new Error('Invalid catalogue response')
   return data
 }
 

@@ -9,6 +9,12 @@ export interface DataSourcesScreenProps {
 export function DataSourcesScreen(_props: DataSourcesScreenProps) {
   const { data, loading, error, refetch } = useDataCatalogue()
   const sources = Array.isArray(data) ? data : []
+  const ageDays = (value: unknown) => {
+    if (typeof value !== "string") return null
+    const retrieved = new Date(value)
+    if (!Number.isFinite(retrieved.getTime())) return null
+    return Math.max(0, Math.floor((Date.now() - retrieved.getTime()) / 86400000))
+  }
   return (
     <>
       <PageHeading
@@ -38,6 +44,7 @@ export function DataSourcesScreen(_props: DataSourcesScreenProps) {
                   <th>Publisher</th>
                   <th>Licence</th>
                   <th>Retrieved</th>
+                  <th>Age</th>
                   <th>Coverage</th>
                   <th>Source type</th>
                 </tr>
@@ -45,14 +52,13 @@ export function DataSourcesScreen(_props: DataSourcesScreenProps) {
               <tbody>
                 {sources.map((source: any, index: number) => (
                   <tr key={source.dataset_id || index}>
-                    <td>
-                      {source.title || source.dataset_id || "Not available"}
-                    </td>
+                    <td><strong>{source.title || source.dataset_id || "Not available"}</strong>{source.source_url && <a href={source.source_url} target="_blank" rel="noreferrer">Open source</a>}</td>
                     <td>{source.publisher || "Not available"}</td>
                     <td>{source.licence || "Not available"}</td>
                     <td>{source.date_retrieved || "Not available"}</td>
+                    <td>{ageDays(source.date_retrieved) == null ? "Not available" : `${ageDays(source.date_retrieved)} days`}</td>
                     <td>{source.temporal_range || "Not available"}</td>
-                    <td>{source.source_type || "Not available"}</td>
+                    <td>{source.source_type || "Not supplied by catalogue"}</td>
                   </tr>
                 ))}
               </tbody>
