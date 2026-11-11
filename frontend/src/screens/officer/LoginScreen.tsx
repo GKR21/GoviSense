@@ -73,7 +73,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
       <div className="login-story">
         <div className="brand brand--login">
           <div className="brand__mark">
-            <Sprout size={23} />
+            <img src="/govisense-logo.png" alt="GoviSense logo" />
           </div>
           <div>
             <strong>GoviSense</strong>
