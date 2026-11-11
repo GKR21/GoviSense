@@ -60,6 +60,7 @@ import {
   acknowledgeAlertApi,
   useLatestForecasts,
   cropApiId,
+  fetchConfidenceBadge,
   type CropForecastData,
   type AuthUser,
 } from "../../api"
@@ -127,6 +128,15 @@ export function OfficerScreen({
   const { data: forecastData, loading: forecastLoading, error: forecastError, refetch: reloadForecasts } = useLatestForecasts(cropApiKey)
   const isLiveApi = forecastData?.isLive === true
   const currentApiCropData: CropForecastData | undefined = forecastData?.crops[cropApiKey]
+  const [confidenceEvaluation, setConfidenceEvaluation] = useState<Awaited<ReturnType<typeof fetchConfidenceBadge>> | null>(null)
+  const [confidenceError, setConfidenceError] = useState<string | null>(null)
+  useEffect(() => {
+    let active = true
+    setConfidenceEvaluation(null); setConfidenceError(null)
+    if (!currentUser) return () => { active = false }
+    fetchConfidenceBadge(cropApiKey).then(result => { if (active) setConfidenceEvaluation(result) }).catch(error => { if (active) setConfidenceError(error instanceof Error ? error.message : "Confidence unavailable") })
+    return () => { active = false }
+  }, [cropApiKey, currentUser])
 
   const recordDecision = async (value: string, details?: Partial<PolicyDecision>) => {
     setSaved(false)
@@ -316,7 +326,7 @@ export function OfficerScreen({
                 <option value="error">Error</option>
               </select>
             </label>
-            <span className="original-confidence">Confidence: {currentApiCropData?.ai2_price_forecast?.confidence ?? "Not available"}</span>
+            <span className="original-confidence">Confidence: {confidenceEvaluation ? `${confidenceEvaluation.badge} (${confidenceEvaluation.score_pct}%)` : confidenceError ? "Not available" : "Loading"}</span>
             <div style={{ position: "relative", display: "inline-flex" }}>
               <IconButton icon={Bell} label="Notifications" onClick={() => setAlertsOpen(true)} />
               {alertsData && alertsData.length > 0 && (
@@ -350,6 +360,8 @@ export function OfficerScreen({
         </header>
 
         <main className="officer-content">
+          {(forecastData?.is_demo === true || /demo|synthetic/i.test(forecastData?.data_quality || "") || confidenceEvaluation?.is_demo === true) && <div className="alert-banner alert-banner--warning" role="status">Demo or synthetic data is being displayed.</div>}
+          {confidenceEvaluation?.badge === "low" && <div className="alert-banner alert-banner--warning" role="status"><strong>{cropApiKey === "chilli" ? "Chilli low confidence:" : "Low confidence:"}</strong> {confidenceEvaluation.reasons.join(" ") || "The backend did not provide a reason."}</div>}
           {decisionError && <div className="alert-banner" role="alert">{decisionError}</div>}
           {screenState !== "ready" ? (
             <ScreenStateView

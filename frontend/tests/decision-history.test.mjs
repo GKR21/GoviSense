@@ -76,3 +76,16 @@ test("history filters and missing provenance remain honest", async () => {
  assert.equal(row.leadTime, null)
  assert.equal(row.timestamp, "Not available")
 })
+
+test("confidence indicators use the backend response without fabricated fallback data", async () => {
+ globalThis.fetch = async url => {
+   assert.equal(new URL(url).pathname, "/api/confidence/badge")
+   assert.equal(new URL(url).searchParams.get("crop_id"), "chilli")
+   return Response.json({ crop_id: "chilli", badge: "low", score_pct: 42, reasons: ["SPI validation failed"] })
+ }
+ const response = await api.fetchConfidenceBadge("Chilli")
+ assert.equal(response.badge, "low")
+ assert.deepEqual(response.reasons, ["SPI validation failed"])
+ globalThis.fetch = async () => new Response("offline", { status: 503 })
+ await assert.rejects(() => api.fetchConfidenceBadge("Chilli"), /503/)
+})
