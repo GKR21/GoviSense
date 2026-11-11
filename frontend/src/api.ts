@@ -465,8 +465,8 @@ export function mapApiRecordToPolicyDecision(r: DecisionRecordApi): import("./ty
   const act = action.toUpperCase()
   const category = /STORAGE|HOLD|BUFFER/.test(act) ? "Storage buffer"
     : /TARIFF|DUTY|LEVY/.test(act) ? "Tariff adjustment"
-    : /ADVISORY|PLANT/.test(act) ? "Planting advisory"
-    : /IMPORT/.test(act) ? "Import quota" : "Other"
+      : /ADVISORY|PLANT/.test(act) ? "Planting advisory"
+        : /IMPORT/.test(act) ? "Import quota" : "Other"
   const assumptions = r.assumptions || {}
   const lead = assumptions.lead_time_weeks ?? assumptions.import_lead_time_weeks
   return {
@@ -588,7 +588,7 @@ export function saveAuthSession(token: string, user: AuthUser, persist: boolean 
       sessionStorage.setItem(AUTH_TOKEN_KEY, token)
       sessionStorage.setItem(AUTH_USER_KEY, JSON.stringify(user))
     }
-  } catch {}
+  } catch { }
 }
 
 export function clearAuthSession() {
@@ -598,7 +598,7 @@ export function clearAuthSession() {
     localStorage.removeItem(AUTH_USER_KEY)
     sessionStorage.removeItem(AUTH_TOKEN_KEY)
     sessionStorage.removeItem(AUTH_USER_KEY)
-  } catch {}
+  } catch { }
 }
 
 export function getAuthHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
@@ -704,7 +704,7 @@ export async function fetchHealth() {
 }
 
 export async function fetchEvaluationScoreboard(cropId?: string) {
-  const url = new URL(`${API_BASE_URL}/api/evaluation/scoreboard`)
+  const url = apiUrl("/api/evaluation/scoreboard")
   if (cropId) url.searchParams.set("crop_id", cropId)
   const res = await fetch(url.toString(), { headers: getAuthHeaders() })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
