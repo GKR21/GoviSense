@@ -2,8 +2,13 @@ import { useState, useEffect } from "react"
 import type { View } from "./types"
 import { OfficerScreen } from "./screens/officer/OfficerScreen"
 import { FarmerScreen } from "./screens/farmer/FarmerScreen"
+import { LoginScreen } from "./screens/officer/LoginScreen"
+import { getStoredAuthToken, getStoredAuthUser } from "./api"
 
 export default function App() {
+  const [, setAuthVersion] = useState(0)
+  const storedUser = getStoredAuthUser()
+  const authenticated = Boolean(getStoredAuthToken() && storedUser && (storedUser.role === "Officer" || storedUser.role === "Admin"))
   const [view, setView] = useState<View>(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search)
@@ -38,6 +43,10 @@ export default function App() {
       window.removeEventListener("offline", handleOffline)
     }
   }, [])
+
+  if (!authenticated) {
+    return <div className="auth-gate"><LoginScreen onLogin={(role) => { setAuthVersion((value) => value + 1); handleSetView(role === "Admin" ? "admin" : "officer") }} /></div>
+  }
 
   return (
     <div className="app-shell">

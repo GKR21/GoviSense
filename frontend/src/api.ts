@@ -121,6 +121,8 @@ export interface LatestForecastsResponse {
     target_season: string
     recommendations: RecommendationItem[]
   }
+  is_demo?: boolean
+  data_quality?: string
 }
 
 export type LatestForecastsWithMeta = LatestForecastsResponse & { isLive: boolean }
@@ -268,41 +270,58 @@ export function mapPlantingReportToGroundReport(r: PlantingReportApi): GroundRep
   }
 }
 
+export interface SimulationResult {
+  crop: string
+  area_ha: number
+  yield_mt_ha: number
+  scenarios?: Partial<Record<"low" | "mid" | "high", {
+    supply_mt?: number; demand_mt?: number; gap_mt?: number; spi_ratio?: number; spi_label?: string
+  }>>
+  data_available?: boolean
+  is_demo?: boolean
+  run_id?: string
+  model_version?: string
+  data_version?: string
+  loss_pct?: number
+  import_volume_mt?: number
+}
+
 export async function simulateScenarioApi(payload: {
   crop: string
   custom_planted_extent_ha?: number
   custom_yield_mt_ha?: number
   custom_import_volume_mt?: number
   custom_loss_pct?: number
-}) {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/simulate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return await res.json()
-  } catch (err) {
-    return null
+}): Promise<SimulationResult> {
+  for (const value of [payload.custom_planted_extent_ha, payload.custom_yield_mt_ha]) {
+    if (value !== undefined && (!Number.isFinite(value) || value < 0)) throw new Error("Area and yield must be finite, non-negative numbers.")
   }
+  const data = await postApi("/api/simulate", payload)
+  if (data.crop !== payload.crop || !Number.isFinite(data.area_ha) || data.area_ha < 0 || !Number.isFinite(data.yield_mt_ha) || data.yield_mt_ha < 0) {
+    throw new Error("Invalid simulation response")
+  }
+  return data
 }
 
 export async function fetchGapTimeline(cropId?: string, season?: string, leadWeeks?: number) {
   const data = await readApi('/api/forecasts/gap-timeline', { crop_id: cropId, season, lead_weeks: leadWeeks })
-  if (!Array.isArray(data.timelines)) throw new Error('Invalid gap timeline response')
+  if (!Array.isArray(data.timelines) || data.timelines.some((timeline: any) =>
+    !timeline || typeof timeline.crop_id !== "string" || typeof timeline.decision_deadline !== "string" ||
+    typeof timeline.import_lead_weeks !== "number" || typeof timeline.days_remaining !== "number" ||
+    !Array.isArray(timeline.options))) throw new Error('Invalid gap timeline response')
   return data
 }
 
 export async function fetchPriceOutlook(cropId?: string) {
   const data = await readApi('/api/forecasts/price-outlook', { crop_id: cropId })
   if (!data.crops || typeof data.crops !== 'object' || Array.isArray(data.crops)) throw new Error('Invalid price outlook response')
+  if (cropId && data.crops[cropId] !== undefined && typeof data.crops[cropId] !== 'object') throw new Error('Invalid price forecast for this crop')
   return data
 }
 
 export async function fetchAdoptionSummary(cropId?: string, season?: string) {
   const data = await readApi('/api/adoption/summary', { crop_id: cropId, season })
-
+  if (typeof data.data_available !== "boolean") throw new Error('Invalid adoption summary response')
   return data
 }
 
@@ -314,7 +333,7 @@ export async function fetchGroundReports(cropId?: string, district?: string) {
 
 export async function fetchDataCatalogue() {
   const data = await readApi('/api/catalogue', {})
-  if (!Array.isArray(data)) throw new Error('Invalid catalogue response')
+  if (!Array.isArray(data) || data.some((item: any) => !item || typeof item.dataset_id !== "string" || typeof item.title !== "string")) throw new Error('Invalid catalogue response')
   return data
 }
 
@@ -439,82 +458,38 @@ export async function logDecisionActionApi(payload: DecisionLogPayloadApi): Prom
   return data
 }
 
-export function mapApiRecordToPolicyDecision(r: DecisionRecordApi): {
-  id: string
-  date: string
-  timestamp: string
-  crop: string
-  district: string
-  modelVersion: string
-  dataVersion: string
-  assumptions: string
-  leadTime: number
-  action: string
-  category: "Import quota" | "Storage buffer" | "Tariff adjustment" | "Price alert"
-  officer: string
-  designation: string
-  status: "Active" | "Executed" | "Superseded"
-  notes?: string
-  confidence?: string
-  sha256Hash: string
-  impactEstimate?: string
-} {
+export function mapApiRecordToPolicyDecision(r: DecisionRecordApi): import("./types").PolicyDecision {
   const dt = new Date(r.timestamp)
-  const isValidDate = !isNaN(dt.getTime())
-  const dateStr = isValidDate
-    ? dt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
-    : r.timestamp.slice(0, 10)
-  const timeStr = isValidDate
-    ? dt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) + " UTC"
-    : r.timestamp.slice(11, 19) + " UTC"
-
-  const cropName =
-    r.crop_id === "big_onion"
-      ? "Big onion"
-      : r.crop_id === "chilli"
-        ? "Chilli"
-        : r.crop_id.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-
-  let category: "Import quota" | "Storage buffer" | "Tariff adjustment" | "Price alert" = "Import quota"
-  const act = (r.action_type || "").toUpperCase()
-  if (act.includes("STORAGE") || act.includes("HOLD") || act.includes("BUFFER")) {
-    category = "Storage buffer"
-  } else if (act.includes("TARIFF") || act.includes("DUTY") || act.includes("LEVY")) {
-    category = "Tariff adjustment"
-  } else if (act.includes("ADVISORY") || act.includes("PLANT")) {
-    category = "Price alert"
-  }
-
-  const sha256 = isReceiptHash(r.record_hash) ? r.record_hash : isReceiptHash(r.hash) ? r.hash : ""
-
-  const assumptionsStr =
-    typeof r.assumptions === "object" && r.assumptions !== null
-      ? Object.entries(r.assumptions)
-          .filter(([k]) => k !== "notes")
-          .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
-          .join(" · ")
-      : String(r.assumptions || "")
-
-  const actionDisplay = `${r.action_type.replace(/_/g, " ")}${r.quantity ? ` (${r.quantity.toLocaleString()} ${r.unit})` : ""}`
-
+  const validDate = Number.isFinite(dt.getTime())
+  const action = r.action_type || "Not available"
+  const act = action.toUpperCase()
+  const category = /STORAGE|HOLD|BUFFER/.test(act) ? "Storage buffer"
+    : /TARIFF|DUTY|LEVY/.test(act) ? "Tariff adjustment"
+    : /ADVISORY|PLANT/.test(act) ? "Planting advisory"
+    : /IMPORT/.test(act) ? "Import quota" : "Other"
+  const assumptions = r.assumptions || {}
+  const lead = assumptions.lead_time_weeks ?? assumptions.import_lead_time_weeks
   return {
     id: serverId(r.decision_id) || "",
-    date: dateStr,
-    timestamp: timeStr,
-    crop: cropName,
-    district: r.assumptions?.district || "Anuradhapura",
-    modelVersion: r.model_version || "LightGBM-v2.1+HiGHS-LP",
-    dataVersion: r.data_version || "CBSL-HARTI-DOA-2024.12",
-    assumptions: assumptionsStr || `Loss 15% · Target ${r.quantity} ${r.unit}`,
-    leadTime: r.assumptions?.lead_time_weeks || 7,
-    action: actionDisplay,
+    runId: serverId(r.run_id) || "",
+    season: r.season,
+    quantity: r.quantity,
+    unit: r.unit,
+    date: validDate ? dt.toLocaleDateString("en-GB", { timeZone: "UTC" }) : "Not available",
+    timestamp: validDate ? dt.toISOString() : "Not available",
+    crop: (r.crop_id || "Not available").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
+    district: assumptions.district || "Not available",
+    modelVersion: r.model_version || "Not available",
+    dataVersion: r.data_version || "Not available",
+    assumptions: Object.keys(assumptions).length ? JSON.stringify(assumptions) : "Not available",
+    leadTime: typeof lead === "number" && Number.isFinite(lead) ? lead : null,
+    action: `${action.replace(/_/g, " ")}${Number.isFinite(r.quantity) ? ` (${r.quantity} ${r.unit || ""})` : ""}`,
     category,
     officer: serverId(r.officer_id) || "Not available",
-    designation: "Authorized Agricultural Decision Maker",
-    status: "Active",
-    notes: r.rationale || (r.assumptions?.notes as string) || "System recorded policy directive.",
-    sha256Hash: sha256,
-    impactEstimate: r.rationale,
+    designation: "Not available",
+    status: "Not available",
+    notes: r.rationale || "",
+    sha256Hash: isReceiptHash(r.record_hash) ? r.record_hash : isReceiptHash(r.hash) ? r.hash : "",
   }
 }
 
@@ -533,54 +508,32 @@ export interface ConfidenceBadgeEvaluation {
   soil_data_present: boolean
   reasons: string[]
   data_age_days?: number
+  is_demo?: boolean
+  data_quality?: string
   isLive?: boolean
 }
 
 export async function fetchConfidenceBadge(
   cropId: string = "big_onion",
-  dataAgeDays: number = 15,
-  areaReportedShare: number = 0.35,
-  soilPhAvailable: boolean = true,
+  dataAgeDays?: number,
+  areaReportedShare?: number,
+  soilPhAvailable?: boolean,
 ): Promise<ConfidenceBadgeEvaluation> {
   const normCrop = cropId.toLowerCase().includes("chilli")
     ? "chilli"
     : cropId.toLowerCase().includes("onion")
       ? "big_onion"
       : cropId.toLowerCase().replace(/\s+/g, "_")
-  try {
-    const url = new URL(`${API_BASE_URL}/api/confidence/badge`)
-    url.searchParams.set("crop_id", normCrop)
-    url.searchParams.set("data_age_days", String(dataAgeDays))
-    url.searchParams.set("area_reported_share", String(areaReportedShare))
-    url.searchParams.set("soil_ph_available", String(soilPhAvailable))
-    const res = await fetch(url.toString())
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = await res.json()
-    return { ...data, data_age_days: dataAgeDays, isLive: true }
-  } catch (err) {
-    const isChilli = normCrop === "chilli"
-    return {
-      crop_id: normCrop,
-      badge: isChilli ? "low" : "high",
-      score_pct: isChilli ? 60.0 : 80.0,
-      data_fresh: dataAgeDays <= 45,
-      area_reported_share_adequate: areaReportedShare >= 0.20,
-      model_beats_baseline: true,
-      spi_validation_passed: !isChilli,
-      soil_data_present: soilPhAvailable,
-      reasons: [
-        `Data is fresh (${dataAgeDays} days old, limit 45 days).`,
-        `Ground acreage coverage adequate (${(areaReportedShare * 100).toFixed(1)}% reported).`,
-        `Production model beats baseline.`,
-        isChilli
-          ? `SPI thesis unverified: Chilli market dynamics driven by uncoordinated green vs dry arbitrage.`
-          : `SPI thesis verified against historical price changes.`,
-        `Site soil pH agronomic data verified.`,
-      ],
-      data_age_days: dataAgeDays,
-      isLive: false,
-    }
-  }
+  const url = apiUrl("/api/confidence/badge")
+  url.searchParams.set("crop_id", normCrop)
+  if (dataAgeDays !== undefined) url.searchParams.set("data_age_days", String(dataAgeDays))
+  if (areaReportedShare !== undefined) url.searchParams.set("area_reported_share", String(areaReportedShare))
+  if (soilPhAvailable !== undefined) url.searchParams.set("soil_ph_available", String(soilPhAvailable))
+  const response = await fetch(url.toString(), { headers: getAuthHeaders() })
+  if (!response.ok) throw new Error(`Could not load confidence badge (HTTP ${response.status})`)
+  const data = await response.json()
+  if (!data || !["high", "medium", "low"].includes(data.badge) || !Array.isArray(data.reasons)) throw new Error("Invalid confidence response")
+  return { ...data, isLive: true }
 }
 
 // ---------------------------------------------------------------------------
@@ -666,7 +619,7 @@ export async function loginUser(
     const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, role }),
+      body: JSON.stringify({ username: email.trim(), password, role: role?.toLowerCase() }),
     })
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}))
@@ -677,11 +630,25 @@ export async function loginUser(
       }
     }
     const data = await res.json()
-    saveAuthSession(data.access_token, data.user)
+    const token = typeof data.access_token === "string" ? data.access_token : ""
+    const rawUser = data.user
+    const returnedRole = typeof rawUser?.role === "string" ? rawUser.role.toLowerCase() : ""
+    if (!token || !rawUser || !["officer", "admin", "farmer"].includes(returnedRole)) {
+      return { success: false, error: "Authentication response was incomplete." }
+    }
+    const user: AuthUser = {
+      email: String(rawUser.email || email).trim(),
+      role: returnedRole === "admin" ? "Admin" : returnedRole === "farmer" ? "Farmer" : "Officer",
+      name: String(rawUser.name || "Authenticated user"),
+      designation: String(rawUser.designation || "Authenticated user"),
+      district: String(rawUser.district || "Not available"),
+      officer_id: String(rawUser.officer_id || ""),
+    }
+    saveAuthSession(token, user)
     return {
       success: true,
-      token: data.access_token,
-      user: data.user,
+      token,
+      user,
     }
   } catch (err) {
     // If backend cannot be reached, validate credentials with authorized baseline
@@ -689,6 +656,40 @@ export async function loginUser(
       success: false,
       error: "Authentication failed. Server is unreachable or credentials are invalid.",
     }
+  }
+}
+
+export async function registerUser(payload: {
+  full_name: string
+  role: "officer" | "farmer"
+  district: string
+  username: string
+  password: string
+}): Promise<LoginResult> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) return { success: false, error: data.detail || `Registration failed (HTTP ${res.status}).` }
+    const token = typeof data.access_token === "string" ? data.access_token : ""
+    const rawUser = data.user
+    const returnedRole = typeof rawUser?.role === "string" ? rawUser.role.toLowerCase() : payload.role
+    if (!token || !rawUser || !["officer", "farmer"].includes(returnedRole)) return { success: false, error: "Registration response was incomplete." }
+    const user: AuthUser = {
+      email: String(rawUser.username || payload.username),
+      role: returnedRole === "farmer" ? "Farmer" : "Officer",
+      name: String(rawUser.full_name || payload.full_name),
+      designation: returnedRole === "farmer" ? "Registered Farmer" : "Agricultural Extension Officer",
+      district: String(rawUser.district || payload.district),
+      officer_id: "",
+    }
+    saveAuthSession(token, user)
+    return { success: true, token, user }
+  } catch {
+    return { success: false, error: "Registration failed. Check your connection and try again." }
   }
 }
 
