@@ -48,6 +48,13 @@ SEED_USERS = [
         "district": "National / HQ",
     },
     {
+        "username": "gayanathkrishan06@gmail.com",
+        "password_hash": "$2b$12$GZPqHYtv6g2VfbvvyKheJe77jUllhAv9fSLDQ427wf1SqrxpKaUTi",
+        "role": "admin",
+        "name": "Gayanath Krishan",
+        "district": "National / HQ",
+    },
+    {
         "username": "sunil@farmer.govisense.lk",
         "password": "farmer123",
         "role": "farmer",
@@ -65,6 +72,11 @@ def ensure_seed_users() -> None:
         with get_session() as session:
             for u in SEED_USERS:
                 existing = session.query(UserModel).filter(UserModel.username == u["username"]).first()
+                if existing and u["username"] == "gayanathkrishan06@gmail.com":
+                    existing.password_hash = u["password_hash"]
+                    existing.role_code = "admin"
+                    existing.full_name = u["name"]
+                    continue
                 if not existing:
                     if u["role"] in ("officer", "admin") and u.get("officer_id"):
                         ensure_officer(
@@ -87,7 +99,7 @@ def ensure_seed_users() -> None:
 
                     new_user = UserModel(
                         username=u["username"],
-                        password_hash=hash_password(u["password"]),
+                        password_hash=u.get("password_hash") or hash_password(u["password"]),
                         role_code=u["role"],
                         officer_id=u.get("officer_id"),
                         pseudonymous_id=u.get("pseudonymous_id"),
