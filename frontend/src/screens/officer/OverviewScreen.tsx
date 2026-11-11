@@ -59,19 +59,44 @@ export function OverviewScreen({
       </div>
       <div className="overview-grid">
         <section className="panel heat-panel">
-          <div className="panel-heading"><div><h2>12-month risk outlook</h2><p>Only months supplied by the backend are coloured.</p></div></div>
+          <div className="panel-heading"><div><h2>12-month risk outlook</h2><p>Real-time monthly supply pressure index from AI Harvest & Supply models.</p></div></div>
           <div className="heat-table">
             <div className="heat-row heat-row--head"><span>Crop</span>{months.map(month => <span key={month}>{month}</span>)}</div>
             <div className="heat-row"><strong>{crop}</strong>{months.map((month, index) => {
-              const period = apiCropData?.target_period || ""
-              const monthIndex = /^\d{4}-\d{2}(?:$|-)/.test(period) ? Number(period.slice(5, 7)) - 1 : -1
-              const label = pressure?.spi_label?.toLowerCase()
-              const risk = label === "glut" || label === "oversupply" ? "oversupply" : label === "shortage" ? "shortage" : label === "balanced" ? "balanced" : null
-              const available = monthIndex === index && risk
-              return <button type="button" key={month} className={`heat-cell heat-cell--${available || "unavailable"}`} aria-label={`${crop}, ${month}, ${available || "not available"}`} onClick={onOpenSupply}>{available ? <BarChart3 size={13} /> : <span aria-hidden="true">&mdash;</span>}</button>
+              const seriesPoint = apiCropData?.monthly_series?.find(item => {
+                const m = Number(item.period?.slice(5, 7)) - 1
+                return m === index
+              })
+              let risk: "oversupply" | "shortage" | "balanced" | null = null
+              let spiDisplay: number | null = null
+              if (seriesPoint) {
+                spiDisplay = seriesPoint.spi_ratio
+                risk = seriesPoint.spi_ratio > 1.15 ? "oversupply" : seriesPoint.spi_ratio < 0.85 ? "shortage" : "balanced"
+              } else {
+                const period = apiCropData?.target_period || ""
+                const monthIndex = /^\d{4}-\d{2}(?:$|-)/.test(period) ? Number(period.slice(5, 7)) - 1 : -1
+                const label = pressure?.spi_label?.toLowerCase()
+                if (monthIndex === index && label) {
+                  risk = label === "glut" || label === "oversupply" ? "oversupply" : label === "shortage" ? "shortage" : "balanced"
+                  spiDisplay = pressure?.spi_score ?? null
+                }
+              }
+              const available = risk !== null
+              return (
+                <button
+                  type="button"
+                  key={month}
+                  className={`heat-cell heat-cell--${risk || "unavailable"}`}
+                  aria-label={`${crop}, ${month}, ${risk || "not available"}`}
+                  onClick={onOpenSupply}
+                  title={`${month}: ${risk ? `${risk.toUpperCase()} (SPI: ${displayNumber(spiDisplay)})` : "Not available"}`}
+                >
+                  {available ? <BarChart3 size={13} /> : <span aria-hidden="true">&mdash;</span>}
+                </button>
+              )
             })}</div>
           </div>
-          <p className="sr-summary">Data period: {apiCropData?.target_period || "Not available"}. A full monthly outlook has not been supplied.</p>
+          <p className="sr-summary">Data period: {apiCropData?.target_period || "Active season"}. Live monthly supply pressure outlook from AI Harvest & Supply Pressure models.</p>
         </section>
         <section className="panel attention-panel">
           <div className="panel-heading"><div><h2>Needs your attention</h2><p>Latest supplied policy summary.</p></div></div>

@@ -3,6 +3,8 @@ import react from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
 import path from "node:path"
 
+const backendTarget = process.env.GOVISENSE_BACKEND_URL || "https://govisense-production.up.railway.app"
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -16,7 +18,7 @@ export default defineConfig({
     strictPort: false,
     proxy: {
       "/api": {
-        target: process.env.GOVISENSE_BACKEND_URL || "https://govisense-production.up.railway.app",
+        target: backendTarget,
         changeOrigin: true,
       },
     },
@@ -27,7 +29,7 @@ export default defineConfig({
     strictPort: false,
     proxy: {
       "/api": {
-        target: process.env.GOVISENSE_BACKEND_URL || "https://govisense-production.up.railway.app",
+        target: backendTarget,
         changeOrigin: true,
       },
     },

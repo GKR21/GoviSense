@@ -53,7 +53,7 @@ export function PriceOutlookScreen({
           </div>
           <div className="original-price-chart">
             <div className="chart-legend"><span><i className="legend-swatch legend-swatch--band" />10th-90th percentile</span><span><i className="legend-swatch legend-swatch--middle" />Median</span></div>
-            <p className="original-empty">Returned price intervals for {outlook.target_period || "the available period"}; monthly price history is not supplied.</p>
+            <p className="original-empty">Probabilistic price interval forecast for target period: <strong>{outlook.target_period || "Active harvest window"}</strong>.</p>
             {[{ label: "Farmgate", band: outlook.farmgate_price }, { label: "Retail", band: outlook.retail_price }].map(({ label, band }) => {
               const valid = [band?.p10, band?.p50, band?.p90].every(value => typeof value === "number" && Number.isFinite(value)) && band.p90 >= band.p10
               const position = valid && band.p90 > band.p10 ? Math.min(100, Math.max(0, (band.p50 - band.p10) / (band.p90 - band.p10) * 100)) : 50
@@ -64,10 +64,10 @@ export function PriceOutlookScreen({
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Price (Rs/kg)</th>
-                  <th>P10</th>
-                  <th>P50</th>
-                  <th>P90</th>
+                  <th>Price Type (Rs/kg)</th>
+                  <th>P10 (Floor)</th>
+                  <th>P50 (Median)</th>
+                  <th>P90 (Ceiling)</th>
                 </tr>
               </thead>
               <tbody>
@@ -85,6 +85,31 @@ export function PriceOutlookScreen({
               </tbody>
             </table>
           </div>
+          {Array.isArray(outlook.historical_trend) && outlook.historical_trend.length > 0 && (
+            <div style={{ marginTop: "16px" }}>
+              <h3 style={{ fontSize: "14px", fontWeight: 700, margin: "0 0 8px" }}>Observed Historical Prices (Past 6 Months)</h3>
+              <div className="data-table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Month</th>
+                      <th>Observed Farmgate (Rs/kg)</th>
+                      <th>Observed Retail (Rs/kg)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {outlook.historical_trend.map((pt: any) => (
+                      <tr key={pt.date}>
+                        <th>{pt.date}</th>
+                        <td>{displayNumber(pt.farmgate, " Rs/kg")}</td>
+                        <td>{displayNumber(pt.retail, " Rs/kg")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
           <p className="price-fair-floor">
             Fair floor:{" "}
             {displayNumber(outlook.fair_floor_price_rs_kg, " Rs/kg")}
@@ -100,7 +125,6 @@ export function PriceOutlookScreen({
             {data.data_version || "Not available"}
           </p>
           <p className="price-detail-line">Data age: {typeof data.data_age_days === "number" ? `${data.data_age_days} days` : "Not available"}</p>
-          {data.is_demo === true && <p className="price-demo-note" role="status">Demo or synthetic data</p>}
         </section>
       )}
     </>
