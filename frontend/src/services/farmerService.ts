@@ -21,6 +21,10 @@ export const initialFarmerProfile: FarmerProfileData = {
   primaryCropInterest: "", pseudonymousConsent: false, dataVersion: "", lastSyncTime: "",
 }
 
+function createFarmerProfile(): FarmerProfileData {
+  return { ...initialFarmerProfile }
+}
+
 const CROP_IMAGE_MAP: Record<string, { image: string; photoCredit: string; scientificName: string }> = {
   big_onion: {
     image: "https://images.unsplash.com/photo-1600807644626-fb3c8c8ba40d?auto=format&fit=crop&w=800&q=80",

@@ -44,7 +44,7 @@ export function AdoptionScreen({
           </Button>
         }
       />
-      <section className="panel large-data-panel">
+      <section className="panel large-data-panel adoption-summary-panel">
         <h2>Reported adoption</h2>
         <ApiDataState
           loading={summary.loading}
@@ -84,7 +84,7 @@ export function AdoptionScreen({
             </div>
           ))}
       </section>
-      <div className="overview-grid">
+      <div className="overview-grid adoption-layout">
       <section className="panel adoption-panel">
         <h2>Adoption simulation</h2>
         <p>
