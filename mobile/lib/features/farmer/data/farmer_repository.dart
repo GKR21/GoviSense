@@ -71,6 +71,7 @@ class FarmerRepository extends ChangeNotifier {
       name: user.name ?? '',
       district: user.district ?? '',
       totalLandAcres: 0,
+      soilPh: 6.5,
     );
     _crops = <CropItem>[];
     _reports = <PlantingReport>[];
@@ -98,6 +99,7 @@ class FarmerRepository extends ChangeNotifier {
       district: effDist,
       division: _profile.division,
       totalLandAcres: totalLandAcres ?? _profile.totalLandAcres,
+      soilPh: (_profile.soilPh >= 5.0 && _profile.soilPh <= 8.0) ? _profile.soilPh : 6.5,
       lastSyncTime: 'Just now',
     );
     notifyListeners();

@@ -15,6 +15,7 @@ import 'widgets/mini_gauge_widget.dart';
 import 'widgets/water_drops_widget.dart';
 import 'widgets/why_advice_bottom_sheet.dart';
 import 'widgets/digital_farmer_card_widget.dart';
+import 'widgets/crop_image.dart';
 import 'crop_detail_page.dart';
 import 'market_prices_page.dart';
 import '../../../shared/widgets/premium_confirm_dialog.dart';
@@ -63,7 +64,10 @@ class _FarmerPageState extends State<FarmerPage> {
     super.initState();
     _profileLandAcres = _repo.profile.totalLandAcres;
     _profileIsRainfed = _repo.profile.isRainfed;
-    _profileSoilPh = _repo.profile.soilPh;
+    _profileSoilPh =
+        (_repo.profile.soilPh >= 5.0 && _repo.profile.soilPh <= 8.0)
+        ? _repo.profile.soilPh
+        : 6.5;
     _repo.addListener(_onRepoUpdated);
     _repo.checkBackendConnection();
     _repo.refreshRecommendations();
@@ -79,6 +83,12 @@ class _FarmerPageState extends State<FarmerPage> {
 
   void _onRepoUpdated() {
     if (mounted) {
+      if (_profileSoilPh < 5.0 || _profileSoilPh > 8.0) {
+        _profileSoilPh =
+            (_repo.profile.soilPh >= 5.0 && _repo.profile.soilPh <= 8.0)
+            ? _repo.profile.soilPh
+            : 6.5;
+      }
       if (_repo.crops.isNotEmpty &&
           !_repo.crops.any((c) => c.id == _selectedCropId)) {
         _selectedCropId = _repo.crops.first.id;
@@ -576,6 +586,13 @@ class _FarmerPageState extends State<FarmerPage> {
                       Text(
                         _repo.decPriceSummary,
                         style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       const LocalizedText(
                         'Live wholesale & retail prices across Sri Lankan DECs',
                         style: TextStyle(
@@ -809,15 +826,11 @@ class _FarmerPageState extends State<FarmerPage> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                crop.imageUrl,
+              child: CropImage(
+                url: crop.imageUrl,
                 height: 56,
                 width: 56,
                 fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => const ColoredBox(
-                  color: AppTheme.primaryTint,
-                  child: Icon(Icons.image_not_supported_outlined),
-                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -1004,15 +1017,11 @@ class _FarmerPageState extends State<FarmerPage> {
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(21),
                 ),
-                child: Image.network(
-                  crop.imageUrl,
+                child: CropImage(
+                  url: crop.imageUrl,
                   height: 140,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => const ColoredBox(
-                    color: AppTheme.primaryTint,
-                    child: Icon(Icons.image_not_supported_outlined),
-                  ),
                 ),
               ),
               Positioned(
@@ -1302,8 +1311,8 @@ class _FarmerPageState extends State<FarmerPage> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        c.imageUrl,
+                      child: CropImage(
+                        url: c.imageUrl,
                         height: 48,
                         width: 48,
                         fit: BoxFit.cover,
@@ -1353,12 +1362,13 @@ class _FarmerPageState extends State<FarmerPage> {
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [0.5, 1.0, 1.5, 2.0, 3.0].map((acres) {
-              final isSelected = _reportedAreaAcres == acres;
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 3),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [0.5, 1.0, 1.5, 2.0, 3.0].map((acres) {
+                final isSelected = _reportedAreaAcres == acres;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
                   child: ChoiceChip(
                     label: LocalizedText('$acres ac'),
                     selected: isSelected,
@@ -1371,9 +1381,9 @@ class _FarmerPageState extends State<FarmerPage> {
                       fontSize: 11,
                     ),
                   ),
-                ),
-              );
-            }).toList(),
+                );
+              }).toList(),
+            ),
           ),
           const SizedBox(height: 18),
           const LocalizedText(
@@ -2344,12 +2354,13 @@ class _FarmerPageState extends State<FarmerPage> {
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 6),
-              Row(
-                children: [0.5, 1.0, 1.5, 2.0, 3.0].map((acres) {
-                  final isSelected = _profileLandAcres == acres;
-                  return Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [0.5, 1.0, 1.5, 2.0, 3.0].map((acres) {
+                    final isSelected = _profileLandAcres == acres;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
                       child: ChoiceChip(
                         label: LocalizedText('$acres'),
                         selected: isSelected,
@@ -2362,9 +2373,9 @@ class _FarmerPageState extends State<FarmerPage> {
                           fontSize: 11,
                         ),
                       ),
-                    ),
-                  );
-                }).toList(),
+                    );
+                  }).toList(),
+                ),
               ),
               const SizedBox(height: 14),
               // Irrigation Toggle
@@ -2464,7 +2475,7 @@ class _FarmerPageState extends State<FarmerPage> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: LocalizedText(
-                      '${_profileSoilPh.toStringAsFixed(1)} pH',
+                      '${_profileSoilPh.clamp(5.0, 8.0).toStringAsFixed(1)} pH',
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -2475,13 +2486,14 @@ class _FarmerPageState extends State<FarmerPage> {
                 ],
               ),
               Slider(
-                value: _profileSoilPh,
+                value: _profileSoilPh.clamp(5.0, 8.0),
                 min: 5.0,
                 max: 8.0,
                 divisions: 30,
                 activeColor: AppTheme.primary,
-                label: _profileSoilPh.toStringAsFixed(1),
-                onChanged: (val) => setState(() => _profileSoilPh = val),
+                label: _profileSoilPh.clamp(5.0, 8.0).toStringAsFixed(1),
+                onChanged: (val) =>
+                    setState(() => _profileSoilPh = val.clamp(5.0, 8.0)),
               ),
               const SizedBox(height: 8),
               // Recalibrate Button
