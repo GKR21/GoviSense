@@ -76,6 +76,7 @@ export const OFFICER_NAV_ITEMS = [
   "Adoption tracker",
   "Decision history",
   "Data sources",
+  "Model evaluation",
 ] as const
 
 export type OfficerPage = typeof OFFICER_NAV_ITEMS[number] | "Settings" | "Login"

@@ -37,6 +37,7 @@ import {
   Warehouse,
   X,
   Zap,
+  Target,
 } from "lucide-react"
 import { cx, type View, type ScreenState, type OfficerPage, type PolicyDecision, type GroundReport } from "../../types"
 import {
@@ -72,6 +73,7 @@ import { PriceOutlookScreen } from "./PriceOutlookScreen"
 import { AdoptionScreen } from "./AdoptionScreen"
 import { HistoryScreen } from "./HistoryScreen"
 import { DataSourcesScreen } from "./DataSourcesScreen"
+import { EvaluationScreen } from "./EvaluationScreen"
 import { SettingsScreen } from "./SettingsScreen"
 import { LoginScreen } from "./LoginScreen"
 
@@ -83,6 +85,7 @@ const officerNav = [
   ["Adoption tracker", Users],
   ["Decision history", History],
   ["Data sources", Database],
+  ["Model evaluation", Target],
 ] as const
 
 export function OfficerScreen({
@@ -434,6 +437,8 @@ export function OfficerScreen({
               crop={selectedCrop}
               isLiveApi={isLiveApi}
             />
+          ) : page === "Model evaluation" ? (
+            <EvaluationScreen cropId={cropApiKey} />
           ) : page === "Settings" ? (
             <SettingsScreen />
           ) : (
